@@ -1,0 +1,108 @@
+from pathlib import Path
+
+import pymupdf
+import pytest
+from PIL import ImageFont
+
+from lao_document_ocr.capture_suite import (
+    generate_capture_suite,
+    load_capture_suite,
+)
+from lao_document_ocr.capture_templates import CaptureTemplate
+
+
+def _font_path() -> Path:
+    candidates = [
+        Path("/usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf"),
+        Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+        Path("/Library/Fonts/Arial.ttf"),
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", size=20)
+        path = getattr(font, "path", None)
+        if path and Path(path).is_file():
+            return Path(path)
+    except OSError:
+        pass
+    pytest.skip("No TrueType font available for capture suite test")
+
+
+def test_generate_capture_suite_builds_combined_pdf(tmp_path) -> None:
+    manifest_path = generate_capture_suite(
+        [
+            "ສະບາຍດີ ໂລກ",
+            "ຂອບໃຈ ຫຼາຍ",
+            "Lao OCR 2026",
+            "ລາຄາ 20,000 ກີບ",
+        ],
+        tmp_path / "suite",
+        _font_path(),
+        suite_id="baseline",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        templates=[
+            CaptureTemplate.PLAIN,
+            CaptureTemplate.TWO_COLUMN,
+            CaptureTemplate.RULED_TABLE,
+        ],
+        dpi=96,
+        lines_per_page=4,
+        max_pages_per_template=1,
+    )
+
+    suite = load_capture_suite(manifest_path)
+    root = manifest_path.parent
+
+    assert suite.suite_id == "baseline"
+    assert [pack.template for pack in suite.packs] == [
+        "plain",
+        "two-column",
+        "ruled-table",
+    ]
+    assert all(pack.page_count == 1 for pack in suite.packs)
+    assert all((root / pack.manifest).is_file() for pack in suite.packs)
+    assert all((root / pack.printable_pdf).is_file() for pack in suite.packs)
+
+    combined = root / suite.combined_pdf
+    assert combined.is_file()
+    pdf = pymupdf.open(combined)
+    try:
+        assert pdf.page_count == 3
+    finally:
+        pdf.close()
+
+
+def test_capture_suite_defaults_to_all_templates(tmp_path) -> None:
+    manifest_path = generate_capture_suite(
+        ["ສະບາຍດີ", "ຂອບໃຈ", "OCR", "20,000 ₭"],
+        tmp_path / "suite",
+        _font_path(),
+        suite_id="all",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        dpi=96,
+        lines_per_page=4,
+        max_pages_per_template=1,
+    )
+
+    suite = load_capture_suite(manifest_path)
+    assert {pack.template for pack in suite.packs} == {
+        template.value for template in CaptureTemplate
+    }
+
+
+def test_capture_suite_rejects_duplicate_templates(tmp_path) -> None:
+    with pytest.raises(ValueError, match="unique"):
+        generate_capture_suite(
+            ["one line"],
+            tmp_path / "suite",
+            _font_path(),
+            suite_id="duplicate",
+            text_license="CC0-1.0",
+            text_provenance="Unit-test corpus",
+            templates=[CaptureTemplate.PLAIN, CaptureTemplate.PLAIN],
+            dpi=96,
+        )

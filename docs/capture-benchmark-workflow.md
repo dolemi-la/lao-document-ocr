@@ -85,6 +85,8 @@ baseline-v1/
 
 The printable PDF and digital page PNGs are reproducible source pages.
 
+For multi-layout campaigns, generate one combined suite instead of separate packs. See [capture-suite.md](capture-suite.md).
+
 ## 3. Capture real optical versions
 
 Print at approximately 100% scale.

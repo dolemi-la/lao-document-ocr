@@ -437,3 +437,49 @@ def test_dataset_report_cli(tmp_path, monkeypatch, capsys) -> None:
     assert payload["validation"]["ok"] is True
     captured = capsys.readouterr()
     assert "Validation: ok" in captured.out
+
+
+def test_generate_capture_suite_cli(tmp_path, monkeypatch, capsys) -> None:
+    corpus = tmp_path / "suite-corpus.txt"
+    output = tmp_path / "suite"
+    corpus.write_text(
+        "ສະບາຍດີ ໂລກ\nຂອບໃຈ ຫຼາຍ\nLao OCR 2026\nລາຄາ 20,000 ກີບ\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "generate-capture-suite",
+            "--corpus",
+            str(corpus),
+            "--output",
+            str(output),
+            "--font",
+            str(_cli_font_path()),
+            "--suite-id",
+            "cli-suite",
+            "--text-license",
+            "CC0-1.0",
+            "--text-provenance",
+            "CLI unit-test corpus",
+            "--dpi",
+            "96",
+            "--max-pages-per-template",
+            "1",
+            "--template",
+            "plain",
+            "--template",
+            "receipt",
+        ],
+    )
+
+    assert main() == 0
+    manifest = output / "capture-suite.json"
+    combined = output / "cli-suite.pdf"
+    assert manifest.is_file()
+    assert combined.is_file()
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert [pack["template"] for pack in payload["packs"]] == ["plain", "receipt"]
+    assert "Combined PDF:" in capsys.readouterr().out

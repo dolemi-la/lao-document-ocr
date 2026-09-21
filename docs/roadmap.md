@@ -29,6 +29,7 @@ Status: in progress
 - [x] dataset coverage/integrity report + duplicate-image detection
 - [x] multi-axis benchmark tags and per-tag CER/WER
 - [x] structured printable capture templates for multi-column/table/receipt/form collection
+- [x] combined multi-template capture suite generator
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos

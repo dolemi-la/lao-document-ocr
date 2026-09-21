@@ -191,6 +191,33 @@ def _parser() -> argparse.ArgumentParser:
         default="plain",
     )
 
+    capture_suite = subparsers.add_parser(
+        "generate-capture-suite",
+        help="Generate multiple capture templates plus one combined printable PDF.",
+    )
+    capture_suite.add_argument("--corpus", required=True, type=Path)
+    capture_suite.add_argument("--output", required=True, type=Path)
+    capture_suite.add_argument("--font", required=True, type=Path)
+    capture_suite.add_argument("--suite-id", required=True)
+    capture_suite.add_argument("--text-license", required=True)
+    capture_suite.add_argument("--text-provenance", required=True)
+    capture_suite.add_argument("--dpi", type=int, default=150)
+    capture_suite.add_argument("--lines-per-page", type=int, default=8)
+    capture_suite.add_argument("--max-pages-per-template", type=int)
+    capture_suite.add_argument(
+        "--template",
+        action="append",
+        choices=[
+            "plain",
+            "two-column",
+            "ruled-table",
+            "borderless-table",
+            "receipt",
+            "form",
+        ],
+        help="Repeat to select templates. Omit to generate all templates.",
+    )
+
     capture_register = subparsers.add_parser(
         "register-capture",
         help="Register a released flatbed/phone capture from a capture-pack page.",
@@ -516,6 +543,32 @@ def _generate_capture_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def _generate_capture_suite(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_suite import generate_capture_suite
+    from lao_document_ocr.capture_templates import CaptureTemplate
+
+    templates = (
+        [CaptureTemplate(value) for value in args.template]
+        if args.template
+        else None
+    )
+    manifest = generate_capture_suite(
+        load_corpus(args.corpus),
+        args.output,
+        args.font,
+        suite_id=args.suite_id,
+        text_license=args.text_license,
+        text_provenance=args.text_provenance,
+        templates=templates,
+        dpi=args.dpi,
+        lines_per_page=args.lines_per_page,
+        max_pages_per_template=args.max_pages_per_template,
+    )
+    print(f"Capture suite: {manifest}")
+    print(f"Combined PDF: {manifest.parent / (args.suite_id + '.pdf')}")
+    return 0
+
+
 def _register_capture(args: argparse.Namespace) -> int:
     from lao_document_ocr.capture_registration import (
         CaptureMode,
@@ -661,6 +714,8 @@ def main() -> int:
             return _generate_synthetic(args)
         if args.command == "generate-capture-pack":
             return _generate_capture_pack(args)
+        if args.command == "generate-capture-suite":
+            return _generate_capture_suite(args)
         if args.command == "register-capture":
             return _register_capture(args)
         if args.command == "train-recognizer":

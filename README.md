@@ -217,6 +217,7 @@ lao-ocr bundle-benchmarks --ocr ocr.json --layout layout.json --docx docx.json -
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
 lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf>
 lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-v1 --font <font.ttf> --pack-id baseline-v1 --text-license CC0-1.0 --text-provenance <source> --template plain
+lao-ocr generate-capture-suite --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-suite-v1 --font <font.ttf> --suite-id baseline-suite-v1 --text-license CC0-1.0 --text-provenance <source>
 lao-ocr register-capture --help
 lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2
 lao-ocr export-recognizer --checkpoint training/runs/crnn-v2/recognizer.pt --output training/runs/crnn-v2/recognizer.pt2
@@ -236,6 +237,7 @@ See:
 - [docs/benchmark-bundles.md](docs/benchmark-bundles.md)
 - [docs/benchmark-source-review.md](docs/benchmark-source-review.md)
 - [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
+- [docs/capture-suite.md](docs/capture-suite.md)
 
 Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
 
