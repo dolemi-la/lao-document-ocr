@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      OCR_LANGUAGES: lao+eng
+      MAX_PAGES: "60"
+      MAX_UPLOAD_BYTES: "26214400"
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      - api

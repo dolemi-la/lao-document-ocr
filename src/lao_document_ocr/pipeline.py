@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import fitz
+from PIL import Image
+
+from lao_document_ocr.models import Document, Page
+from lao_document_ocr.ocr.base import OcrEngine, OcrEngineError
+from lao_document_ocr.ocr.tesseract import TesseractEngine
+from lao_document_ocr.preprocessing import preprocess_image
+from lao_document_ocr.structure import build_blocks
+
+SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}
+SUPPORTED_SUFFIXES = SUPPORTED_IMAGE_SUFFIXES | {".pdf"}
+
+
+class DocumentProcessingError(RuntimeError):
+    pass
+
+
+def _render_pdf(path: Path, max_pages: int) -> list[Image.Image]:
+    pages: list[Image.Image] = []
+    try:
+        pdf = fitz.open(path)
+    except Exception as exc:
+        raise DocumentProcessingError(f"Could not open PDF: {exc}") from exc
+
+    try:
+        if pdf.page_count > max_pages:
+            raise DocumentProcessingError(
+                f"PDF has {pdf.page_count} pages; maximum is {max_pages}."
+            )
+        for page in pdf:
+            pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+            mode = "RGB" if pixmap.n < 4 else "RGBA"
+            image = Image.frombytes(mode, (pixmap.width, pixmap.height), pixmap.samples)
+            pages.append(image.convert("RGB"))
+    finally:
+        pdf.close()
+    return pages
+
+
+def _load_pages(path: Path, max_pages: int) -> list[Image.Image]:
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        return _render_pdf(path, max_pages)
+    if suffix in SUPPORTED_IMAGE_SUFFIXES:
+        try:
+            with Image.open(path) as image:
+                return [image.convert("RGB")]
+        except Exception as exc:
+            raise DocumentProcessingError(f"Could not open image: {exc}") from exc
+    raise DocumentProcessingError(f"Unsupported file type: {suffix or 'unknown'}")
+
+
+def process_document(
+    path: str | Path,
+    *,
+    source_name: str | None = None,
+    engine: OcrEngine | None = None,
+    max_pages: int = 60,
+) -> Document:
+    path = Path(path)
+    engine = engine or TesseractEngine()
+    pages = _load_pages(path, max_pages=max_pages)
+
+    output_pages: list[Page] = []
+    for page_number, image in enumerate(pages, start=1):
+        cleaned = preprocess_image(image)
+        try:
+            lines = engine.recognize(cleaned)
+        except OcrEngineError as exc:
+            raise DocumentProcessingError(str(exc)) from exc
+
+        output_pages.append(
+            Page(
+                number=page_number,
+                width=cleaned.width,
+                height=cleaned.height,
+                blocks=build_blocks(lines),
+            )
+        )
+
+    return Document(
+        source_name=source_name or path.name,
+        pages=output_pages,
+        metadata={
+            "engine": engine.__class__.__name__,
+            "page_count": len(output_pages),
+        },
+    )

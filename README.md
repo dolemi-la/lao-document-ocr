@@ -1,0 +1,203 @@
+# Lao Document OCR
+
+Open-source, Lao-first OCR for turning scanned images and PDFs into editable documents.
+
+The project is local-first: no account, cloud API, billing system, or external LLM is required for the v0.1 pipeline.
+
+## v0.1
+
+Input:
+
+- PDF
+- PNG
+- JPEG
+- TIFF
+- WebP
+
+Output:
+
+- editable DOCX
+- Markdown
+- plain text
+- structured JSON document AST
+
+Current OCR baseline:
+
+- Tesseract
+- Lao + English (`lao+eng`)
+- conservative image cleanup and deskew
+- heuristic heading/list reconstruction
+
+The OCR engine is behind a small interface so it can be replaced by our own Lao recognizer without changing the API or exporters.
+
+> Accuracy claims must be backed by the benchmark suite. This project does not claim 99% accuracy.
+
+## Quick start with Docker
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+- Web: http://localhost:5173
+- API docs: http://localhost:8000/docs
+- Health: http://localhost:8000/health
+
+The API image installs `tesseract-ocr`, `tesseract-ocr-lao`, and `tesseract-ocr-eng`.
+
+## Local development
+
+Requirements:
+
+- Python 3.11+
+- Node.js 20+
+- pnpm
+- Tesseract
+- Lao and English Tesseract trained data
+
+On Ubuntu 24.04:
+
+```bash
+sudo apt install tesseract-ocr tesseract-ocr-lao tesseract-ocr-eng
+```
+
+On macOS, install Tesseract with your package manager, then make sure both `lao.traineddata` and `eng.traineddata` are available in Tesseract's tessdata directory.
+
+Install backend:
+
+```bash
+make install
+make api
+```
+
+Install web app:
+
+```bash
+cd apps/web
+pnpm install
+pnpm dev
+```
+
+## API
+
+### Health
+
+```http
+GET /health
+```
+
+Reports whether Tesseract and the requested language data are available.
+
+### Parse into structured JSON
+
+```http
+POST /v1/parse
+Content-Type: multipart/form-data
+```
+
+Upload field: `file`.
+
+### Convert
+
+```http
+POST /v1/convert
+Content-Type: multipart/form-data
+```
+
+Returns a ZIP containing:
+
+```text
+document.docx
+document.md
+document.txt
+document.json
+```
+
+Defaults:
+
+- max file size: 25 MB
+- max PDF length: 60 pages
+- OCR languages: Lao + English
+
+Override them with:
+
+- `MAX_UPLOAD_BYTES`
+- `MAX_PAGES`
+- `OCR_LANGUAGES`
+- `CORS_ORIGINS`
+
+## Document AST
+
+OCR output is normalized into an intermediate representation rather than writing Word files directly:
+
+```text
+Document
+└── Page
+    └── Block
+        ├── heading
+        ├── paragraph
+        ├── list
+        ├── table
+        └── image
+```
+
+Every text block can include:
+
+- text
+- bounding box
+- OCR confidence
+- semantic block type
+- metadata
+
+This lets DOCX, Markdown, TXT, JSON, HTML, search indexing, and future RAG integrations share one OCR pass.
+
+## Lao Word output
+
+DOCX output uses:
+
+- language metadata: `lo-LA`
+- default font: `Noto Sans Lao`
+
+The project does not bundle Phetsarath OT. If the font is legally installed on the machine opening the document, the exporter can be configured to use `Phetsarath OT` instead.
+
+## Benchmarks
+
+Benchmark utilities include:
+
+- Character Error Rate (CER)
+- Word Error Rate (WER)
+
+See [benchmarks/README.md](benchmarks/README.md).
+
+The benchmark dataset will be split by document type instead of reporting one misleading aggregate number.
+
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md).
+
+## Roadmap
+
+See [docs/roadmap.md](docs/roadmap.md).
+
+High-level direction:
+
+1. reproducible local baseline
+2. Lao OCR dataset and benchmark
+3. own Lao recognizer weights
+4. layout and table reconstruction
+5. production hardening
+
+## Privacy
+
+The default Docker deployment processes documents locally. There is no telemetry or external OCR API in v0.1.
+
+Do not commit private scanned documents to this repository.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+Apache License 2.0.
