@@ -1,0 +1,62 @@
+{
+  "schema_version": "1",
+  "reviewed_at": "2026-09-21",
+  "sources": [
+    {
+      "id": "hplt-v2-lao",
+      "name": "HPLT v2 Lao (lao-Laoo)",
+      "url": "https://hplt-project.org/datasets/v2.0",
+      "license": "CC0-1.0",
+      "status": "approved-text-only",
+      "allowed_uses": [
+        "training-text",
+        "synthetic-rendering",
+        "capture-pack-source-text"
+      ],
+      "disallowed_uses": [
+        "claiming-as-real-scan-benchmark"
+      ],
+      "notes": "Approved as Lao text input. Real optical benchmark pages should be created by printing/capturing project-generated pages rather than treating the corpus itself as scanned-document evidence."
+    },
+    {
+      "id": "khamlao-moe-derived-corpus",
+      "name": "KhamLao MOE textbook-derived corpus/images",
+      "url": "https://github.com/nouvath07/KhamLao",
+      "license": "repository-MIT-underlying-source-rights-unclear",
+      "status": "not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-images",
+        "public-ground-truth-corpus",
+        "training-data-ingestion"
+      ],
+      "notes": "The repository is MIT, but its corpus pipeline states that it harvests Lao MOE textbooks. The repository license does not establish redistribution rights for the underlying textbook content. Do not ingest until those source rights are independently clarified."
+    },
+    {
+      "id": "lao-sabaidee",
+      "name": "Lao-SABAIDEE",
+      "url": "https://github.com/xinke-wang/OCRDatasets",
+      "license": "unknown",
+      "status": "pending-unavailable",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark",
+        "training-data-ingestion"
+      ],
+      "notes": "The dataset catalog lists about 500 Lao handwritten samples but no public download link and no clear redistribution license. Revisit only if an authoritative source and license become available."
+    },
+    {
+      "id": "nayanaocr-2025",
+      "name": "NayanaOCR Corpus 2025",
+      "url": "https://huggingface.co/datasets/Cognitive-Lab/NayanaOCR_Corpus_2025",
+      "license": "CC-BY-NC-4.0-with-supplemental-terms",
+      "status": "not-selected",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "project-public-benchmark",
+        "default-training-source"
+      ],
+      "notes": "Large synthetic multilingual OCR corpus, but its noncommercial terms do not match this project's permissive/commercial-friendly data policy. The published configs also do not provide a Lao-specific dataset path for our target."
+    }
+  ]
+}

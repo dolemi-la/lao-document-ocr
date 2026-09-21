@@ -154,3 +154,23 @@ lao-ocr bundle-benchmarks \
 ```
 
 See [../docs/benchmark-bundles.md](../docs/benchmark-bundles.md).
+
+## Rights-clear capture packs
+
+The preferred real-scan acquisition path is:
+
+```text
+approved text source
+  -> generate-capture-pack
+  -> print
+  -> real flatbed/phone capture
+  -> register-capture
+  -> validate-dataset
+```
+
+Source decisions live in `source-registry.json`.
+
+See:
+
+- [../docs/benchmark-source-review.md](../docs/benchmark-source-review.md)
+- [../docs/capture-benchmark-workflow.md](../docs/capture-benchmark-workflow.md)

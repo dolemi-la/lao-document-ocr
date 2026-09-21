@@ -215,6 +215,8 @@ lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output doc
 lao-ocr bundle-benchmarks --ocr ocr.json --layout layout.json --docx docx.json --revision <git-sha> --output bundle.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
 lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf>
+lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-v1 --font <font.ttf> --pack-id baseline-v1 --text-license CC0-1.0 --text-provenance <source>
+lao-ocr register-capture --help
 lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2
 lao-ocr export-recognizer --checkpoint training/runs/crnn-v2/recognizer.pt --output training/runs/crnn-v2/recognizer.pt2
 lao-ocr benchmark-recognizer --manifest training/generated/v1/manifest.jsonl --model training/runs/crnn-v2/recognizer.pt2 --output training/runs/crnn-v2/benchmark.json
@@ -231,6 +233,8 @@ See:
 - [docs/layout-benchmark.md](docs/layout-benchmark.md)
 - [docs/docx-fidelity-benchmark.md](docs/docx-fidelity-benchmark.md)
 - [docs/benchmark-bundles.md](docs/benchmark-bundles.md)
+- [docs/benchmark-source-review.md](docs/benchmark-source-review.md)
+- [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
 
 Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
 

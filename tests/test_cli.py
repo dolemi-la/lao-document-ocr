@@ -2,10 +2,32 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFont
 
 from lao_document_ocr.cli import main
+
+
+def _cli_font_path() -> Path:
+    candidates = [
+        Path("/usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf"),
+        Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+        Path("/Library/Fonts/Arial.ttf"),
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", size=20)
+        path = getattr(font, "path", None)
+        if path and Path(path).is_file():
+            return Path(path)
+    except OSError:
+        pass
+    import pytest
+
+    pytest.skip("No TrueType font available for CLI capture-pack test")
 
 
 def test_prepare_corpus_cli(tmp_path, monkeypatch, capsys) -> None:
@@ -257,3 +279,97 @@ def test_bundle_benchmarks_cli(tmp_path, monkeypatch, capsys) -> None:
     assert payload["reports"][0]["kind"] == "ocr"
     captured = capsys.readouterr()
     assert "Reports: 1" in captured.out
+
+
+def test_generate_capture_pack_cli(tmp_path, monkeypatch, capsys) -> None:
+    corpus = tmp_path / "corpus.txt"
+    output = tmp_path / "capture-pack"
+    corpus.write_text(
+        "ສະບາຍດີ ໂລກ\nລາຄາ 20,000 ກີບ\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "generate-capture-pack",
+            "--corpus",
+            str(corpus),
+            "--output",
+            str(output),
+            "--font",
+            str(_cli_font_path()),
+            "--pack-id",
+            "cli-pack",
+            "--text-license",
+            "CC0-1.0",
+            "--text-provenance",
+            "CLI unit-test corpus",
+            "--dpi",
+            "96",
+        ],
+    )
+
+    assert main() == 0
+    assert (output / "capture-pack.json").is_file()
+    assert (output / "cli-pack.pdf").is_file()
+    captured = capsys.readouterr()
+    assert "Capture pack:" in captured.out
+    assert "Printable PDF:" in captured.out
+
+
+def test_register_capture_cli(tmp_path, monkeypatch, capsys) -> None:
+    corpus = tmp_path / "corpus.txt"
+    pack_dir = tmp_path / "capture-pack"
+    corpus.write_text("ສະບາຍດີ ໂລກ\n", encoding="utf-8")
+
+    from lao_document_ocr.capture_pack import generate_capture_pack
+
+    pack_manifest = generate_capture_pack(
+        ["ສະບາຍດີ ໂລກ"],
+        pack_dir,
+        _cli_font_path(),
+        pack_id="cli-register",
+        text_license="CC0-1.0",
+        text_provenance="CLI unit-test corpus",
+        dpi=96,
+    )
+    capture = tmp_path / "phone.jpg"
+    Image.new("RGB", (900, 1200), "white").save(capture)
+    dataset_root = tmp_path / "dataset"
+    dataset_manifest = dataset_root / "manifest.jsonl"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "register-capture",
+            "--pack-manifest",
+            str(pack_manifest),
+            "--page-id",
+            "cli-register-p0001",
+            "--capture-image",
+            str(capture),
+            "--capture-id",
+            "phone-a",
+            "--mode",
+            "phone-photo",
+            "--contributor",
+            "CLI Contributor",
+            "--release-license",
+            "CC0-1.0",
+            "--dataset-root",
+            str(dataset_root),
+            "--dataset-manifest",
+            str(dataset_manifest),
+            "--confirm-release",
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["id"] == "cli-register-p0001-phone-a"
+    assert payload["subset"] == "phone-photo"
+    assert dataset_manifest.is_file()

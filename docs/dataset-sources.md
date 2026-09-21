@@ -67,7 +67,11 @@ lao-ocr prepare-corpus \
 
 ## Real scanned Lao documents
 
-Status: not yet approved.
+Status: project-created capture-pack workflow approved; third-party scanned-document sources remain unapproved unless independently reviewed.
+
+The authoritative candidate registry is `benchmarks/source-registry.json`; see [benchmark-source-review.md](benchmark-source-review.md).
+
+For the current collection procedure, see [capture-benchmark-workflow.md](capture-benchmark-workflow.md).
 
 The real-document benchmark should prefer:
 

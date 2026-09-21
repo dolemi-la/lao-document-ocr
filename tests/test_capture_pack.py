@@ -1,0 +1,129 @@
+import json
+from pathlib import Path
+
+import pytest
+from PIL import ImageFont
+
+from lao_document_ocr.capture_pack import (
+    capture_pack_page,
+    generate_capture_pack,
+    load_capture_pack,
+)
+
+
+def _font_path() -> Path:
+    candidates = [
+        Path("/usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf"),
+        Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+        Path("/Library/Fonts/Arial.ttf"),
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", size=20)
+        path = getattr(font, "path", None)
+        if path and Path(path).is_file():
+            return Path(path)
+    except OSError:
+        pass
+
+    pytest.skip("No TrueType font available for capture-pack test")
+
+
+def test_generate_capture_pack_writes_pages_truth_pdf_and_manifest(tmp_path) -> None:
+    manifest_path = generate_capture_pack(
+        [
+            "ສະບາຍດີ ໂລກ",
+            "ຂອບໃຈ ຫຼາຍ",
+            "Lao OCR 2026",
+            "ລາຄາລວມ 125,000 ກີບ",
+        ],
+        tmp_path / "pack",
+        _font_path(),
+        pack_id="baseline",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        dpi=96,
+        lines_per_page=2,
+    )
+
+    root, manifest = load_capture_pack(manifest_path)
+
+    assert manifest.pack_id == "baseline"
+    assert manifest.text_license == "CC0-1.0"
+    assert len(manifest.pages) == 2
+    assert (root / "baseline.pdf").is_file()
+    assert all((root / page.image).is_file() for page in manifest.pages)
+    assert all((root / page.ground_truth).is_file() for page in manifest.pages)
+    assert all(len(page.sha256) == 64 for page in manifest.pages)
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["pages"][0]["id"] == "baseline-p0001"
+
+
+def test_capture_pack_truth_contains_page_identifier(tmp_path) -> None:
+    manifest_path = generate_capture_pack(
+        ["ສະບາຍດີ ໂລກ"],
+        tmp_path / "pack",
+        _font_path(),
+        pack_id="id-test",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        dpi=96,
+    )
+    root, manifest = load_capture_pack(manifest_path)
+    page = capture_pack_page(manifest, "id-test-p0001")
+    truth = (root / page.ground_truth).read_text(encoding="utf-8")
+
+    assert "Page ID: id-test-p0001" in truth
+    assert "Capture ID: id-test-p0001" in truth
+    assert "ສະບາຍດີ ໂລກ" in truth
+
+
+def test_missing_page_id_is_rejected(tmp_path) -> None:
+    manifest_path = generate_capture_pack(
+        ["one line"],
+        tmp_path / "pack",
+        _font_path(),
+        pack_id="missing",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        dpi=96,
+    )
+    _, manifest = load_capture_pack(manifest_path)
+
+    with pytest.raises(ValueError, match="not found"):
+        capture_pack_page(manifest, "missing-p9999")
+
+
+def test_capture_pack_rejects_unsafe_pack_id(tmp_path) -> None:
+    with pytest.raises(ValueError, match="pack_id"):
+        generate_capture_pack(
+            ["one line"],
+            tmp_path / "pack",
+            _font_path(),
+            pack_id="../unsafe",
+            text_license="CC0-1.0",
+            text_provenance="Unit-test corpus",
+            dpi=96,
+        )
+
+
+def test_capture_pack_rejects_path_traversal_in_manifest(tmp_path) -> None:
+    manifest_path = generate_capture_pack(
+        ["one line"],
+        tmp_path / "pack",
+        _font_path(),
+        pack_id="safe",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        dpi=96,
+    )
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["pages"][0]["ground_truth"] = "../../outside.txt"
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="inside the pack directory"):
+        load_capture_pack(manifest_path)

@@ -155,6 +155,40 @@ def _parser() -> argparse.ArgumentParser:
     synthetic.add_argument("--max-font-size", type=int, default=56)
     synthetic.add_argument("--max-samples", type=int)
 
+    capture_pack = subparsers.add_parser(
+        "generate-capture-pack",
+        help="Generate printable rights-clear benchmark capture pages from a corpus.",
+    )
+    capture_pack.add_argument("--corpus", required=True, type=Path)
+    capture_pack.add_argument("--output", required=True, type=Path)
+    capture_pack.add_argument("--font", required=True, type=Path)
+    capture_pack.add_argument("--pack-id", required=True)
+    capture_pack.add_argument("--text-license", required=True)
+    capture_pack.add_argument("--text-provenance", required=True)
+    capture_pack.add_argument("--dpi", type=int, default=150)
+    capture_pack.add_argument("--lines-per-page", type=int, default=10)
+    capture_pack.add_argument("--max-pages", type=int)
+
+    capture_register = subparsers.add_parser(
+        "register-capture",
+        help="Register a released flatbed/phone capture from a capture-pack page.",
+    )
+    capture_register.add_argument("--pack-manifest", required=True, type=Path)
+    capture_register.add_argument("--page-id", required=True)
+    capture_register.add_argument("--capture-image", required=True, type=Path)
+    capture_register.add_argument("--capture-id", required=True)
+    capture_register.add_argument(
+        "--mode",
+        required=True,
+        choices=["flatbed-scan", "degraded-scan", "phone-photo"],
+    )
+    capture_register.add_argument("--contributor", required=True)
+    capture_register.add_argument("--release-license", required=True)
+    capture_register.add_argument("--dataset-root", required=True, type=Path)
+    capture_register.add_argument("--dataset-manifest", required=True, type=Path)
+    capture_register.add_argument("--notes")
+    capture_register.add_argument("--confirm-release", action="store_true")
+
     train = subparsers.add_parser(
         "train-recognizer",
         help="Train the CRNN+CTC Lao line recognizer.",
@@ -417,6 +451,48 @@ def _generate_synthetic(args: argparse.Namespace) -> int:
     return 0
 
 
+def _generate_capture_pack(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_pack import generate_capture_pack
+
+    manifest = generate_capture_pack(
+        load_corpus(args.corpus),
+        args.output,
+        args.font,
+        pack_id=args.pack_id,
+        text_license=args.text_license,
+        text_provenance=args.text_provenance,
+        dpi=args.dpi,
+        lines_per_page=args.lines_per_page,
+        max_pages=args.max_pages,
+    )
+    print(f"Capture pack: {manifest}")
+    print(f"Printable PDF: {manifest.parent / (args.pack_id + '.pdf')}")
+    return 0
+
+
+def _register_capture(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_registration import (
+        CaptureMode,
+        register_capture,
+    )
+
+    sample = register_capture(
+        capture_pack_manifest=args.pack_manifest,
+        page_id=args.page_id,
+        capture_image=args.capture_image,
+        capture_id=args.capture_id,
+        capture_mode=CaptureMode(args.mode),
+        contributor=args.contributor,
+        release_license=args.release_license,
+        dataset_root=args.dataset_root,
+        dataset_manifest=args.dataset_manifest,
+        confirm_release=args.confirm_release,
+        notes=args.notes,
+    )
+    print(json.dumps(sample.model_dump(mode="json", exclude_none=True), ensure_ascii=False))
+    return 0
+
+
 def _train_recognizer(args: argparse.Namespace) -> int:
     try:
         from lao_document_ocr.recognizer_training import TrainingConfig, train_recognizer
@@ -535,6 +611,10 @@ def main() -> int:
             return _prepare_corpus(args)
         if args.command == "generate-synthetic":
             return _generate_synthetic(args)
+        if args.command == "generate-capture-pack":
+            return _generate_capture_pack(args)
+        if args.command == "register-capture":
+            return _register_capture(args)
         if args.command == "train-recognizer":
             return _train_recognizer(args)
         if args.command == "export-recognizer":
@@ -545,7 +625,7 @@ def main() -> int:
             return _benchmark_recognizer(args)
         if args.command == "calibrate-recognizer":
             return _calibrate_recognizer(args)
-    except (DatasetManifestError, OcrEngineError, ValueError) as exc:
+    except (DatasetManifestError, OcrEngineError, ValueError, FileNotFoundError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     parser.error(f"Unknown command: {args.command}")

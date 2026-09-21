@@ -24,6 +24,8 @@ Status: in progress
 - [x] dataset manifest format
 - [x] train/dev/test split rules
 - [x] document licensing/provenance metadata
+- [x] rights-clear printable capture-pack + real-capture registration workflow
+- [x] benchmark source review registry/policy
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos
