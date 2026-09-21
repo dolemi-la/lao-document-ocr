@@ -63,7 +63,9 @@ The long-term Lao model should implement the same `OcrEngine` interface.
 
 Turns OCR lines into semantic blocks. v0.1 intentionally uses conservative heuristics.
 
-Table reconstruction is not guessed when evidence is weak.
+### `src/lao_document_ocr/table_detection.py`
+
+Detects clear ruled grids using horizontal/vertical morphology, assigns OCR lines to row/column cells, and emits editable table blocks. Borderless or ambiguous tables intentionally fall back to ordinary text instead of being guessed.
 
 ### `src/lao_document_ocr/models.py`
 

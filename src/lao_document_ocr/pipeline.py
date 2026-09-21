@@ -9,7 +9,7 @@ from lao_document_ocr.models import Document, Page
 from lao_document_ocr.ocr.base import OcrEngine, OcrEngineError
 from lao_document_ocr.ocr.tesseract import TesseractEngine
 from lao_document_ocr.preprocessing import preprocess_image
-from lao_document_ocr.structure import build_blocks
+from lao_document_ocr.structure import build_page_blocks
 
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}
 SUPPORTED_SUFFIXES = SUPPORTED_IMAGE_SUFFIXES | {".pdf"}
@@ -78,7 +78,7 @@ def process_document(
                 number=page_number,
                 width=cleaned.width,
                 height=cleaned.height,
-                blocks=build_blocks(lines),
+                blocks=build_page_blocks(lines, cleaned),
             )
         )
 

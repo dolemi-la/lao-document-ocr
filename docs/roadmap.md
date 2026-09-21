@@ -59,9 +59,10 @@ Status: started
 - [ ] learned/general text-region detection
 - heading/body/list classification
 - reading order
-- table detection
-- row/column/cell structure
-- merged cells
+- [x] simple ruled-table detection baseline
+- [x] row/column/cell structure for clear ruled grids
+- [ ] borderless/complex table detection
+- [ ] merged cells
 - header/footer detection
 - embedded image preservation
 - DOCX fidelity benchmark

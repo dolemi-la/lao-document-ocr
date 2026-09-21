@@ -27,6 +27,7 @@ Current OCR baseline:
 - Lao + English (`lao+eng`)
 - conservative image cleanup and deskew
 - heuristic heading/list reconstruction
+- conservative simple ruled-table reconstruction into editable Word tables
 
 The OCR engine is behind a small interface so it can be replaced by our own Lao recognizer without changing the API or exporters.
 
