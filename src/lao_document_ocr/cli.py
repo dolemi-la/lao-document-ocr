@@ -6,6 +6,13 @@ import sys
 from pathlib import Path
 
 from lao_document_ocr.benchmarking import benchmark_dataset, write_report
+from lao_document_ocr.corpus import (
+    CorpusFilter,
+    iter_jsonl,
+    iter_plain_text,
+    prepare_corpus,
+    write_corpus,
+)
 from lao_document_ocr.dataset import (
     DatasetManifestError,
     DatasetSplit,
@@ -39,6 +46,20 @@ def _parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--languages", default="lao+eng")
     benchmark.add_argument("--psm", type=int, default=3)
     benchmark.add_argument("--no-hash-check", action="store_true")
+
+    corpus = subparsers.add_parser(
+        "prepare-corpus",
+        help="Normalize/filter Lao text for synthetic OCR training.",
+    )
+    corpus.add_argument("--input", required=True, type=Path)
+    corpus.add_argument("--output", required=True, type=Path)
+    corpus.add_argument("--format", choices=["text", "jsonl"], default="text")
+    corpus.add_argument("--field", default="text")
+    corpus.add_argument("--min-chars", type=int, default=8)
+    corpus.add_argument("--max-chars", type=int, default=180)
+    corpus.add_argument("--min-lao-ratio", type=float, default=0.5)
+    corpus.add_argument("--limit", type=int)
+    corpus.add_argument("--keep-duplicates", action="store_true")
 
     return parser
 
@@ -93,6 +114,25 @@ def _benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def _prepare_corpus(args: argparse.Namespace) -> int:
+    if args.format == "jsonl":
+        source = iter_jsonl(args.input, field=args.field)
+    else:
+        source = iter_plain_text(args.input)
+
+    config = CorpusFilter(
+        min_chars=args.min_chars,
+        max_chars=args.max_chars,
+        min_lao_ratio=args.min_lao_ratio,
+        deduplicate=not args.keep_duplicates,
+    )
+    lines = prepare_corpus(source, config, limit=args.limit)
+    output = write_corpus(lines, args.output)
+    print(f"Corpus: {output}")
+    print(f"Lines: {len(lines)}")
+    return 0
+
+
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
@@ -101,6 +141,8 @@ def main() -> int:
             return _validate(args)
         if args.command == "benchmark":
             return _benchmark(args)
+        if args.command == "prepare-corpus":
+            return _prepare_corpus(args)
     except (DatasetManifestError, OcrEngineError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

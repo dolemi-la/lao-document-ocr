@@ -172,6 +172,7 @@ Useful commands:
 ```bash
 lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
+lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
 ```
 
 See:

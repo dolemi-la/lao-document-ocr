@@ -31,6 +31,28 @@ A repository being public is not enough. We only ingest material when redistribu
 - Use: benchmark/control model while our own Lao recognizer is developed
 - Notes: this is a model dependency, not our benchmark ground truth.
 
+## Approved source for synthetic training text
+
+### HPLT v2 Lao (lao-Laoo)
+
+- Source: https://hplt-project.org/datasets/v2.0
+- License: CC0
+- Status: approved for text-only corpus preparation
+- Use: diverse Lao text lines for synthetic OCR rendering and language coverage
+- Notes: use the cleaned/deduplicated Lao corpus as text input only. It is not a real scanned-document OCR benchmark and must not be reported as document accuracy. Keep the downloaded corpus outside Git and generate a normalized local corpus with `lao-ocr prepare-corpus`.
+
+Example after downloading/exporting a text or JSONL slice locally:
+
+```bash
+lao-ocr prepare-corpus \
+  --input /path/to/lao-source.jsonl \
+  --format jsonl \
+  --field text \
+  --output training/data/lao-lines.txt \
+  --min-lao-ratio 0.5 \
+  --limit 100000
+```
+
 ## Candidate training-text source — review before ingestion
 
 ### Tesseract langdata / langdata_lstm
