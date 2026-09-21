@@ -9,6 +9,7 @@ from PIL import Image
 from lao_document_ocr.models import Block, BlockType, BoundingBox
 from lao_document_ocr.normalization import normalize_lao_text
 from lao_document_ocr.ocr.base import RecognizedLine
+from lao_document_ocr.reading_order import order_blocks
 from lao_document_ocr.table_detection import (
     build_table_block,
     detect_ruled_tables,
@@ -84,15 +85,9 @@ def build_blocks(lines: list[RecognizedLine]) -> list[Block]:
 def build_page_blocks(lines: list[RecognizedLine], image: Image.Image) -> list[Block]:
     tables = detect_ruled_tables(image)
     if not tables:
-        return build_blocks(lines)
+        return order_blocks(build_blocks(lines), page_width=image.width)
 
     remaining, assignments = split_table_lines(lines, tables)
     blocks = build_blocks(remaining)
     blocks.extend(build_table_block(table, table_lines) for table, table_lines in assignments)
-    return sorted(
-        blocks,
-        key=lambda block: (
-            block.bbox.y if block.bbox else 0,
-            block.bbox.x if block.bbox else 0,
-        ),
-    )
+    return order_blocks(blocks, page_width=image.width)

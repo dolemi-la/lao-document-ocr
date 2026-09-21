@@ -67,6 +67,10 @@ Turns OCR lines into semantic blocks. v0.1 intentionally uses conservative heuri
 
 Detects clear ruled grids using horizontal/vertical morphology, assigns OCR lines to row/column cells, and emits editable table blocks. Borderless or ambiguous tables intentionally fall back to ordinary text instead of being guessed.
 
+### `src/lao_document_ocr/reading_order.py`
+
+Applies conservative two-column reading order only when a clear central gutter separates at least two blocks per side. Ambiguous/spanning layouts keep normal top-to-bottom ordering instead of guessing.
+
 ### `src/lao_document_ocr/models.py`
 
 The canonical document AST.

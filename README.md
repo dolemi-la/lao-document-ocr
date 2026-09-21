@@ -28,6 +28,7 @@ Current OCR baseline:
 - conservative image cleanup and deskew
 - heuristic heading/list reconstruction
 - conservative simple ruled-table reconstruction into editable Word tables
+- conservative two-column reading order when a clear gutter exists
 
 The OCR engine is behind a small interface so it can be replaced by our own Lao recognizer without changing the API or exporters.
 

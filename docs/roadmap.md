@@ -58,7 +58,8 @@ Status: started
 - [x] deterministic clean-scan text-line detection baseline
 - [ ] learned/general text-region detection
 - heading/body/list classification
-- reading order
+- [x] conservative two-column reading-order baseline
+- [ ] general learned reading order
 - [x] simple ruled-table detection baseline
 - [x] row/column/cell structure for clear ruled grids
 - [ ] borderless/complex table detection
