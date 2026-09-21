@@ -5,6 +5,7 @@ from pathlib import Path
 import pymupdf
 from PIL import Image
 
+from lao_document_ocr.header_footer import mark_repeated_headers_footers
 from lao_document_ocr.models import Document, Page
 from lao_document_ocr.ocr.base import OcrEngine, OcrEngineError
 from lao_document_ocr.ocr.tesseract import TesseractEngine
@@ -81,6 +82,8 @@ def process_document(
                 blocks=build_page_blocks(lines, cleaned),
             )
         )
+
+    mark_repeated_headers_footers(output_pages)
 
     return Document(
         source_name=source_name or path.name,

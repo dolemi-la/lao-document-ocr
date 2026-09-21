@@ -8,6 +8,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
+from lao_document_ocr.header_footer import repeated_role_texts
 from lao_document_ocr.models import Block, BlockType, Document
 
 DEFAULT_FONT = "Noto Sans Lao"
@@ -74,6 +75,29 @@ def _add_block(word: WordDocument, block: Block, font_name: str) -> None:
     _add_text(paragraph, block.text, font_name)
 
 
+def _apply_headers_footers(
+    word: WordDocument,
+    document: Document,
+    font_name: str,
+) -> None:
+    if not word.sections:
+        return
+
+    section = word.sections[0]
+    header_texts = repeated_role_texts(document.pages, "header")
+    footer_texts = repeated_role_texts(document.pages, "footer")
+
+    if header_texts:
+        paragraph = section.header.paragraphs[0]
+        paragraph.text = ""
+        _add_text(paragraph, "\n".join(header_texts), font_name)
+
+    if footer_texts:
+        paragraph = section.footer.paragraphs[0]
+        paragraph.text = ""
+        _add_text(paragraph, "\n".join(footer_texts), font_name)
+
+
 def export_docx(
     document: Document,
     path: str | Path,
@@ -87,8 +111,12 @@ def export_docx(
     normal_style.font.name = font_name
     normal_style.font.size = Pt(11)
 
+    _apply_headers_footers(word, document, font_name)
+
     for page_index, page in enumerate(document.pages):
         for block in page.blocks:
+            if block.metadata.get("role") in {"header", "footer"}:
+                continue
             _add_block(word, block, font_name)
         if page_index < len(document.pages) - 1:
             word.add_page_break()

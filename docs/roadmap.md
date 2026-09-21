@@ -64,7 +64,7 @@ Status: started
 - [x] row/column/cell structure for clear ruled grids
 - [ ] borderless/complex table detection
 - [ ] merged cells
-- header/footer detection
+- [x] repeated header/footer detection baseline and DOCX preservation
 - embedded image preservation
 - DOCX fidelity benchmark
 

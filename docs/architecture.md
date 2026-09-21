@@ -71,6 +71,10 @@ Detects clear ruled grids using horizontal/vertical morphology, assigns OCR line
 
 Applies conservative two-column reading order only when a clear central gutter separates at least two blocks per side. Ambiguous/spanning layouts keep normal top-to-bottom ordering instead of guessing.
 
+### `src/lao_document_ocr/header_footer.py`
+
+Finds exact repeated text in the top/bottom page margins across multi-page documents and tags it as header/footer content. The DOCX exporter moves those tagged blocks into real Word header/footer parts while retaining the role in the document AST.
+
 ### `src/lao_document_ocr/models.py`
 
 The canonical document AST.
