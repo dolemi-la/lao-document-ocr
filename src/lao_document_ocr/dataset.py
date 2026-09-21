@@ -131,6 +131,8 @@ def validate_dataset(
     root = Path(dataset_root).resolve()
     errors = _split_leakage_errors(samples)
 
+    observed_hashes: dict[str, list[str]] = {}
+
     for sample in samples:
         source = (root / sample.source).resolve()
         truth = (root / sample.ground_truth).resolve()
@@ -147,12 +149,17 @@ def validate_dataset(
         if not truth.is_file():
             errors.append(f"{sample.id}: missing ground truth file {sample.ground_truth}")
 
-        if verify_hashes and sample.sha256 and source.is_file():
+        observed_hash = sample.sha256
+        if verify_hashes and source.is_file():
             actual = sha256_file(source)
-            if actual != sample.sha256:
+            if sample.sha256 and actual != sample.sha256:
                 errors.append(
                     f"{sample.id}: sha256 mismatch (expected {sample.sha256}, got {actual})"
                 )
+            observed_hash = actual
+
+        if observed_hash:
+            observed_hashes.setdefault(observed_hash, []).append(sample.id)
 
         if truth.is_file():
             try:
@@ -162,5 +169,13 @@ def validate_dataset(
             else:
                 if not text.strip():
                     errors.append(f"{sample.id}: ground truth is empty")
+
+    for digest, sample_ids in sorted(observed_hashes.items()):
+        unique_ids = sorted(set(sample_ids))
+        if len(unique_ids) > 1:
+            errors.append(
+                "duplicate source image sha256 "
+                f"{digest}: {', '.join(unique_ids)}"
+            )
 
     return errors

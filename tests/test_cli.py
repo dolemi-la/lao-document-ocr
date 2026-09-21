@@ -373,3 +373,57 @@ def test_register_capture_cli(tmp_path, monkeypatch, capsys) -> None:
     assert payload["id"] == "cli-register-p0001-phone-a"
     assert payload["subset"] == "phone-photo"
     assert dataset_manifest.is_file()
+
+
+def test_dataset_report_cli(tmp_path, monkeypatch, capsys) -> None:
+    import hashlib
+
+    image = tmp_path / "sample.png"
+    truth = tmp_path / "sample.txt"
+    image.write_bytes(b"sample-image")
+    truth.write_text("ສະບາຍດີ", encoding="utf-8")
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    manifest = tmp_path / "manifest.jsonl"
+    output = tmp_path / "dataset-report.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "id": "sample-001",
+                "document_id": "doc-001",
+                "split": "test",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "language": "lo",
+                "license": "CC0-1.0",
+                "provenance": "CLI dataset report test",
+                "sha256": digest,
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "dataset-report",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["sample_count"] == 1
+    assert payload["document_count"] == 1
+    assert payload["validation"]["ok"] is True
+    captured = capsys.readouterr()
+    assert "Validation: ok" in captured.out

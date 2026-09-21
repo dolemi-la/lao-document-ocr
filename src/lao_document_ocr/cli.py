@@ -53,6 +53,15 @@ def _parser() -> argparse.ArgumentParser:
     validate.add_argument("--dataset-root", required=True, type=Path)
     validate.add_argument("--no-hash-check", action="store_true")
 
+    dataset_report = subparsers.add_parser(
+        "dataset-report",
+        help="Summarize dataset coverage, splits, licenses, and validation status.",
+    )
+    dataset_report.add_argument("--manifest", required=True, type=Path)
+    dataset_report.add_argument("--dataset-root", required=True, type=Path)
+    dataset_report.add_argument("--output", required=True, type=Path)
+    dataset_report.add_argument("--no-hash-check", action="store_true")
+
     intake = subparsers.add_parser(
         "add-dataset-sample",
         help="Copy a rights-cleared benchmark page into the public dataset.",
@@ -286,6 +295,27 @@ def _validate(args: argparse.Namespace) -> int:
     print(f"Valid dataset: {len(samples)} samples")
     print(json.dumps(counts, indent=2, sort_keys=True))
     return 0
+
+
+def _dataset_report(args: argparse.Namespace) -> int:
+    from lao_document_ocr.dataset_report import (
+        build_dataset_report,
+        write_dataset_report,
+    )
+
+    samples = load_manifest(args.manifest)
+    report = build_dataset_report(
+        samples,
+        args.dataset_root,
+        verify_hashes=not args.no_hash_check,
+    )
+    output = write_dataset_report(report, args.output)
+    print(f"Report: {output}")
+    print(f"Samples: {report['sample_count']}")
+    print(f"Documents: {report['document_count']}")
+    print(f"Validation: {'ok' if report['validation']['ok'] else 'failed'}")
+    print(f"Missing subsets: {len(report['missing_subsets'])}")
+    return 0 if report["validation"]["ok"] else 1
 
 
 def _add_dataset_sample(args: argparse.Namespace) -> int:
@@ -597,6 +627,8 @@ def main() -> int:
             return _convert_document(args)
         if args.command == "validate-dataset":
             return _validate(args)
+        if args.command == "dataset-report":
+            return _dataset_report(args)
         if args.command == "add-dataset-sample":
             return _add_dataset_sample(args)
         if args.command == "benchmark-layout":

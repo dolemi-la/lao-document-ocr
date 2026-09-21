@@ -116,3 +116,50 @@ def test_document_cannot_cross_dataset_splits(tmp_path) -> None:
     errors = validate_dataset(load_manifest(manifest), tmp_path)
 
     assert any("multiple splits" in error for error in errors)
+
+
+def test_duplicate_source_hash_is_reported(tmp_path) -> None:
+    image_a = tmp_path / "a.png"
+    image_b = tmp_path / "b.png"
+    truth_a = tmp_path / "a.txt"
+    truth_b = tmp_path / "b.txt"
+    image_a.write_bytes(b"same-image")
+    image_b.write_bytes(b"same-image")
+    truth_a.write_text("A", encoding="utf-8")
+    truth_b.write_text("B", encoding="utf-8")
+    digest = hashlib.sha256(b"same-image").hexdigest()
+
+    manifest = tmp_path / "manifest.jsonl"
+    entries = [
+        {
+            "id": "a",
+            "document_id": "doc-a",
+            "split": "train",
+            "subset": "clean-print",
+            "source": "a.png",
+            "ground_truth": "a.txt",
+            "license": "CC0-1.0",
+            "provenance": "unit test",
+            "sha256": digest,
+        },
+        {
+            "id": "b",
+            "document_id": "doc-b",
+            "split": "test",
+            "subset": "phone-photo",
+            "source": "b.png",
+            "ground_truth": "b.txt",
+            "license": "CC0-1.0",
+            "provenance": "unit test",
+            "sha256": digest,
+        },
+    ]
+    manifest.write_text(
+        "\n".join(json.dumps(entry) for entry in entries) + "\n",
+        encoding="utf-8",
+    )
+
+    errors = validate_dataset(load_manifest(manifest), tmp_path)
+
+    assert any("duplicate source image sha256" in error for error in errors)
+    assert any("a, b" in error for error in errors)

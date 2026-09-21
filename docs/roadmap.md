@@ -26,6 +26,7 @@ Status: in progress
 - [x] document licensing/provenance metadata
 - [x] rights-clear printable capture-pack + real-capture registration workflow
 - [x] benchmark source review registry/policy
+- [x] dataset coverage/integrity report + duplicate-image detection
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos

@@ -174,3 +174,16 @@ See:
 
 - [../docs/benchmark-source-review.md](../docs/benchmark-source-review.md)
 - [../docs/capture-benchmark-workflow.md](../docs/capture-benchmark-workflow.md)
+
+## Coverage report
+
+Track benchmark growth and integrity with:
+
+```bash
+lao-ocr dataset-report \
+  --manifest benchmarks/public/manifest.jsonl \
+  --dataset-root benchmarks/public \
+  --output benchmarks/results/dataset-report.json
+```
+
+The report includes sample/document counts, split/subset/license coverage, captures per document, missing benchmark categories, and validation errors. Exact duplicate source-image hashes are rejected by dataset validation.

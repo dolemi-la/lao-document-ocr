@@ -209,6 +209,7 @@ Useful commands:
 ```bash
 lao-ocr add-dataset-sample --help
 lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
+lao-ocr dataset-report --manifest <manifest.jsonl> --dataset-root <dataset> --output dataset-report.json
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
 lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
