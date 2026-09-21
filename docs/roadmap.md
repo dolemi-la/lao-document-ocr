@@ -65,7 +65,8 @@ Status: started
 - [ ] borderless/complex table detection
 - [ ] merged cells
 - [x] repeated header/footer detection baseline and DOCX preservation
-- embedded image preservation
+- [x] native PDF embedded-image preservation baseline (excluding full-page scans)
+- [ ] raster/photo-region detection for image-only inputs and scanned pages
 - DOCX fidelity benchmark
 
 Exit condition: layout metrics and table metrics are published alongside OCR accuracy.

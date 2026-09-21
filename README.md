@@ -30,6 +30,7 @@ Current OCR baseline:
 - conservative simple ruled-table reconstruction into editable Word tables
 - conservative two-column reading order when a clear gutter exists
 - repeated multi-page headers/footers exported into real Word header/footer parts
+- native PDF images/logos/figures preserved as real Word media assets (full-page scan backgrounds excluded)
 
 The OCR engine is behind a small interface so it can be replaced by our own Lao recognizer without changing the API or exporters.
 

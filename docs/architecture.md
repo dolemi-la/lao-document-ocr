@@ -75,6 +75,10 @@ Applies conservative two-column reading order only when a clear central gutter s
 
 Finds exact repeated text in the top/bottom page margins across multi-page documents and tags it as header/footer content. The DOCX exporter moves those tagged blocks into real Word header/footer parts while retaining the role in the document AST.
 
+### `src/lao_document_ocr/embedded_images.py`
+
+Extracts native image objects from PDF pages, normalizes them to PNG, maps their rectangles into rendered-page coordinates, and emits image blocks. Images covering most of a page are intentionally excluded so scan-background images are not duplicated alongside OCR text.
+
 ### `src/lao_document_ocr/models.py`
 
 The canonical document AST.

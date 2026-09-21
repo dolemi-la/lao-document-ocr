@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import base64
+import io
 from pathlib import Path
 
 from docx import Document as WordDocument
 from docx.enum.text import WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Pt
+from docx.shared import Inches, Pt
 
 from lao_document_ocr.header_footer import repeated_role_texts
 from lao_document_ocr.models import Block, BlockType, Document
@@ -58,6 +60,22 @@ def _add_block(word: WordDocument, block: Block, font_name: str) -> None:
         for line in block.text.splitlines():
             paragraph = word.add_paragraph(style="List Bullet")
             _add_text(paragraph, line, font_name)
+        return
+
+    if block.type == BlockType.IMAGE:
+        encoded = block.metadata.get("image_base64")
+        if not isinstance(encoded, str) or not encoded:
+            return
+        try:
+            data = base64.b64decode(encoded, validate=True)
+            ratio = float(block.metadata.get("width_ratio", 0.5))
+        except (ValueError, TypeError):
+            return
+        width_inches = max(0.5, min(6.5, 6.5 * max(0.05, min(1.0, ratio))))
+        try:
+            word.add_picture(io.BytesIO(data), width=Inches(width_inches))
+        except Exception:
+            return
         return
 
     if block.type == BlockType.TABLE and block.cells:
