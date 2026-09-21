@@ -20,6 +20,7 @@ from lao_document_ocr.dataset import (
     validate_dataset,
 )
 from lao_document_ocr.ocr import OcrEngineError, TesseractEngine
+from lao_document_ocr.synthetic import generate_synthetic_lines, load_corpus
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -60,6 +61,19 @@ def _parser() -> argparse.ArgumentParser:
     corpus.add_argument("--min-lao-ratio", type=float, default=0.5)
     corpus.add_argument("--limit", type=int)
     corpus.add_argument("--keep-duplicates", action="store_true")
+
+    synthetic = subparsers.add_parser(
+        "generate-synthetic",
+        help="Render labeled text-line images from a prepared corpus.",
+    )
+    synthetic.add_argument("--corpus", required=True, type=Path)
+    synthetic.add_argument("--output", required=True, type=Path)
+    synthetic.add_argument("--font", required=True, type=Path, action="append")
+    synthetic.add_argument("--variants-per-line", type=int, default=1)
+    synthetic.add_argument("--seed", type=int, default=20260921)
+    synthetic.add_argument("--min-font-size", type=int, default=40)
+    synthetic.add_argument("--max-font-size", type=int, default=56)
+    synthetic.add_argument("--max-samples", type=int)
 
     return parser
 
@@ -133,6 +147,24 @@ def _prepare_corpus(args: argparse.Namespace) -> int:
     return 0
 
 
+def _generate_synthetic(args: argparse.Namespace) -> int:
+    lines = load_corpus(args.corpus)
+    manifest = generate_synthetic_lines(
+        lines,
+        args.output,
+        args.font,
+        variants_per_line=args.variants_per_line,
+        seed=args.seed,
+        min_font_size=args.min_font_size,
+        max_font_size=args.max_font_size,
+        max_samples=args.max_samples,
+    )
+    count = sum(1 for line in manifest.read_text(encoding="utf-8").splitlines() if line)
+    print(f"Manifest: {manifest}")
+    print(f"Samples: {count}")
+    return 0
+
+
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
@@ -143,6 +175,8 @@ def main() -> int:
             return _benchmark(args)
         if args.command == "prepare-corpus":
             return _prepare_corpus(args)
+        if args.command == "generate-synthetic":
+            return _generate_synthetic(args)
     except (DatasetManifestError, OcrEngineError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

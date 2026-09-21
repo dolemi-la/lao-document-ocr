@@ -38,14 +38,16 @@ Exit condition: every model change can be measured on a fixed, legal, documented
 
 ## Phase 2 — own recognizer
 
-- synthetic Lao text generator
-- font inventory and licensing review
-- augmentation pipeline
-- line recognizer training
-- model export for CPU inference
-- confidence calibration
-- versioned weights/checksums
-- regression benchmark
+Status: started
+
+- [x] synthetic Lao text generator
+- [x] font inventory and licensing review (initial Noto Lao path)
+- [x] deterministic augmentation pipeline
+- [ ] line recognizer training
+- [ ] model export for CPU inference
+- [ ] confidence calibration
+- [ ] versioned weights/checksums
+- [ ] regression benchmark
 
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 

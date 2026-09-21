@@ -173,6 +173,7 @@ Useful commands:
 lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
+lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf>
 ```
 
 See:

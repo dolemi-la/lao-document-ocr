@@ -30,3 +30,20 @@ Planned components:
 - model cards
 
 No model binaries should be committed directly to Git.
+
+## Synthetic line generation
+
+After preparing a corpus, render deterministic labeled line images with one or more Lao-capable fonts:
+
+```bash
+lao-ocr generate-synthetic \
+  --corpus training/data/lao-lines.txt \
+  --output training/generated/v1 \
+  --font /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf \
+  --variants-per-line 3 \
+  --seed 20260921
+```
+
+Each generated sample records its source text, font, font size, deterministic seed, augmentation parameters, relative image path, and SHA-256. Current augmentations include small rotation, brightness jitter, Gaussian blur, and image noise.
+
+Do not commit generated training images or large corpora to Git. Reproduce them from corpus + config + seed instead.
