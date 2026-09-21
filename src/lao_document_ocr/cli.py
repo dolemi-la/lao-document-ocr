@@ -218,6 +218,20 @@ def _parser() -> argparse.ArgumentParser:
         help="Repeat to select templates. Omit to generate all templates.",
     )
 
+    campaign_report = subparsers.add_parser(
+        "capture-campaign-report",
+        help="Report missing/complete capture modes for a capture suite.",
+    )
+    campaign_report.add_argument("--suite-manifest", required=True, type=Path)
+    campaign_report.add_argument("--dataset-manifest", required=True, type=Path)
+    campaign_report.add_argument("--output", required=True, type=Path)
+    campaign_report.add_argument(
+        "--require-mode",
+        action="append",
+        choices=["flatbed-scan", "degraded-scan", "phone-photo"],
+        help="Repeat to override the default flatbed-scan + phone-photo requirement.",
+    )
+
     capture_register = subparsers.add_parser(
         "register-capture",
         help="Register a released flatbed/phone capture from a capture-pack page.",
@@ -569,6 +583,33 @@ def _generate_capture_suite(args: argparse.Namespace) -> int:
     return 0
 
 
+def _capture_campaign_report(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_campaign import (
+        build_capture_campaign_report,
+        write_capture_campaign_report,
+    )
+    from lao_document_ocr.capture_registration import CaptureMode
+
+    samples = load_manifest(args.dataset_manifest)
+    modes = (
+        [CaptureMode(value) for value in args.require_mode]
+        if args.require_mode
+        else None
+    )
+    report = build_capture_campaign_report(
+        args.suite_manifest,
+        samples,
+        required_modes=modes,
+    )
+    output = write_capture_campaign_report(report, args.output)
+    print(f"Report: {output}")
+    print(f"Suite: {report['suite_id']}")
+    print(f"Completed: {report['completed_captures']}/{report['required_captures']}")
+    print(f"Completion: {report['completion_ratio']:.1%}")
+    print(f"Missing page/mode groups: {len(report['missing'])}")
+    return 0
+
+
 def _register_capture(args: argparse.Namespace) -> int:
     from lao_document_ocr.capture_registration import (
         CaptureMode,
@@ -716,6 +757,8 @@ def main() -> int:
             return _generate_capture_pack(args)
         if args.command == "generate-capture-suite":
             return _generate_capture_suite(args)
+        if args.command == "capture-campaign-report":
+            return _capture_campaign_report(args)
         if args.command == "register-capture":
             return _register_capture(args)
         if args.command == "train-recognizer":

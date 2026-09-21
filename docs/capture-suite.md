@@ -100,3 +100,7 @@ Then capture each page with at least:
 A smaller degraded-scan subset can be added later.
 
 Do not count the generated digital pages as real optical benchmark evidence. The benchmark samples are the registered real captures.
+
+## Track collection progress
+
+After captures start entering the public dataset, compare the suite against the dataset with `capture-campaign-report`. See [capture-campaign-report.md](capture-campaign-report.md).

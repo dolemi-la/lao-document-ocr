@@ -483,3 +483,85 @@ def test_generate_capture_suite_cli(tmp_path, monkeypatch, capsys) -> None:
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert [pack["template"] for pack in payload["packs"]] == ["plain", "receipt"]
     assert "Combined PDF:" in capsys.readouterr().out
+
+
+def test_capture_campaign_report_cli(tmp_path, monkeypatch, capsys) -> None:
+    from lao_document_ocr.capture_suite import generate_capture_suite
+    from lao_document_ocr.capture_templates import CaptureTemplate
+
+    suite_manifest = generate_capture_suite(
+        ["ສະບາຍດີ", "ຂອບໃຈ", "OCR", "20,000 ₭"],
+        tmp_path / "campaign-suite",
+        _cli_font_path(),
+        suite_id="cli-campaign",
+        text_license="CC0-1.0",
+        text_provenance="CLI campaign test",
+        templates=[CaptureTemplate.PLAIN, CaptureTemplate.RECEIPT],
+        dpi=96,
+        lines_per_page=4,
+        max_pages_per_template=1,
+    )
+    dataset_manifest = tmp_path / "campaign-manifest.jsonl"
+    entries = [
+        {
+            "id": "plain-flatbed",
+            "document_id": "cli-campaign-plain-p0001",
+            "split": "test",
+            "subset": "clean-print",
+            "source": "plain-flatbed.jpg",
+            "ground_truth": "plain-flatbed.txt",
+            "license": "CC0-1.0",
+            "provenance": "CLI campaign test",
+            "tags": ["capture:flatbed-scan"],
+        },
+        {
+            "id": "plain-phone",
+            "document_id": "cli-campaign-plain-p0001",
+            "split": "test",
+            "subset": "phone-photo",
+            "source": "plain-phone.jpg",
+            "ground_truth": "plain-phone.txt",
+            "license": "CC0-1.0",
+            "provenance": "CLI campaign test",
+            "tags": ["capture:phone-photo"],
+        },
+        {
+            "id": "receipt-phone",
+            "document_id": "cli-campaign-receipt-p0001",
+            "split": "test",
+            "subset": "phone-photo",
+            "source": "receipt-phone.jpg",
+            "ground_truth": "receipt-phone.txt",
+            "license": "CC0-1.0",
+            "provenance": "CLI campaign test",
+            "tags": ["capture:phone-photo"],
+        },
+    ]
+    dataset_manifest.write_text(
+        "\n".join(json.dumps(entry) for entry in entries) + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "campaign-report.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "capture-campaign-report",
+            "--suite-manifest",
+            str(suite_manifest),
+            "--dataset-manifest",
+            str(dataset_manifest),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["completed_captures"] == 3
+    assert payload["required_captures"] == 4
+    assert payload["completion_ratio"] == 0.75
+    captured = capsys.readouterr()
+    assert "Completion: 75.0%" in captured.out

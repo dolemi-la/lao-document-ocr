@@ -30,6 +30,7 @@ Status: in progress
 - [x] multi-axis benchmark tags and per-tag CER/WER
 - [x] structured printable capture templates for multi-column/table/receipt/form collection
 - [x] combined multi-template capture suite generator
+- [x] capture campaign completion report by template/device mode
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos

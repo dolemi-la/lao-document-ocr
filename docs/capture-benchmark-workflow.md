@@ -217,3 +217,7 @@ Registered capture-pack samples automatically receive tags such as:
 - `source:real-capture`
 
 This matters because one real page can simultaneously be a phone photo, mixed Lao/English, multi-column, and table-heavy. The primary `subset` field is retained for compatibility, but CER/WER reports also aggregate by every tag.
+
+## Track campaign completion
+
+Use `lao-ocr capture-campaign-report` to see which capture-suite pages still need flatbed/phone/degraded captures before freezing the benchmark test set. See [capture-campaign-report.md](capture-campaign-report.md).
