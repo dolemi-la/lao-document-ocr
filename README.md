@@ -44,7 +44,7 @@ Open:
 - API docs: http://localhost:8000/docs
 - Health: http://localhost:8000/health
 
-The API image installs `tesseract-ocr`, `tesseract-ocr-lao`, and `tesseract-ocr-eng`.
+The API image installs Tesseract Lao/English data plus Noto Lao fonts for reproducible smoke tests.
 
 ## Local development
 
@@ -59,7 +59,7 @@ Requirements:
 On Ubuntu 24.04:
 
 ```bash
-sudo apt install tesseract-ocr tesseract-ocr-lao tesseract-ocr-eng
+sudo apt install tesseract-ocr tesseract-ocr-lao tesseract-ocr-eng fonts-noto-core
 ```
 
 On macOS, install Tesseract with your package manager, then make sure both `lao.traineddata` and `eng.traineddata` are available in Tesseract's tessdata directory.
@@ -119,12 +119,14 @@ Defaults:
 - max file size: 25 MB
 - max PDF length: 60 pages
 - OCR languages: Lao + English
+- Tesseract page segmentation mode: 3
 
 Override them with:
 
 - `MAX_UPLOAD_BYTES`
 - `MAX_PAGES`
 - `OCR_LANGUAGES`
+- `OCR_PSM`
 - `CORS_ORIGINS`
 
 ## Document AST
@@ -163,14 +165,22 @@ The project does not bundle Phetsarath OT. If the font is legally installed on t
 
 ## Benchmarks
 
-Benchmark utilities include:
+The repository has a strict JSONL dataset format, dataset validator, CER/WER benchmark runner, per-subset reporting, split-leakage checks, and a deterministic synthetic Lao smoke benchmark.
 
-- Character Error Rate (CER)
-- Word Error Rate (WER)
+Useful commands:
 
-See [benchmarks/README.md](benchmarks/README.md).
+```bash
+lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
+lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
+```
 
-The benchmark dataset will be split by document type instead of reporting one misleading aggregate number.
+See:
+
+- [benchmarks/README.md](benchmarks/README.md)
+- [docs/dataset-format.md](docs/dataset-format.md)
+- [docs/dataset-sources.md](docs/dataset-sources.md)
+
+Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
 
 ## Architecture
 

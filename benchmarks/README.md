@@ -60,7 +60,61 @@ lao-ocr benchmark \
   --output benchmarks/results/tesseract-v1.json
 ```
 
-## What every public report must include
+## Synthetic smoke benchmark
+
+The repository also includes a deterministic smoke generator. It exists to verify the OCR/benchmark pipeline, not to estimate real-world accuracy.
+
+The Docker API image includes Noto Sans Lao and Noto Sans from Debian's `fonts-noto-core` package.
+
+Build the image:
+
+```bash
+docker compose build api
+```
+
+Generate the smoke set:
+
+```bash
+docker run --rm \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  lao-document-ocr-api:latest \
+  python benchmarks/generate_synthetic_smoke.py \
+  --output benchmarks/generated/smoke
+```
+
+Run the current reference configuration:
+
+```bash
+docker run --rm \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  lao-document-ocr-api:latest \
+  lao-ocr benchmark \
+  --manifest benchmarks/generated/smoke/manifest.jsonl \
+  --dataset-root benchmarks/generated/smoke \
+  --split test \
+  --languages lao+eng \
+  --psm 6 \
+  --output benchmarks/generated/smoke/report.json
+```
+
+Current checked-in smoke result:
+
+```text
+Tesseract 5.5.0
+languages: lao+eng
+PSM: 6
+samples: 4
+CER: 0.0235
+WER: 0.1000
+```
+
+See [results/synthetic-smoke-tesseract-5.5.0-psm6.json](results/synthetic-smoke-tesseract-5.5.0-psm6.json).
+
+These numbers must never be marketed as document accuracy. The pages are synthetic and intentionally simple.
+
+## What every public real-document report must include
 
 - benchmark manifest version/commit
 - number of pages
@@ -82,3 +136,5 @@ Never publish a rounded "accuracy" percentage without defining the benchmark and
 - Keep pages from the same source document in one split only.
 - Freeze public test document IDs once a benchmark release is published.
 - Keep exact UTF-8 ground truth under review like source code.
+
+See [../docs/dataset-sources.md](../docs/dataset-sources.md) for reviewed/candidate sources.

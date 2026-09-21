@@ -11,6 +11,7 @@ def test_health_endpoint() -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["engine"] == "tesseract"
+    assert payload["psm"] == 3
 
 
 def test_rejects_unsupported_upload() -> None:

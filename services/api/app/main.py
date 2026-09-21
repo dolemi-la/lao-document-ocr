@@ -23,6 +23,7 @@ from lao_document_ocr.pipeline import SUPPORTED_SUFFIXES, DocumentProcessingErro
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 MAX_PAGES = int(os.getenv("MAX_PAGES", "60"))
 OCR_LANGUAGES = os.getenv("OCR_LANGUAGES", "lao+eng")
+OCR_PSM = int(os.getenv("OCR_PSM", "3"))
 ALLOWED_ORIGINS = [
     item.strip()
     for item in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
@@ -45,7 +46,7 @@ app.add_middleware(
 
 
 def _engine() -> TesseractEngine:
-    return TesseractEngine(languages=OCR_LANGUAGES)
+    return TesseractEngine(languages=OCR_LANGUAGES, psm=OCR_PSM)
 
 
 def _safe_filename(filename: str | None) -> str:
@@ -90,6 +91,7 @@ def health() -> dict:
         "ocr_ready": ready,
         "engine": "tesseract",
         "required_languages": OCR_LANGUAGES.split("+"),
+        "psm": OCR_PSM,
         "available_languages": languages,
         "error": error,
     }

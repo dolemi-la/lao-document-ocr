@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile.api
     environment:
       OCR_LANGUAGES: lao+eng
+      OCR_PSM: "3"
       MAX_PAGES: "60"
       MAX_UPLOAD_BYTES: "26214400"
       CORS_ORIGINS: http://localhost:5173

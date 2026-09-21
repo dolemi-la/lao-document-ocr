@@ -1,0 +1,96 @@
+{
+  "schema_version": "1",
+  "generated_at": "2026-09-21T13:40:40.001498+00:00",
+  "split": "test",
+  "engine": {
+    "name": "TesseractEngine",
+    "tesseract_version": "5.5.0",
+    "languages": "lao+eng",
+    "psm": 6
+  },
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-7.0.12-linuxkit-aarch64-with-glibc2.41"
+  },
+  "elapsed_seconds": 0.9049209589993552,
+  "overall": {
+    "character_edits": 4,
+    "characters": 170,
+    "word_edits": 2,
+    "words": 20,
+    "samples": 4,
+    "cer": 0.023529411764705882,
+    "wer": 0.1
+  },
+  "subsets": {
+    "clean-print": {
+      "character_edits": 2,
+      "characters": 81,
+      "word_edits": 1,
+      "words": 10,
+      "samples": 2,
+      "cer": 0.024691358024691357,
+      "wer": 0.1
+    },
+    "mixed-lao-english": {
+      "character_edits": 0,
+      "characters": 48,
+      "word_edits": 0,
+      "words": 8,
+      "samples": 1,
+      "cer": 0.0,
+      "wer": 0.0
+    },
+    "noisy-scan": {
+      "character_edits": 2,
+      "characters": 41,
+      "word_edits": 1,
+      "words": 2,
+      "samples": 1,
+      "cer": 0.04878048780487805,
+      "wer": 0.5
+    }
+  },
+  "samples": [
+    {
+      "id": "synthetic-clean-001",
+      "document_id": "synthetic-clean-doc",
+      "subset": "clean-print",
+      "cer": 0.05,
+      "wer": 0.25,
+      "elapsed_seconds": 0.1984721670014551,
+      "reference_characters": 40,
+      "hypothesis_characters": 39
+    },
+    {
+      "id": "synthetic-clean-002",
+      "document_id": "synthetic-list-doc",
+      "subset": "clean-print",
+      "cer": 0.0,
+      "wer": 0.0,
+      "elapsed_seconds": 0.17322824999973818,
+      "reference_characters": 41,
+      "hypothesis_characters": 41
+    },
+    {
+      "id": "synthetic-mixed-001",
+      "document_id": "synthetic-mixed-doc",
+      "subset": "mixed-lao-english",
+      "cer": 0.0,
+      "wer": 0.0,
+      "elapsed_seconds": 0.1976057089996175,
+      "reference_characters": 48,
+      "hypothesis_characters": 48
+    },
+    {
+      "id": "synthetic-noisy-001",
+      "document_id": "synthetic-noisy-doc",
+      "subset": "noisy-scan",
+      "cer": 0.04878048780487805,
+      "wer": 0.5,
+      "elapsed_seconds": 0.3306607919985254,
+      "reference_characters": 41,
+      "hypothesis_characters": 42
+    }
+  ]
+}
