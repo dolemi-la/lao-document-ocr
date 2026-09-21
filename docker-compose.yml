@@ -21,3 +21,12 @@ services:
       - "5173:80"
     depends_on:
       - api
+
+  trainer:
+    profiles: ["training"]
+    build:
+      context: .
+      dockerfile: Dockerfile.train
+    volumes:
+      - .:/workspace
+    working_dir: /workspace

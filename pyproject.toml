@@ -33,6 +33,9 @@ dev = [
   "httpx>=0.27,<1",
   "ruff>=0.8,<1",
 ]
+train = [
+  "torch>=2.5,<3",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lao_document_ocr"]

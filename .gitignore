@@ -23,3 +23,6 @@ models/*.pth
 models/*.traineddata
 benchmarks/private/
 benchmarks/generated/
+training/data/
+training/generated/
+training/runs/

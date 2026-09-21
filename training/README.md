@@ -47,3 +47,5 @@ lao-ocr generate-synthetic \
 Each generated sample records its source text, font, font size, deterministic seed, augmentation parameters, relative image path, and SHA-256. Current augmentations include small rotation, brightness jitter, Gaussian blur, and image noise.
 
 Do not commit generated training images or large corpora to Git. Reproduce them from corpus + config + seed instead.
+
+Full recognizer workflow: [../docs/recognizer-training.md](../docs/recognizer-training.md).

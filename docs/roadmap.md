@@ -43,11 +43,11 @@ Status: started
 - [x] synthetic Lao text generator
 - [x] font inventory and licensing review (initial Noto Lao path)
 - [x] deterministic augmentation pipeline
-- [ ] line recognizer training
-- [ ] model export for CPU inference
+- [x] line recognizer training pipeline (CRNN + CTC)
+- [x] model export for CPU inference (`torch.export`)
 - [ ] confidence calibration
-- [ ] versioned weights/checksums
-- [ ] regression benchmark
+- [x] versioned checkpoints/artifact checksums
+- [x] exported-recognizer regression benchmark pipeline
 
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
