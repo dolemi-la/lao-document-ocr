@@ -212,6 +212,7 @@ lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
 lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
+lao-ocr bundle-benchmarks --ocr ocr.json --layout layout.json --docx docx.json --revision <git-sha> --output bundle.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
 lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf>
 lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2
@@ -229,6 +230,7 @@ See:
 - [docs/owned-ocr-engine.md](docs/owned-ocr-engine.md)
 - [docs/layout-benchmark.md](docs/layout-benchmark.md)
 - [docs/docx-fidelity-benchmark.md](docs/docx-fidelity-benchmark.md)
+- [docs/benchmark-bundles.md](docs/benchmark-bundles.md)
 
 Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
 

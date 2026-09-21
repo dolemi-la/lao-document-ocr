@@ -32,6 +32,7 @@ Status: in progress
 - [ ] simple/complex tables
 - [ ] receipts/forms as separate subsets
 - [x] CER/WER reporting by subset
+- [x] benchmark release bundle with report SHA-256/source revision
 - [ ] Tesseract baseline report
 
 Exit condition: every model change can be measured on a fixed, legal, documented dataset.

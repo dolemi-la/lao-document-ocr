@@ -138,3 +138,19 @@ Never publish a rounded "accuracy" percentage without defining the benchmark and
 - Keep exact UTF-8 ground truth under review like source code.
 
 See [../docs/dataset-sources.md](../docs/dataset-sources.md) for reviewed/candidate sources.
+
+## Benchmark release bundle
+
+Keep OCR, recognizer, layout, and DOCX fidelity reports as separate JSON files, then create one provenance bundle:
+
+```bash
+lao-ocr bundle-benchmarks \
+  --ocr benchmarks/results/tesseract.json \
+  --layout benchmarks/results/layout.json \
+  --docx benchmarks/results/docx-fidelity.json \
+  --revision "$(git rev-parse HEAD)" \
+  --label baseline-v1 \
+  --output benchmarks/results/baseline-v1.bundle.json
+```
+
+See [../docs/benchmark-bundles.md](../docs/benchmark-bundles.md).

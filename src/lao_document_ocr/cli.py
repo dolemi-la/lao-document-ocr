@@ -103,6 +103,18 @@ def _parser() -> argparse.ArgumentParser:
     docx_benchmark.add_argument("--dpi", type=int, default=144)
     docx_benchmark.add_argument("--office-binary", type=Path)
 
+    bundle = subparsers.add_parser(
+        "bundle-benchmarks",
+        help="Bundle benchmark reports with hashes and one source revision.",
+    )
+    bundle.add_argument("--ocr", type=Path)
+    bundle.add_argument("--recognizer", type=Path)
+    bundle.add_argument("--layout", type=Path)
+    bundle.add_argument("--docx", type=Path)
+    bundle.add_argument("--output", required=True, type=Path)
+    bundle.add_argument("--revision", required=True)
+    bundle.add_argument("--label")
+
     benchmark = subparsers.add_parser("benchmark", help="Run OCR against a dataset split.")
     benchmark.add_argument("--manifest", required=True, type=Path)
     benchmark.add_argument("--dataset-root", required=True, type=Path)
@@ -312,6 +324,34 @@ def _benchmark_docx(args: argparse.Namespace) -> int:
     return 0
 
 
+def _bundle_benchmarks(args: argparse.Namespace) -> int:
+    from lao_document_ocr.benchmark_bundle import (
+        build_benchmark_bundle,
+        write_benchmark_bundle,
+    )
+
+    reports = {
+        kind: path
+        for kind, path in {
+            "ocr": args.ocr,
+            "recognizer": args.recognizer,
+            "layout": args.layout,
+            "docx": args.docx,
+        }.items()
+        if path is not None
+    }
+    bundle = build_benchmark_bundle(
+        reports,
+        source_revision=args.revision,
+        label=args.label,
+    )
+    output = write_benchmark_bundle(bundle, args.output)
+    print(f"Bundle: {output}")
+    print(f"Revision: {args.revision}")
+    print(f"Reports: {len(bundle['reports'])}")
+    return 0
+
+
 def _benchmark(args: argparse.Namespace) -> int:
     samples = load_manifest(args.manifest)
     engine = TesseractEngine(languages=args.languages, psm=args.psm)
@@ -487,6 +527,8 @@ def main() -> int:
             return _benchmark_layout(args)
         if args.command == "benchmark-docx":
             return _benchmark_docx(args)
+        if args.command == "bundle-benchmarks":
+            return _bundle_benchmarks(args)
         if args.command == "benchmark":
             return _benchmark(args)
         if args.command == "prepare-corpus":

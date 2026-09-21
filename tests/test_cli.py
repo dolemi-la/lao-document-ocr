@@ -218,3 +218,42 @@ def test_benchmark_docx_cli_uses_fidelity_report(tmp_path, monkeypatch, capsys) 
     captured = capsys.readouterr()
     assert "Composite: 0.8100" in captured.out
     assert "Edge F1: 0.7000" in captured.out
+
+
+def test_bundle_benchmarks_cli(tmp_path, monkeypatch, capsys) -> None:
+    ocr = tmp_path / "ocr.json"
+    output = tmp_path / "bundle.json"
+    ocr.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "overall": {"samples": 3, "cer": 0.1, "wer": 0.2},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "bundle-benchmarks",
+            "--ocr",
+            str(ocr),
+            "--output",
+            str(output),
+            "--revision",
+            "abc123",
+            "--label",
+            "baseline-v1",
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["source_revision"] == "abc123"
+    assert payload["label"] == "baseline-v1"
+    assert payload["reports"][0]["kind"] == "ocr"
+    captured = capsys.readouterr()
+    assert "Reports: 1" in captured.out
