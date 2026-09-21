@@ -63,6 +63,10 @@ The long-term Lao model should implement the same `OcrEngine` interface.
 
 Turns OCR lines into semantic blocks. v0.1 intentionally uses conservative heuristics.
 
+### `src/lao_document_ocr/semantic.py`
+
+Classifies OCR paragraph groups into heading/body/list blocks. Heading levels are estimated from line height relative to the page's typical text height. List parsing distinguishes ordered vs bulleted markers, joins wrapped continuation lines into clean list items, and keeps the original OCR text unchanged for CER/WER.
+
 ### `src/lao_document_ocr/table_detection.py`
 
 Detects clear ruled grids using horizontal/vertical morphology, assigns OCR lines to row/column cells, and emits editable table blocks. Missing interior border segments can form rectangular row/column spans; non-rectangular/ambiguous merges are rejected. Borderless tables intentionally fall back to ordinary text instead of being guessed.

@@ -13,8 +13,13 @@ def document_to_markdown(document: Document) -> str:
                 level = max(1, min(6, block.level or 1))
                 output.append(f"{'#' * level} {block.text.replace(chr(10), ' ')}")
             elif block.type == BlockType.LIST:
-                for line in block.text.splitlines():
-                    output.append(f"- {line}")
+                items = block.metadata.get("items")
+                if not isinstance(items, list) or not items:
+                    items = block.text.splitlines()
+                ordered = block.metadata.get("list_style") == "ordered"
+                for index, item in enumerate(items, start=1):
+                    marker = f"{index}." if ordered else "-"
+                    output.append(f"{marker} {item}")
             elif block.type == BlockType.TABLE and block.cells:
                 # Full table reconstruction is a later milestone. Keep cell text lossless for now.
                 output.append(block.text)

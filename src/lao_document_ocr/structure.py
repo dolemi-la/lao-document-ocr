@@ -1,23 +1,21 @@
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from statistics import median
 
 from PIL import Image
 
 from lao_document_ocr.borderless_tables import detect_borderless_tables
-from lao_document_ocr.models import Block, BlockType, BoundingBox
+from lao_document_ocr.models import Block, BoundingBox
 from lao_document_ocr.normalization import normalize_lao_text
 from lao_document_ocr.ocr.base import RecognizedLine
 from lao_document_ocr.reading_order import order_blocks
+from lao_document_ocr.semantic import classify_paragraph
 from lao_document_ocr.table_detection import (
     build_table_block,
     detect_ruled_tables,
     split_table_lines,
 )
-
-_LIST_PREFIX = re.compile(r"^(?:[•▪◦●*-]|\d{1,3}[.)])\s+")
 
 
 def _union_bbox(lines: list[RecognizedLine]) -> BoundingBox:
@@ -44,33 +42,20 @@ def build_blocks(lines: list[RecognizedLine]) -> list[Block]:
         if not text:
             continue
 
-        heights = [line.bbox.height for line in paragraph_lines]
         confidence = sum(line.confidence for line in paragraph_lines) / len(paragraph_lines)
-        first_line = paragraph_lines[0].text
-        is_list = bool(_LIST_PREFIX.match(first_line))
-        is_heading = (
-            len(paragraph_lines) <= 2
-            and len(text) <= 140
-            and median(heights) >= typical_height * 1.35
+        classification = classify_paragraph(
+            paragraph_lines,
+            typical_height=typical_height,
         )
-
-        if is_list:
-            block_type = BlockType.LIST
-            level = None
-        elif is_heading:
-            block_type = BlockType.HEADING
-            level = 1
-        else:
-            block_type = BlockType.PARAGRAPH
-            level = None
 
         blocks.append(
             Block(
-                type=block_type,
+                type=classification.block_type,
                 text=text,
                 bbox=_union_bbox(paragraph_lines),
                 confidence=max(0.0, min(1.0, confidence)),
-                level=level,
+                level=classification.level,
+                metadata=classification.metadata or {},
             )
         )
 

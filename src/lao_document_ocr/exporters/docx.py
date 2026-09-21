@@ -57,9 +57,17 @@ def _add_block(word: WordDocument, block: Block, font_name: str) -> None:
         return
 
     if block.type == BlockType.LIST:
-        for line in block.text.splitlines():
-            paragraph = word.add_paragraph(style="List Bullet")
-            _add_text(paragraph, line, font_name)
+        style = (
+            "List Number"
+            if block.metadata.get("list_style") == "ordered"
+            else "List Bullet"
+        )
+        items = block.metadata.get("items")
+        if not isinstance(items, list) or not items:
+            items = block.text.splitlines()
+        for item in items:
+            paragraph = word.add_paragraph(style=style)
+            _add_text(paragraph, str(item), font_name)
         return
 
     if block.type == BlockType.IMAGE:

@@ -26,7 +26,8 @@ Current OCR baseline:
 - Tesseract
 - Lao + English (`lao+eng`)
 - conservative image cleanup and deskew
-- heuristic heading/list reconstruction
+- heuristic heading hierarchy and paragraph classification
+- numbered and bulleted lists with clean Word/Markdown list styles
 - conservative simple ruled-table reconstruction into editable Word tables
 - merged cells when interior ruled borders are clearly absent
 - conservative borderless aligned-text table reconstruction for strong row/column geometry
