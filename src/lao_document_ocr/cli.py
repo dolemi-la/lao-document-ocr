@@ -84,6 +84,15 @@ def _parser() -> argparse.ArgumentParser:
         help="Confirm redistribution and OCR/model-evaluation rights for this sample.",
     )
 
+    layout_benchmark = subparsers.add_parser(
+        "benchmark-layout",
+        help="Compare two document AST JSON files for layout/structure quality.",
+    )
+    layout_benchmark.add_argument("--reference", required=True, type=Path)
+    layout_benchmark.add_argument("--prediction", required=True, type=Path)
+    layout_benchmark.add_argument("--output", required=True, type=Path)
+    layout_benchmark.add_argument("--iou-threshold", type=float, default=0.5)
+
     benchmark = subparsers.add_parser("benchmark", help="Run OCR against a dataset split.")
     benchmark.add_argument("--manifest", required=True, type=Path)
     benchmark.add_argument("--dataset-root", required=True, type=Path)
@@ -242,6 +251,31 @@ def _add_dataset_sample(args: argparse.Namespace) -> int:
         rights_confirmed=args.confirm_redistributable,
     )
     print(json.dumps(sample.model_dump(mode="json", exclude_none=True), ensure_ascii=False))
+    return 0
+
+
+def _benchmark_layout(args: argparse.Namespace) -> int:
+    from lao_document_ocr.layout_benchmark import (
+        benchmark_layout,
+        load_document_ast,
+        write_layout_report,
+    )
+
+    reference = load_document_ast(args.reference)
+    prediction = load_document_ast(args.prediction)
+    report = benchmark_layout(
+        reference,
+        prediction,
+        iou_threshold=args.iou_threshold,
+    )
+    output = write_layout_report(report, args.output)
+    metrics = report["metrics"]
+    print(f"Report: {output}")
+    print(f"Block F1: {metrics['block_f1']:.4f}")
+    print(f"Mean IoU: {metrics['mean_iou']:.4f}")
+    print(f"Type accuracy: {metrics['block_type_accuracy']:.4f}")
+    print(f"Reading-order accuracy: {metrics['reading_order_accuracy']:.4f}")
+    print(f"Table-cell F1: {metrics['table_cell_f1']:.4f}")
     return 0
 
 
@@ -416,6 +450,8 @@ def main() -> int:
             return _validate(args)
         if args.command == "add-dataset-sample":
             return _add_dataset_sample(args)
+        if args.command == "benchmark-layout":
+            return _benchmark_layout(args)
         if args.command == "benchmark":
             return _benchmark(args)
         if args.command == "prepare-corpus":

@@ -210,6 +210,7 @@ Useful commands:
 lao-ocr add-dataset-sample --help
 lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
+lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
 lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf>
 lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2
@@ -225,6 +226,7 @@ See:
 - [docs/dataset-sources.md](docs/dataset-sources.md)
 - [docs/dataset-intake.md](docs/dataset-intake.md)
 - [docs/owned-ocr-engine.md](docs/owned-ocr-engine.md)
+- [docs/layout-benchmark.md](docs/layout-benchmark.md)
 
 Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
 

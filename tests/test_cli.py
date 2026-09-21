@@ -120,3 +120,50 @@ def test_calibrate_recognizer_cli(tmp_path, monkeypatch, capsys) -> None:
     captured = capsys.readouterr()
     assert "Calibration:" in captured.out
     assert "Samples: 3" in captured.out
+
+
+def test_benchmark_layout_cli(tmp_path, monkeypatch, capsys) -> None:
+    from lao_document_ocr.models import Block, BlockType, BoundingBox, Document, Page
+
+    document = Document(
+        pages=[
+            Page(
+                number=1,
+                width=600,
+                height=800,
+                blocks=[
+                    Block(
+                        type=BlockType.PARAGRAPH,
+                        text="Body",
+                        bbox=BoundingBox(x=50, y=100, width=500, height=100),
+                    )
+                ],
+            )
+        ]
+    )
+    reference = tmp_path / "reference.json"
+    prediction = tmp_path / "prediction.json"
+    output = tmp_path / "layout-report.json"
+    reference.write_text(document.model_dump_json(indent=2), encoding="utf-8")
+    prediction.write_text(document.model_dump_json(indent=2), encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "benchmark-layout",
+            "--reference",
+            str(reference),
+            "--prediction",
+            str(prediction),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 0
+    assert output.is_file()
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["metrics"]["block_f1"] == 1.0
+    assert "Block F1: 1.0000" in capsys.readouterr().out

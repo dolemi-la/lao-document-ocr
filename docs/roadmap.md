@@ -70,7 +70,8 @@ Status: started
 - [x] native PDF embedded-image preservation baseline (excluding full-page scans)
 - [x] conservative photo-like raster-region detection for image/scanned inputs
 - [ ] general diagram/illustration segmentation
-- DOCX fidelity benchmark
+- [x] layout/table AST benchmark metrics pipeline
+- [ ] DOCX visual fidelity benchmark
 
 Exit condition: layout metrics and table metrics are published alongside OCR accuracy.
 
