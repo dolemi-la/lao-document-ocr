@@ -313,12 +313,17 @@ def test_generate_capture_pack_cli(tmp_path, monkeypatch, capsys) -> None:
             "CLI unit-test corpus",
             "--dpi",
             "96",
+            "--template",
+            "two-column",
         ],
     )
 
     assert main() == 0
     assert (output / "capture-pack.json").is_file()
     assert (output / "cli-pack.pdf").is_file()
+    payload = json.loads((output / "capture-pack.json").read_text(encoding="utf-8"))
+    assert payload["pages"][0]["template"] == "two-column"
+    assert "layout:multi-column" in payload["pages"][0]["tags"]
     captured = capsys.readouterr()
     assert "Capture pack:" in captured.out
     assert "Printable PDF:" in captured.out

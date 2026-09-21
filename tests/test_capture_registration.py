@@ -166,3 +166,38 @@ def test_capture_id_must_be_filename_safe(tmp_path) -> None:
             dataset_manifest=tmp_path / "dataset" / "manifest.jsonl",
             confirm_release=True,
         )
+
+
+def test_structured_template_tags_flow_into_real_capture(tmp_path) -> None:
+    from lao_document_ocr.capture_templates import CaptureTemplate
+
+    pack = generate_capture_pack(
+        ["ສະບາຍດີ", "ຂອບໃຈ", "ລາຄາ 20,000 ກີບ", "OCR"],
+        tmp_path / "structured-pack",
+        _font_path(),
+        pack_id="columns",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        dpi=96,
+        lines_per_page=4,
+        template=CaptureTemplate.TWO_COLUMN,
+    )
+    dataset_root = tmp_path / "dataset-structured"
+    manifest = dataset_root / "manifest.jsonl"
+
+    sample = register_capture(
+        capture_pack_manifest=pack,
+        page_id="columns-p0001",
+        capture_image=_capture(tmp_path, "structured.jpg"),
+        capture_id="phone-a",
+        capture_mode=CaptureMode.PHONE_PHOTO,
+        contributor="Example Contributor",
+        release_license="CC0-1.0",
+        dataset_root=dataset_root,
+        dataset_manifest=manifest,
+        confirm_release=True,
+    )
+
+    assert "layout:multi-column" in sample.tags
+    assert "template:two-column" in sample.tags
+    assert "capture:phone-photo" in sample.tags

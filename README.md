@@ -202,7 +202,7 @@ The project does not bundle Phetsarath OT. If the font is legally installed on t
 
 ## Benchmarks
 
-The repository has a strict JSONL dataset format, dataset validator, CER/WER benchmark runner, per-subset and multi-axis benchmark-tag reporting, split-leakage checks, and a deterministic synthetic Lao smoke benchmark.
+The repository has a strict JSONL dataset format, dataset validator, CER/WER benchmark runner, per-subset and multi-axis benchmark-tag reporting, split-leakage checks, structured capture templates, and a deterministic synthetic Lao smoke benchmark.
 
 Useful commands:
 
@@ -216,7 +216,7 @@ lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output doc
 lao-ocr bundle-benchmarks --ocr ocr.json --layout layout.json --docx docx.json --revision <git-sha> --output bundle.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
 lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf>
-lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-v1 --font <font.ttf> --pack-id baseline-v1 --text-license CC0-1.0 --text-provenance <source>
+lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-v1 --font <font.ttf> --pack-id baseline-v1 --text-license CC0-1.0 --text-provenance <source> --template plain
 lao-ocr register-capture --help
 lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2
 lao-ocr export-recognizer --checkpoint training/runs/crnn-v2/recognizer.pt --output training/runs/crnn-v2/recognizer.pt2

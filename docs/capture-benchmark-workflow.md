@@ -32,6 +32,43 @@ lao-ocr generate-capture-pack \
   --max-pages 100
 ```
 
+## Structured capture templates
+
+`generate-capture-pack` supports six deterministic layouts:
+
+- `plain` — normal single-column text
+- `two-column` — clear left/right reading-order challenge
+- `ruled-table` — visible grid table with Lao text + numeric values
+- `borderless-table` — aligned text/value table without drawn borders
+- `receipt` — receipt-like item/amount/total layout
+- `form` — label/value form rows
+
+Example:
+
+```bash
+lao-ocr generate-capture-pack \
+  --corpus training/data/lao-lines.txt \
+  --output benchmarks/capture-packs/multi-column-v1 \
+  --font /path/to/NotoSansLao-Regular.ttf \
+  --pack-id multi-column-v1 \
+  --text-license CC0-1.0 \
+  --text-provenance "HPLT v2 Lao lao-Laoo cleaned corpus" \
+  --template two-column
+```
+
+Every page records its template and benchmark tags. For example, a captured two-column phone photo can carry all of:
+
+```text
+template:two-column
+layout:multi-column
+capture:phone-photo
+source:capture-pack
+source:real-capture
+language:lao
+```
+
+This lets the same real capture participate in overlapping benchmark slices without duplicating it.
+
 The output contains:
 
 ```text

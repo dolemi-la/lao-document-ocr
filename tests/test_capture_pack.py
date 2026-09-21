@@ -129,3 +129,30 @@ def test_capture_pack_rejects_path_traversal_in_manifest(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="inside the pack directory"):
         load_capture_pack(manifest_path)
+
+
+def test_capture_pack_records_structured_template_and_tags(tmp_path) -> None:
+    from lao_document_ocr.capture_templates import CaptureTemplate
+
+    manifest_path = generate_capture_pack(
+        [
+            "ສະບາຍດີ ໂລກ",
+            "ຂອບໃຈ ຫຼາຍ",
+            "ການອ່ານ ແລະ ຂຽນ",
+            "ລາຄາ 20,000 ກີບ",
+        ],
+        tmp_path / "pack",
+        _font_path(),
+        pack_id="columns",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        dpi=96,
+        lines_per_page=4,
+        template=CaptureTemplate.TWO_COLUMN,
+    )
+
+    _, manifest = load_capture_pack(manifest_path)
+    page = manifest.pages[0]
+    assert page.template == "two-column"
+    assert "layout:multi-column" in page.tags
+    assert "template:two-column" in page.tags

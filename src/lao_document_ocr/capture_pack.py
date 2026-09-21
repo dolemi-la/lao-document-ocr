@@ -9,6 +9,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from lao_document_ocr.capture_templates import (
+    CaptureTemplate,
+    render_capture_page,
+)
 from lao_document_ocr.normalization import normalize_lao_text
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -21,6 +25,7 @@ class CapturePackPage:
     ground_truth: str
     sha256: str
     lines: tuple[str, ...]
+    template: str = CaptureTemplate.PLAIN.value
     tags: tuple[str, ...] = ()
 
 
@@ -221,6 +226,7 @@ def generate_capture_pack(
     dpi: int = 150,
     lines_per_page: int = 10,
     max_pages: int | None = None,
+    template: CaptureTemplate = CaptureTemplate.PLAIN,
 ) -> Path:
     if not corpus_lines:
         raise ValueError("corpus is empty")
@@ -266,11 +272,12 @@ def generate_capture_pack(
 
         page_id = f"{pack_id}-p{page_index:04d}"
         source_lines = normalized[start : start + lines_per_page]
-        image, ground_truth = _render_page(
+        image, ground_truth, tags = render_capture_page(
             page_id=page_id,
             lines=source_lines,
             font_path=font,
             dpi=dpi,
+            template=template,
         )
 
         image_path = pages_dir / f"{page_id}.png"
@@ -285,7 +292,8 @@ def generate_capture_pack(
                 ground_truth=truth_path.relative_to(output).as_posix(),
                 sha256=_sha256(image_path),
                 lines=tuple(source_lines),
-                tags=_page_tags(source_lines),
+                template=template.value,
+                tags=tags,
             )
         )
         page_images.append(image)
@@ -353,6 +361,7 @@ def load_capture_pack(path: str | Path) -> tuple[Path, CapturePackManifest]:
             ),
             sha256=str(item["sha256"]),
             lines=tuple(str(line) for line in item.get("lines", [])),
+            template=str(item.get("template", CaptureTemplate.PLAIN.value)),
             tags=tuple(str(tag) for tag in item.get("tags", [])),
         )
         for item in page_entries

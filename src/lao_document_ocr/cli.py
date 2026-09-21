@@ -178,6 +178,18 @@ def _parser() -> argparse.ArgumentParser:
     capture_pack.add_argument("--dpi", type=int, default=150)
     capture_pack.add_argument("--lines-per-page", type=int, default=10)
     capture_pack.add_argument("--max-pages", type=int)
+    capture_pack.add_argument(
+        "--template",
+        choices=[
+            "plain",
+            "two-column",
+            "ruled-table",
+            "borderless-table",
+            "receipt",
+            "form",
+        ],
+        default="plain",
+    )
 
     capture_register = subparsers.add_parser(
         "register-capture",
@@ -485,6 +497,7 @@ def _generate_synthetic(args: argparse.Namespace) -> int:
 
 def _generate_capture_pack(args: argparse.Namespace) -> int:
     from lao_document_ocr.capture_pack import generate_capture_pack
+    from lao_document_ocr.capture_templates import CaptureTemplate
 
     manifest = generate_capture_pack(
         load_corpus(args.corpus),
@@ -496,6 +509,7 @@ def _generate_capture_pack(args: argparse.Namespace) -> int:
         dpi=args.dpi,
         lines_per_page=args.lines_per_page,
         max_pages=args.max_pages,
+        template=CaptureTemplate(args.template),
     )
     print(f"Capture pack: {manifest}")
     print(f"Printable PDF: {manifest.parent / (args.pack_id + '.pdf')}")

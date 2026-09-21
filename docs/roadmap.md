@@ -28,6 +28,7 @@ Status: in progress
 - [x] benchmark source review registry/policy
 - [x] dataset coverage/integrity report + duplicate-image detection
 - [x] multi-axis benchmark tags and per-tag CER/WER
+- [x] structured printable capture templates for multi-column/table/receipt/form collection
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos
