@@ -29,6 +29,7 @@ Current OCR baseline:
 - heuristic heading/list reconstruction
 - conservative simple ruled-table reconstruction into editable Word tables
 - merged cells when interior ruled borders are clearly absent
+- conservative borderless aligned-text table reconstruction for strong row/column geometry
 - conservative two-column reading order when a clear gutter exists
 - repeated multi-page headers/footers exported into real Word header/footer parts
 - native PDF images/logos/figures preserved as real Word media assets (full-page scan backgrounds excluded)

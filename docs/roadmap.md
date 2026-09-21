@@ -62,7 +62,8 @@ Status: started
 - [ ] general learned reading order
 - [x] simple ruled-table detection baseline
 - [x] row/column/cell structure for clear ruled grids
-- [ ] borderless/complex table detection
+- [x] conservative aligned-text borderless-table baseline
+- [ ] general/complex borderless table detection
 - [x] merged-cell baseline for clear ruled rectangular spans
 - [ ] merged cells in borderless/complex tables
 - [x] repeated header/footer detection baseline and DOCX preservation

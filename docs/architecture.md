@@ -67,6 +67,10 @@ Turns OCR lines into semantic blocks. v0.1 intentionally uses conservative heuri
 
 Detects clear ruled grids using horizontal/vertical morphology, assigns OCR lines to row/column cells, and emits editable table blocks. Missing interior border segments can form rectangular row/column spans; non-rectangular/ambiguous merges are rejected. Borderless tables intentionally fall back to ordinary text instead of being guessed.
 
+### `src/lao_document_ocr/borderless_tables.py`
+
+Detects borderless tables only from strong repeated OCR geometry: stable column anchors, tight row spacing, short cell text, and real gaps between columns. Two-column candidates additionally require a consistently numeric/currency/date-style value column so ordinary two-column prose remains reading-order content instead of being converted into a table.
+
 ### `src/lao_document_ocr/reading_order.py`
 
 Applies conservative two-column reading order only when a clear central gutter separates at least two blocks per side. Ambiguous/spanning layouts keep normal top-to-bottom ordering instead of guessing.

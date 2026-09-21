@@ -6,6 +6,7 @@ from statistics import median
 
 from PIL import Image
 
+from lao_document_ocr.borderless_tables import detect_borderless_tables
 from lao_document_ocr.models import Block, BlockType, BoundingBox
 from lao_document_ocr.normalization import normalize_lao_text
 from lao_document_ocr.ocr.base import RecognizedLine
@@ -83,11 +84,23 @@ def build_blocks(lines: list[RecognizedLine]) -> list[Block]:
 
 
 def build_page_blocks(lines: list[RecognizedLine], image: Image.Image) -> list[Block]:
-    tables = detect_ruled_tables(image)
-    if not tables:
-        return order_blocks(build_blocks(lines), page_width=image.width)
+    ruled_tables = detect_ruled_tables(image)
+    remaining = lines
+    ruled_blocks: list[Block] = []
 
-    remaining, assignments = split_table_lines(lines, tables)
+    if ruled_tables:
+        remaining, assignments = split_table_lines(lines, ruled_tables)
+        ruled_blocks = [
+            build_table_block(table, table_lines)
+            for table, table_lines in assignments
+        ]
+
+    remaining, borderless_blocks = detect_borderless_tables(
+        remaining,
+        page_width=image.width,
+    )
+
     blocks = build_blocks(remaining)
-    blocks.extend(build_table_block(table, table_lines) for table, table_lines in assignments)
+    blocks.extend(ruled_blocks)
+    blocks.extend(borderless_blocks)
     return order_blocks(blocks, page_width=image.width)
