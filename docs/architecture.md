@@ -79,6 +79,10 @@ Finds exact repeated text in the top/bottom page margins across multi-page docum
 
 Extracts native image objects from PDF pages, normalizes them to PNG, maps their rectangles into rendered-page coordinates, and emits image blocks. Images covering most of a page are intentionally excluded so scan-background images are not duplicated alongside OCR text.
 
+### `src/lao_document_ocr/raster_regions.py`
+
+Masks recognized text and known native-PDF image rectangles, then detects dense photo/logo-like raster regions. It rejects near-full-page regions to avoid duplicating scan backgrounds and crops from the original color page for DOCX preservation.
+
 ### `src/lao_document_ocr/models.py`
 
 The canonical document AST.

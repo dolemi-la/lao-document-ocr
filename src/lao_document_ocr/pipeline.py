@@ -12,6 +12,7 @@ from lao_document_ocr.models import Document, Page
 from lao_document_ocr.ocr.base import OcrEngine, OcrEngineError
 from lao_document_ocr.ocr.tesseract import TesseractEngine
 from lao_document_ocr.preprocessing import preprocess_image
+from lao_document_ocr.raster_regions import detect_raster_regions
 from lao_document_ocr.reading_order import order_blocks
 from lao_document_ocr.structure import build_page_blocks
 
@@ -96,6 +97,14 @@ def process_document(
 
         blocks = build_page_blocks(lines, cleaned)
         blocks.extend(asset.to_block() for asset in loaded_page.embedded_images)
+        blocks.extend(
+            detect_raster_regions(
+                cleaned,
+                lines,
+                source_image=loaded_page.image,
+                exclude_boxes=[asset.bbox for asset in loaded_page.embedded_images],
+            )
+        )
         blocks = order_blocks(blocks, page_width=cleaned.width)
 
         output_pages.append(
