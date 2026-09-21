@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
-from lao_document_ocr.recognizer_training import prepare_line_image
+from lao_document_ocr.confidence_calibration import ConfidenceCalibration
+from lao_document_ocr.recognizer_training import prepare_line_image, prepare_line_pil_image
 from lao_document_ocr.vocabulary import CharacterVocabulary
 
 
@@ -15,6 +17,7 @@ from lao_document_ocr.vocabulary import CharacterVocabulary
 class RecognitionResult:
     text: str
     confidence: float
+    calibrated_confidence: float | None
     valid_timesteps: int
 
 
@@ -38,7 +41,12 @@ def _require_torch():
 
 
 class ExportedLineRecognizer:
-    def __init__(self, artifact_path: str | Path) -> None:
+    def __init__(
+        self,
+        artifact_path: str | Path,
+        *,
+        calibration_path: str | Path | None = None,
+    ) -> None:
         torch = _require_torch()
         self.artifact_path = Path(artifact_path)
         metadata_path = self.artifact_path.with_suffix(self.artifact_path.suffix + ".json")
@@ -59,17 +67,15 @@ class ExportedLineRecognizer:
         self.width_downsample_factor = int(metadata["width_downsample_factor"])
         self.vocabulary = CharacterVocabulary(tuple(metadata["vocabulary"]["characters"]))
 
+        self.calibration = (
+            ConfidenceCalibration.load(calibration_path) if calibration_path is not None else None
+        )
+
         exported = torch.export.load(str(self.artifact_path))
         self.model = exported.module()
 
-    def recognize(self, image_path: str | Path) -> RecognitionResult:
+    def _recognize_array(self, array: np.ndarray, valid_width: int) -> RecognitionResult:
         torch = _require_torch()
-        array, valid_width = prepare_line_image(
-            image_path,
-            image_height=self.image_height,
-            max_width=self.max_width,
-        )
-
         padded = np.zeros((1, self.image_height, self.max_width), dtype=np.float32)
         padded[:, :, :valid_width] = array
 
@@ -85,8 +91,28 @@ class ExportedLineRecognizer:
         max_probabilities, token_ids = probabilities.max(dim=-1)
         text = self.vocabulary.decode_ctc(token_ids.tolist())
         confidence = float(max_probabilities.mean().item()) if valid_timesteps else 0.0
+        calibrated_confidence = (
+            self.calibration.calibrate(confidence) if self.calibration is not None else None
+        )
         return RecognitionResult(
             text=text,
             confidence=confidence,
+            calibrated_confidence=calibrated_confidence,
             valid_timesteps=valid_timesteps,
         )
+
+    def recognize(self, image_path: str | Path) -> RecognitionResult:
+        array, valid_width = prepare_line_image(
+            image_path,
+            image_height=self.image_height,
+            max_width=self.max_width,
+        )
+        return self._recognize_array(array, valid_width)
+
+    def recognize_image(self, image: Image.Image) -> RecognitionResult:
+        array, valid_width = prepare_line_pil_image(
+            image,
+            image_height=self.image_height,
+            max_width=self.max_width,
+        )
+        return self._recognize_array(array, valid_width)

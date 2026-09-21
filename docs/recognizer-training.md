@@ -79,7 +79,7 @@ The sidecar `recognizer.pt2.json` contains:
 lao-ocr recognize-line   --model training/runs/crnn-v2/recognizer.pt2   --image line.png
 ```
 
-This command is for model development. Full-page OCR still uses the existing OCR engine interface until the project-owned recognizer reaches benchmark quality and is integrated with line detection.
+This command is for cropped-line model development. An experimental full-page engine now combines deterministic line detection with the project-owned recognizer; see [owned-ocr-engine.md](owned-ocr-engine.md). Tesseract remains the default until the owned model beats the fixed real-document baseline.
 
 ## CTC capacity
 
@@ -98,7 +98,20 @@ lao-ocr benchmark-recognizer \
   --output training/runs/crnn-v2/benchmark.json
 ```
 
-The report includes aggregate CER/WER plus per-sample hypotheses, timing, and the current uncalibrated probability score. Treat the probability as diagnostic only until confidence calibration is implemented.
+The report includes aggregate CER/WER plus per-sample hypotheses, timing, and the raw probability score. Raw confidence is diagnostic only until calibrated on a held-out development set.
+
+## 8. Calibrate confidence on held-out dev data
+
+```bash
+lao-ocr calibrate-recognizer \
+  --report training/runs/crnn-v2/dev-report.json \
+  --output training/runs/crnn-v2/calibration.json \
+  --bins 10
+```
+
+The current calibrator maps raw mean timestep probability to observed character accuracy using quantile bins. Do not fit it on the final test set.
+
+Use the calibration file with `recognize-line`, `benchmark-recognizer`, or the full-page owned OCR engine.
 
 ## Development sanity result
 

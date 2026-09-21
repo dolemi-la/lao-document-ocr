@@ -16,9 +16,11 @@ from lao_document_ocr.corpus import (
 from lao_document_ocr.dataset import (
     DatasetManifestError,
     DatasetSplit,
+    DatasetSubset,
     load_manifest,
     validate_dataset,
 )
+from lao_document_ocr.dataset_intake import add_dataset_sample
 from lao_document_ocr.ocr import OcrEngineError, TesseractEngine
 from lao_document_ocr.synthetic import generate_synthetic_lines, load_corpus
 from lao_document_ocr.training_manifest import load_training_manifest
@@ -35,6 +37,37 @@ def _parser() -> argparse.ArgumentParser:
     validate.add_argument("--manifest", required=True, type=Path)
     validate.add_argument("--dataset-root", required=True, type=Path)
     validate.add_argument("--no-hash-check", action="store_true")
+
+    intake = subparsers.add_parser(
+        "add-dataset-sample",
+        help="Copy a rights-cleared benchmark page into the public dataset.",
+    )
+    intake.add_argument("--dataset-root", required=True, type=Path)
+    intake.add_argument("--manifest", required=True, type=Path)
+    intake.add_argument("--id", required=True, dest="sample_id")
+    intake.add_argument("--document-id", required=True)
+    intake.add_argument(
+        "--subset",
+        required=True,
+        choices=[subset.value for subset in DatasetSubset],
+    )
+    intake.add_argument("--image", required=True, type=Path)
+    intake.add_argument("--ground-truth", required=True, type=Path)
+    intake.add_argument("--license", required=True)
+    intake.add_argument("--provenance", required=True)
+    intake.add_argument("--language", default="lo")
+    intake.add_argument("--source-url")
+    intake.add_argument("--license-url")
+    intake.add_argument("--notes")
+    intake.add_argument(
+        "--split",
+        choices=[split.value for split in DatasetSplit],
+    )
+    intake.add_argument(
+        "--confirm-redistributable",
+        action="store_true",
+        help="Confirm redistribution and OCR/model-evaluation rights for this sample.",
+    )
 
     benchmark = subparsers.add_parser("benchmark", help="Run OCR against a dataset split.")
     benchmark.add_argument("--manifest", required=True, type=Path)
@@ -114,6 +147,17 @@ def _parser() -> argparse.ArgumentParser:
     recognizer_benchmark.add_argument("--model", required=True, type=Path)
     recognizer_benchmark.add_argument("--output", required=True, type=Path)
     recognizer_benchmark.add_argument("--no-hash-check", action="store_true")
+    recognizer_benchmark.add_argument("--calibration", type=Path)
+
+    calibrate = subparsers.add_parser(
+        "calibrate-recognizer",
+        help="Fit confidence calibration from a held-out recognizer benchmark report.",
+    )
+    calibrate.add_argument("--report", required=True, type=Path)
+    calibrate.add_argument("--output", required=True, type=Path)
+    calibrate.add_argument("--bins", type=int, default=10)
+
+    recognize.add_argument("--calibration", type=Path)
 
     return parser
 
@@ -137,6 +181,28 @@ def _validate(args: argparse.Namespace) -> int:
 
     print(f"Valid dataset: {len(samples)} samples")
     print(json.dumps(counts, indent=2, sort_keys=True))
+    return 0
+
+
+def _add_dataset_sample(args: argparse.Namespace) -> int:
+    sample = add_dataset_sample(
+        dataset_root=args.dataset_root,
+        manifest_path=args.manifest,
+        sample_id=args.sample_id,
+        document_id=args.document_id,
+        subset=DatasetSubset(args.subset),
+        image_path=args.image,
+        ground_truth_path=args.ground_truth,
+        license=args.license,
+        provenance=args.provenance,
+        language=args.language,
+        source_url=args.source_url,
+        license_url=args.license_url,
+        notes=args.notes,
+        split=DatasetSplit(args.split) if args.split else None,
+        rights_confirmed=args.confirm_redistributable,
+    )
+    print(json.dumps(sample.model_dump(mode="json", exclude_none=True), ensure_ascii=False))
     return 0
 
 
@@ -250,10 +316,12 @@ def _recognize_line(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    recognizer = ExportedLineRecognizer(args.model)
+    recognizer = ExportedLineRecognizer(args.model, calibration_path=args.calibration)
     result = recognizer.recognize(args.image)
     print(result.text)
     print(f"uncalibrated_confidence={result.confidence:.4f}", file=sys.stderr)
+    if result.calibrated_confidence is not None:
+        print(f"calibrated_confidence={result.calibrated_confidence:.4f}", file=sys.stderr)
     return 0
 
 
@@ -272,7 +340,10 @@ def _benchmark_recognizer(args: argparse.Namespace) -> int:
         args.manifest,
         verify_hashes=not args.no_hash_check,
     )
-    recognizer = ExportedLineRecognizer(args.model)
+    recognizer = ExportedLineRecognizer(
+        args.model,
+        calibration_path=args.calibration,
+    )
     report = benchmark_recognizer(samples, recognizer)
     output = write_recognizer_report(report, args.output)
     overall = report["overall"]
@@ -283,12 +354,27 @@ def _benchmark_recognizer(args: argparse.Namespace) -> int:
     return 0
 
 
+def _calibrate_recognizer(args: argparse.Namespace) -> int:
+    from lao_document_ocr.confidence_calibration import fit_from_recognizer_report
+
+    report = json.loads(args.report.read_text(encoding="utf-8"))
+    calibration = fit_from_recognizer_report(report, max_bins=args.bins)
+    output = calibration.save(args.output)
+    print(f"Calibration: {output}")
+    print(f"Samples: {calibration.sample_count}")
+    print(f"Raw MAE: {calibration.raw_mae:.4f}")
+    print(f"Calibrated MAE: {calibration.calibrated_mae:.4f}")
+    return 0
+
+
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
     try:
         if args.command == "validate-dataset":
             return _validate(args)
+        if args.command == "add-dataset-sample":
+            return _add_dataset_sample(args)
         if args.command == "benchmark":
             return _benchmark(args)
         if args.command == "prepare-corpus":
@@ -303,6 +389,8 @@ def main() -> int:
             return _recognize_line(args)
         if args.command == "benchmark-recognizer":
             return _benchmark_recognizer(args)
+        if args.command == "calibrate-recognizer":
+            return _calibrate_recognizer(args)
     except (DatasetManifestError, OcrEngineError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

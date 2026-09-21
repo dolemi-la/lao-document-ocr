@@ -118,6 +118,7 @@ Defaults:
 
 - max file size: 25 MB
 - max PDF length: 60 pages
+- OCR engine: Tesseract
 - OCR languages: Lao + English
 - Tesseract page segmentation mode: 3
 
@@ -125,9 +126,14 @@ Override them with:
 
 - `MAX_UPLOAD_BYTES`
 - `MAX_PAGES`
+- `OCR_ENGINE=tesseract|owned`
 - `OCR_LANGUAGES`
 - `OCR_PSM`
+- `OCR_MODEL_PATH` (required for `OCR_ENGINE=owned`)
+- `OCR_CALIBRATION_PATH` (optional for the owned recognizer)
 - `CORS_ORIGINS`
+
+The project-owned engine is experimental and requires the optional PyTorch dependencies. See [docs/owned-ocr-engine.md](docs/owned-ocr-engine.md).
 
 ## Document AST
 
@@ -170,6 +176,7 @@ The repository has a strict JSONL dataset format, dataset validator, CER/WER ben
 Useful commands:
 
 ```bash
+lao-ocr add-dataset-sample --help
 lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
@@ -177,6 +184,7 @@ lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output trainin
 lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2
 lao-ocr export-recognizer --checkpoint training/runs/crnn-v2/recognizer.pt --output training/runs/crnn-v2/recognizer.pt2
 lao-ocr benchmark-recognizer --manifest training/generated/v1/manifest.jsonl --model training/runs/crnn-v2/recognizer.pt2 --output training/runs/crnn-v2/benchmark.json
+lao-ocr calibrate-recognizer --report <dev-report.json> --output <calibration.json>
 ```
 
 See:
@@ -184,6 +192,8 @@ See:
 - [benchmarks/README.md](benchmarks/README.md)
 - [docs/dataset-format.md](docs/dataset-format.md)
 - [docs/dataset-sources.md](docs/dataset-sources.md)
+- [docs/dataset-intake.md](docs/dataset-intake.md)
+- [docs/owned-ocr-engine.md](docs/owned-ocr-engine.md)
 
 Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
 

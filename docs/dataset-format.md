@@ -115,6 +115,10 @@ Anything reviewers need to understand about the sample.
 
 `source` and `ground_truth` must be relative and may not contain parent traversal (`..`).
 
+## Intake helper
+
+Use [dataset-intake.md](dataset-intake.md) and `lao-ocr add-dataset-sample` instead of manually copying public benchmark files whenever possible. The intake command hashes files, preserves document-level split assignment, and requires explicit redistribution/evaluation rights confirmation.
+
 ## Validation
 
 ```bash

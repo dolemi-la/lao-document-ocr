@@ -86,7 +86,7 @@ def process_document(
         source_name=source_name or path.name,
         pages=output_pages,
         metadata={
-            "engine": engine.__class__.__name__,
+            "engine": engine.metadata(),
             "page_count": len(output_pages),
         },
     )

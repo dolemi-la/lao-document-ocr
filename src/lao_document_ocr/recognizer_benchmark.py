@@ -80,6 +80,7 @@ def benchmark_recognizer(
                 "wer": counts.to_dict()["wer"],
                 "elapsed_seconds": elapsed,
                 "uncalibrated_confidence": getattr(result, "confidence", None),
+                "calibrated_confidence": getattr(result, "calibrated_confidence", None),
             }
         )
 

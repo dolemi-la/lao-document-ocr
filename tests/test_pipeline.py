@@ -30,4 +30,4 @@ def test_process_image_with_fake_engine(tmp_path) -> None:
 
     assert len(document.pages) == 1
     assert document.pages[0].blocks[0].text == "Hello OCR"
-    assert document.metadata["engine"] == "FakeEngine"
+    assert document.metadata["engine"]["name"] == "FakeEngine"

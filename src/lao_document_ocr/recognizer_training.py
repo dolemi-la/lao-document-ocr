@@ -74,17 +74,16 @@ def _require_torch():
     return torch, nn, DataLoader, Dataset
 
 
-def prepare_line_image(
-    path: str | Path,
+def prepare_line_pil_image(
+    image: Image.Image,
     *,
     image_height: int,
     max_width: int,
 ) -> tuple[np.ndarray, int]:
-    with Image.open(path) as source:
-        image = ImageOps.exif_transpose(source).convert("L")
+    image = ImageOps.exif_transpose(image).convert("L")
 
     if image.width < 1 or image.height < 1:
-        raise ValueError(f"Invalid image dimensions: {path}")
+        raise ValueError("Invalid image dimensions")
 
     scale = image_height / image.height
     target_width = max(1, int(round(image.width * scale)))
@@ -105,6 +104,20 @@ def prepare_line_image(
     array = np.asarray(canvas, dtype=np.float32)
     array = 1.0 - (array / 255.0)
     return array[None, :, :], target_width
+
+
+def prepare_line_image(
+    path: str | Path,
+    *,
+    image_height: int,
+    max_width: int,
+) -> tuple[np.ndarray, int]:
+    with Image.open(path) as source:
+        return prepare_line_pil_image(
+            source,
+            image_height=image_height,
+            max_width=max_width,
+        )
 
 
 def _build_dataset_type():

@@ -45,7 +45,7 @@ Status: started
 - [x] deterministic augmentation pipeline
 - [x] line recognizer training pipeline (CRNN + CTC)
 - [x] model export for CPU inference (`torch.export`)
-- [ ] confidence calibration
+- [x] confidence calibration pipeline (held-out dev report -> calibration artifact)
 - [x] versioned checkpoints/artifact checksums
 - [x] exported-recognizer regression benchmark pipeline
 
@@ -53,7 +53,10 @@ Exit condition: our recognizer beats the published Tesseract baseline on the fix
 
 ## Phase 3 — layout/table reconstruction
 
-- text-region detection
+Status: started
+
+- [x] deterministic clean-scan text-line detection baseline
+- [ ] learned/general text-region detection
 - heading/body/list classification
 - reading order
 - table detection

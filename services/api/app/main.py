@@ -17,13 +17,21 @@ from lao_document_ocr.exporters import (
     export_markdown,
     export_text,
 )
-from lao_document_ocr.ocr import TesseractEngine
+from lao_document_ocr.ocr import (
+    OcrEngine,
+    OcrEngineError,
+    OwnedRecognizerEngine,
+    TesseractEngine,
+)
 from lao_document_ocr.pipeline import SUPPORTED_SUFFIXES, DocumentProcessingError, process_document
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 MAX_PAGES = int(os.getenv("MAX_PAGES", "60"))
+OCR_ENGINE = os.getenv("OCR_ENGINE", "tesseract").strip().lower()
 OCR_LANGUAGES = os.getenv("OCR_LANGUAGES", "lao+eng")
 OCR_PSM = int(os.getenv("OCR_PSM", "3"))
+OCR_MODEL_PATH = os.getenv("OCR_MODEL_PATH")
+OCR_CALIBRATION_PATH = os.getenv("OCR_CALIBRATION_PATH")
 ALLOWED_ORIGINS = [
     item.strip()
     for item in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
@@ -45,8 +53,17 @@ app.add_middleware(
 )
 
 
-def _engine() -> TesseractEngine:
-    return TesseractEngine(languages=OCR_LANGUAGES, psm=OCR_PSM)
+def _engine() -> OcrEngine:
+    if OCR_ENGINE == "tesseract":
+        return TesseractEngine(languages=OCR_LANGUAGES, psm=OCR_PSM)
+    if OCR_ENGINE == "owned":
+        if not OCR_MODEL_PATH:
+            raise OcrEngineError("OCR_MODEL_PATH is required when OCR_ENGINE=owned")
+        return OwnedRecognizerEngine(
+            OCR_MODEL_PATH,
+            calibration_path=OCR_CALIBRATION_PATH,
+        )
+    raise OcrEngineError(f"Unsupported OCR_ENGINE: {OCR_ENGINE}")
 
 
 def _safe_filename(filename: str | None) -> str:
@@ -77,24 +94,39 @@ def _validate_suffix(filename: str) -> str:
 
 @app.get("/health")
 def health() -> dict:
-    engine = _engine()
     try:
-        languages = engine.available_languages()
+        engine = _engine()
         ready = engine.is_available()
+        metadata = engine.metadata()
         error = None
     except Exception as exc:
-        languages = []
+        engine = None
         ready = False
+        metadata = None
         error = str(exc)
-    return {
+
+    payload = {
         "status": "ok",
         "ocr_ready": ready,
-        "engine": "tesseract",
-        "required_languages": OCR_LANGUAGES.split("+"),
-        "psm": OCR_PSM,
-        "available_languages": languages,
+        "engine": OCR_ENGINE,
+        "metadata": metadata,
         "error": error,
     }
+    if OCR_ENGINE == "tesseract":
+        try:
+            available_languages = (
+                engine.available_languages() if isinstance(engine, TesseractEngine) else []
+            )
+        except OcrEngineError:
+            available_languages = []
+        payload.update(
+            {
+                "required_languages": OCR_LANGUAGES.split("+"),
+                "psm": OCR_PSM,
+                "available_languages": available_languages,
+            }
+        )
+    return payload
 
 
 @app.post("/v1/parse")
