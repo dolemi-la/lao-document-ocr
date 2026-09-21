@@ -79,6 +79,10 @@ Applies conservative two-column reading order only when a clear central gutter s
 
 Compares reviewed and predicted document ASTs independently of OCR text quality. It reports normalized block IoU/F1, semantic type accuracy, reading-order accuracy, and table shape/cell-span structure metrics.
 
+### `src/lao_document_ocr/visual_fidelity.py`
+
+Optionally renders generated DOCX files through headless LibreOffice and compares the rendered pages against reference images/PDFs using pixel similarity, foreground IoU, tolerant edge F1, and page-count consistency. LibreOffice is benchmark-only and is not required by the OCR runtime.
+
 ### `src/lao_document_ocr/header_footer.py`
 
 Finds exact repeated text in the top/bottom page margins across multi-page documents and tags it as header/footer content. The DOCX exporter moves those tagged blocks into real Word header/footer parts while retaining the role in the document AST.

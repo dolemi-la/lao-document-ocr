@@ -93,6 +93,16 @@ def _parser() -> argparse.ArgumentParser:
     layout_benchmark.add_argument("--output", required=True, type=Path)
     layout_benchmark.add_argument("--iou-threshold", type=float, default=0.5)
 
+    docx_benchmark = subparsers.add_parser(
+        "benchmark-docx",
+        help="Render a DOCX and compare it visually against a reference image/PDF.",
+    )
+    docx_benchmark.add_argument("--reference", required=True, type=Path)
+    docx_benchmark.add_argument("--docx", required=True, type=Path)
+    docx_benchmark.add_argument("--output", required=True, type=Path)
+    docx_benchmark.add_argument("--dpi", type=int, default=144)
+    docx_benchmark.add_argument("--office-binary", type=Path)
+
     benchmark = subparsers.add_parser("benchmark", help="Run OCR against a dataset split.")
     benchmark.add_argument("--manifest", required=True, type=Path)
     benchmark.add_argument("--dataset-root", required=True, type=Path)
@@ -279,6 +289,29 @@ def _benchmark_layout(args: argparse.Namespace) -> int:
     return 0
 
 
+def _benchmark_docx(args: argparse.Namespace) -> int:
+    from lao_document_ocr.visual_fidelity import (
+        benchmark_docx_fidelity,
+        write_fidelity_report,
+    )
+
+    report = benchmark_docx_fidelity(
+        args.reference,
+        args.docx,
+        dpi=args.dpi,
+        office_binary=args.office_binary,
+    )
+    output = write_fidelity_report(report, args.output)
+    metrics = report["metrics"]
+    print(f"Report: {output}")
+    print(f"Composite: {metrics['composite_score']:.4f}")
+    print(f"Pixel similarity: {metrics['pixel_similarity']:.4f}")
+    print(f"Foreground IoU: {metrics['foreground_iou']:.4f}")
+    print(f"Edge F1: {metrics['edge_f1']:.4f}")
+    print(f"Page-count score: {metrics['page_count_score']:.4f}")
+    return 0
+
+
 def _benchmark(args: argparse.Namespace) -> int:
     samples = load_manifest(args.manifest)
     engine = TesseractEngine(languages=args.languages, psm=args.psm)
@@ -452,6 +485,8 @@ def main() -> int:
             return _add_dataset_sample(args)
         if args.command == "benchmark-layout":
             return _benchmark_layout(args)
+        if args.command == "benchmark-docx":
+            return _benchmark_docx(args)
         if args.command == "benchmark":
             return _benchmark(args)
         if args.command == "prepare-corpus":

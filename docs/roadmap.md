@@ -71,7 +71,7 @@ Status: started
 - [x] conservative photo-like raster-region detection for image/scanned inputs
 - [ ] general diagram/illustration segmentation
 - [x] layout/table AST benchmark metrics pipeline
-- [ ] DOCX visual fidelity benchmark
+- [x] optional DOCX visual fidelity benchmark pipeline (LibreOffice renderer)
 
 Exit condition: layout metrics and table metrics are published alongside OCR accuracy.
 

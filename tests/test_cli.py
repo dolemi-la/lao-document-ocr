@@ -167,3 +167,54 @@ def test_benchmark_layout_cli(tmp_path, monkeypatch, capsys) -> None:
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["metrics"]["block_f1"] == 1.0
     assert "Block F1: 1.0000" in capsys.readouterr().out
+
+
+def test_benchmark_docx_cli_uses_fidelity_report(tmp_path, monkeypatch, capsys) -> None:
+    import lao_document_ocr.visual_fidelity as visual_fidelity
+
+    reference = tmp_path / "reference.png"
+    docx = tmp_path / "result.docx"
+    output = tmp_path / "fidelity.json"
+    reference.write_bytes(b"reference")
+    docx.write_bytes(b"docx")
+
+    def fake_benchmark(*args, **kwargs):
+        return {
+            "schema_version": "1",
+            "dpi": 144,
+            "renderer": {"binary": "fake", "version": "fake", "pymupdf_version": "fake"},
+            "metrics": {
+                "reference_pages": 1,
+                "predicted_pages": 1,
+                "compared_pages": 1,
+                "page_count_score": 1.0,
+                "pixel_similarity": 0.9,
+                "foreground_iou": 0.8,
+                "edge_f1": 0.7,
+                "composite_score": 0.81,
+                "pages": [],
+            },
+        }
+
+    monkeypatch.setattr(visual_fidelity, "benchmark_docx_fidelity", fake_benchmark)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "benchmark-docx",
+            "--reference",
+            str(reference),
+            "--docx",
+            str(docx),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["metrics"]["composite_score"] == 0.81
+    captured = capsys.readouterr()
+    assert "Composite: 0.8100" in captured.out
+    assert "Edge F1: 0.7000" in captured.out
