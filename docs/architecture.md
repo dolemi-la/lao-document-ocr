@@ -65,7 +65,7 @@ Turns OCR lines into semantic blocks. v0.1 intentionally uses conservative heuri
 
 ### `src/lao_document_ocr/table_detection.py`
 
-Detects clear ruled grids using horizontal/vertical morphology, assigns OCR lines to row/column cells, and emits editable table blocks. Borderless or ambiguous tables intentionally fall back to ordinary text instead of being guessed.
+Detects clear ruled grids using horizontal/vertical morphology, assigns OCR lines to row/column cells, and emits editable table blocks. Missing interior border segments can form rectangular row/column spans; non-rectangular/ambiguous merges are rejected. Borderless tables intentionally fall back to ordinary text instead of being guessed.
 
 ### `src/lao_document_ocr/reading_order.py`
 

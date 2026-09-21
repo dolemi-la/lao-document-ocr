@@ -63,7 +63,8 @@ Status: started
 - [x] simple ruled-table detection baseline
 - [x] row/column/cell structure for clear ruled grids
 - [ ] borderless/complex table detection
-- [ ] merged cells
+- [x] merged-cell baseline for clear ruled rectangular spans
+- [ ] merged cells in borderless/complex tables
 - [x] repeated header/footer detection baseline and DOCX preservation
 - [x] native PDF embedded-image preservation baseline (excluding full-page scans)
 - [ ] raster/photo-region detection for image-only inputs and scanned pages

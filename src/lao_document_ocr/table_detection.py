@@ -15,6 +15,10 @@ class RuledTable:
     bbox: BoundingBox
     x_lines: tuple[int, ...]
     y_lines: tuple[int, ...]
+    # (row, interior vertical boundary index)
+    missing_vertical_borders: tuple[tuple[int, int], ...] = ()
+    # (interior horizontal boundary index, column)
+    missing_horizontal_borders: tuple[tuple[int, int], ...] = ()
 
 
 def _collapse_positions(positions: np.ndarray, max_gap: int = 2) -> tuple[int, ...]:
@@ -28,6 +32,87 @@ def _collapse_positions(positions: np.ndarray, max_gap: int = 2) -> tuple[int, .
         else:
             groups.append([value])
     return tuple(round(sum(group) / len(group)) for group in groups)
+
+
+def _vertical_border_coverage(
+    vertical_mask: np.ndarray,
+    *,
+    x: int,
+    y0: int,
+    y1: int,
+) -> float:
+    if y1 <= y0:
+        return 1.0
+    height, width = vertical_mask.shape
+    left = max(0, x - 2)
+    right = min(width, x + 3)
+    top = max(0, y0 + 3)
+    bottom = min(height, y1 - 3)
+    if bottom <= top or right <= left:
+        return 1.0
+    segment = vertical_mask[top:bottom, left:right]
+    return float(np.mean(np.any(segment > 0, axis=1)))
+
+
+def _horizontal_border_coverage(
+    horizontal_mask: np.ndarray,
+    *,
+    y: int,
+    x0: int,
+    x1: int,
+) -> float:
+    if x1 <= x0:
+        return 1.0
+    height, width = horizontal_mask.shape
+    top = max(0, y - 2)
+    bottom = min(height, y + 3)
+    left = max(0, x0 + 3)
+    right = min(width, x1 - 3)
+    if bottom <= top or right <= left:
+        return 1.0
+    segment = horizontal_mask[top:bottom, left:right]
+    return float(np.mean(np.any(segment > 0, axis=0)))
+
+
+def _missing_borders(
+    horizontal_mask: np.ndarray,
+    vertical_mask: np.ndarray,
+    x_lines: tuple[int, ...],
+    y_lines: tuple[int, ...],
+    *,
+    min_coverage: float = 0.55,
+) -> tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]]:
+    missing_vertical: list[tuple[int, int]] = []
+    missing_horizontal: list[tuple[int, int]] = []
+
+    row_count = len(y_lines) - 1
+    column_count = len(x_lines) - 1
+
+    for boundary_index in range(1, len(x_lines) - 1):
+        x = x_lines[boundary_index]
+        for row in range(row_count):
+            coverage = _vertical_border_coverage(
+                vertical_mask,
+                x=x,
+                y0=y_lines[row],
+                y1=y_lines[row + 1],
+            )
+            if coverage < min_coverage:
+                missing_vertical.append((row, boundary_index))
+
+    for boundary_index in range(1, len(y_lines) - 1):
+        y = y_lines[boundary_index]
+        for column in range(column_count):
+            coverage = _horizontal_border_coverage(
+                horizontal_mask,
+                y=y,
+                x0=x_lines[column],
+                x1=x_lines[column + 1],
+            )
+            if coverage < min_coverage:
+                missing_horizontal.append((boundary_index, column))
+
+    return tuple(missing_vertical), tuple(missing_horizontal)
 
 
 def detect_ruled_tables(image: Image.Image) -> list[RuledTable]:
@@ -82,6 +167,12 @@ def detect_ruled_tables(image: Image.Image) -> list[RuledTable]:
 
         absolute_x = tuple(x + value for value in local_x_lines)
         absolute_y = tuple(y + value for value in local_y_lines)
+        missing_vertical, missing_horizontal = _missing_borders(
+            horizontal,
+            vertical,
+            absolute_x,
+            absolute_y,
+        )
 
         tables.append(
             RuledTable(
@@ -93,6 +184,8 @@ def detect_ruled_tables(image: Image.Image) -> list[RuledTable]:
                 ),
                 x_lines=absolute_x,
                 y_lines=absolute_y,
+                missing_vertical_borders=missing_vertical,
+                missing_horizontal_borders=missing_horizontal,
             )
         )
 
@@ -115,6 +208,70 @@ def _cell_index(value: float, boundaries: tuple[int, ...]) -> int | None:
     return None
 
 
+def _merged_components(table: RuledTable) -> list[set[tuple[int, int]]]:
+    row_count = len(table.y_lines) - 1
+    column_count = len(table.x_lines) - 1
+    parent = {
+        (row, column): (row, column)
+        for row in range(row_count)
+        for column in range(column_count)
+    }
+
+    def find(cell: tuple[int, int]) -> tuple[int, int]:
+        root = cell
+        while parent[root] != root:
+            root = parent[root]
+        while parent[cell] != cell:
+            next_cell = parent[cell]
+            parent[cell] = root
+            cell = next_cell
+        return root
+
+    def union(left: tuple[int, int], right: tuple[int, int]) -> None:
+        left_root = find(left)
+        right_root = find(right)
+        if left_root != right_root:
+            parent[right_root] = left_root
+
+    for row, boundary_index in table.missing_vertical_borders:
+        left_column = boundary_index - 1
+        right_column = boundary_index
+        if 0 <= row < row_count and 0 <= left_column < right_column < column_count:
+            union((row, left_column), (row, right_column))
+
+    for boundary_index, column in table.missing_horizontal_borders:
+        top_row = boundary_index - 1
+        bottom_row = boundary_index
+        if 0 <= column < column_count and 0 <= top_row < bottom_row < row_count:
+            union((top_row, column), (bottom_row, column))
+
+    grouped: dict[tuple[int, int], set[tuple[int, int]]] = {}
+    for cell in parent:
+        grouped.setdefault(find(cell), set()).add(cell)
+
+    components: list[set[tuple[int, int]]] = []
+    for component in grouped.values():
+        if len(component) == 1:
+            components.append(component)
+            continue
+        rows = [cell[0] for cell in component]
+        columns = [cell[1] for cell in component]
+        expected = {
+            (row, column)
+            for row in range(min(rows), max(rows) + 1)
+            for column in range(min(columns), max(columns) + 1)
+        }
+        if component == expected:
+            components.append(component)
+        else:
+            components.extend({cell} for cell in sorted(component))
+
+    return sorted(
+        components,
+        key=lambda component: min(component),
+    )
+
+
 def build_table_block(table: RuledTable, lines: list[RecognizedLine]) -> Block:
     cell_lines: dict[tuple[int, int], list[RecognizedLine]] = {}
 
@@ -127,36 +284,54 @@ def build_table_block(table: RuledTable, lines: list[RecognizedLine]) -> Block:
             continue
         cell_lines.setdefault((row, column), []).append(line)
 
-    cells: list[TableCell] = []
-    row_text: list[str] = []
     row_count = len(table.y_lines) - 1
     column_count = len(table.x_lines) - 1
+    cells: list[TableCell] = []
+    display_grid = [["" for _ in range(column_count)] for _ in range(row_count)]
 
-    for row in range(row_count):
-        values: list[str] = []
-        for column in range(column_count):
-            grouped = sorted(
-                cell_lines.get((row, column), []),
-                key=lambda line: (line.bbox.y, line.bbox.x),
+    for component in _merged_components(table):
+        rows = [cell[0] for cell in component]
+        columns = [cell[1] for cell in component]
+        anchor_row = min(rows)
+        anchor_column = min(columns)
+        row_span = max(rows) - anchor_row + 1
+        column_span = max(columns) - anchor_column + 1
+
+        grouped_lines: list[RecognizedLine] = []
+        for coordinate in sorted(component):
+            grouped_lines.extend(cell_lines.get(coordinate, []))
+        grouped_lines.sort(key=lambda line: (line.bbox.y, line.bbox.x))
+        text = " ".join(
+            line.text.strip() for line in grouped_lines if line.text.strip()
+        ).strip()
+
+        cells.append(
+            TableCell(
+                row=anchor_row,
+                column=anchor_column,
+                text=text,
+                row_span=row_span,
+                column_span=column_span,
             )
-            text = " ".join(line.text.strip() for line in grouped if line.text.strip()).strip()
-            values.append(text)
-            cells.append(TableCell(row=row, column=column, text=text))
-        row_text.append("\t".join(values))
+        )
+        display_grid[anchor_row][anchor_column] = text
 
     confidences = [line.confidence for line in lines if _inside(line.bbox, table)]
     confidence = sum(confidences) / len(confidences) if confidences else None
 
     return Block(
         type=BlockType.TABLE,
-        text="\n".join(row_text),
+        text="\n".join("\t".join(row) for row in display_grid),
         bbox=table.bbox,
         confidence=confidence,
         cells=cells,
         metadata={
-            "detector": "ruled-grid-v1",
+            "detector": "ruled-grid-v2",
             "rows": row_count,
             "columns": column_count,
+            "merged_cells": sum(
+                1 for cell in cells if cell.row_span > 1 or cell.column_span > 1
+            ),
         },
     )
 

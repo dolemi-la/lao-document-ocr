@@ -79,12 +79,19 @@ def _add_block(word: WordDocument, block: Block, font_name: str) -> None:
         return
 
     if block.type == BlockType.TABLE and block.cells:
-        max_row = max(cell.row for cell in block.cells) + 1
-        max_column = max(cell.column for cell in block.cells) + 1
-        table = word.add_table(rows=max_row, cols=max_column)
+        row_count = int(block.metadata.get("rows") or (max(cell.row for cell in block.cells) + 1))
+        column_count = int(
+            block.metadata.get("columns")
+            or (max(cell.column for cell in block.cells) + 1)
+        )
+        table = word.add_table(rows=row_count, cols=column_count)
         table.style = "Table Grid"
-        for cell in block.cells:
+        for cell in sorted(block.cells, key=lambda item: (item.row, item.column)):
             target = table.cell(cell.row, cell.column)
+            if cell.row_span > 1 or cell.column_span > 1:
+                end_row = min(row_count - 1, cell.row + cell.row_span - 1)
+                end_column = min(column_count - 1, cell.column + cell.column_span - 1)
+                target = target.merge(table.cell(end_row, end_column))
             target.text = ""
             _add_text(target.paragraphs[0], cell.text, font_name)
         return
