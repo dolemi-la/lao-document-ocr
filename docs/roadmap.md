@@ -2,7 +2,7 @@
 
 ## Phase 0 — baseline/local MVP
 
-Status: in progress
+Status: complete
 
 - image and PDF input
 - Lao + English Tesseract baseline
@@ -19,18 +19,20 @@ Exit condition: a clean Lao scan can be processed locally into editable outputs 
 
 ## Phase 1 — Lao dataset + benchmark
 
-- dataset manifest format
-- train/dev/test split rules
-- document licensing/provenance metadata
-- clean printed scans
-- noisy scans
-- phone photos
-- mixed Lao/English
-- multi-column documents
-- simple/complex tables
-- receipts/forms as separate subsets
-- CER/WER reporting by subset
-- Tesseract baseline report
+Status: in progress
+
+- [x] dataset manifest format
+- [x] train/dev/test split rules
+- [x] document licensing/provenance metadata
+- [ ] clean printed scans
+- [ ] noisy scans
+- [ ] phone photos
+- [ ] mixed Lao/English
+- [ ] multi-column documents
+- [ ] simple/complex tables
+- [ ] receipts/forms as separate subsets
+- [x] CER/WER reporting by subset
+- [ ] Tesseract baseline report
 
 Exit condition: every model change can be measured on a fixed, legal, documented dataset.
 

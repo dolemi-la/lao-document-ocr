@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 from PIL import Image
 
@@ -30,3 +31,6 @@ class OcrEngine(ABC):
     @abstractmethod
     def recognize(self, image: Image.Image) -> list[RecognizedLine]:
         raise NotImplementedError
+
+    def metadata(self) -> dict[str, Any]:
+        return {"name": self.__class__.__name__}

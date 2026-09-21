@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Any
 
 import pytesseract
 from PIL import Image
@@ -32,6 +33,18 @@ class TesseractEngine(OcrEngine):
             return False
         required = set(self.languages.split("+"))
         return required.issubset(available)
+
+    def metadata(self) -> dict[str, Any]:
+        try:
+            version = str(pytesseract.get_tesseract_version())
+        except TesseractNotFoundError:
+            version = "unavailable"
+        return {
+            "name": self.__class__.__name__,
+            "tesseract_version": version,
+            "languages": self.languages,
+            "psm": self.psm,
+        }
 
     def _validate(self) -> None:
         available = set(self.available_languages())

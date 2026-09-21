@@ -1,6 +1,6 @@
 # Benchmarks
 
-Do not use private documents in the public benchmark set.
+The benchmark suite measures OCR quality without hiding hard document classes behind one aggregate number.
 
 ## Metrics
 
@@ -9,36 +9,76 @@ Do not use private documents in the public benchmark set.
 
 Lower is better.
 
-## Suggested public dataset layout
+Overall CER/WER are weighted by the amount of reference text, not the arithmetic mean of per-page percentages.
+
+## Dataset structure
+
+Suggested layout:
 
 ```text
-benchmarks/data/
-├── clean-print/
-├── noisy-scan/
-├── phone-photo/
-├── mixed-lao-english/
-├── multi-column/
-└── tables/
+benchmarks/public/
+├── data/
+│   ├── clean-print/
+│   ├── noisy-scan/
+│   ├── phone-photo/
+│   ├── mixed-lao-english/
+│   ├── multi-column/
+│   ├── simple-table/
+│   ├── complex-table/
+│   ├── receipt/
+│   └── form/
+└── ground-truth/
+    └── ...
 ```
 
-Each sample should include:
+The manifest can live separately, for example:
 
-- source image/PDF page
-- exact UTF-8 ground truth
-- license/provenance metadata
-- optional layout annotations
+```text
+benchmarks/manifest-v1.jsonl
+```
 
-## Report format
+See [../docs/dataset-format.md](../docs/dataset-format.md).
 
-Always report results per subset and include:
+## Validate a dataset
 
+```bash
+lao-ocr validate-dataset \
+  --manifest benchmarks/manifest-v1.jsonl \
+  --dataset-root benchmarks/public
+```
+
+## Run the Tesseract baseline
+
+Run in an environment with Tesseract Lao and English language data:
+
+```bash
+lao-ocr benchmark \
+  --manifest benchmarks/manifest-v1.jsonl \
+  --dataset-root benchmarks/public \
+  --split test \
+  --languages lao+eng \
+  --output benchmarks/results/tesseract-v1.json
+```
+
+## What every public report must include
+
+- benchmark manifest version/commit
 - number of pages
-- number of characters
+- number of reference characters
 - engine/model version
-- preprocessing version
+- preprocessing version/commit
 - CER
 - WER
-- hardware
+- per-subset CER/WER
+- hardware/platform information
 - runtime
 
-Never publish a rounded "accuracy" percentage without the underlying benchmark definition.
+Never publish a rounded "accuracy" percentage without defining the benchmark and metric behind it.
+
+## Dataset policy
+
+- Do not commit private documents.
+- Do not redistribute scans without clear rights.
+- Keep pages from the same source document in one split only.
+- Freeze public test document IDs once a benchmark release is published.
+- Keep exact UTF-8 ground truth under review like source code.

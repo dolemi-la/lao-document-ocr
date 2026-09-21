@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import fitz
+import pymupdf
 from PIL import Image
 
 from lao_document_ocr.models import Document, Page
@@ -22,7 +22,7 @@ class DocumentProcessingError(RuntimeError):
 def _render_pdf(path: Path, max_pages: int) -> list[Image.Image]:
     pages: list[Image.Image] = []
     try:
-        pdf = fitz.open(path)
+        pdf = pymupdf.open(path)
     except Exception as exc:
         raise DocumentProcessingError(f"Could not open PDF: {exc}") from exc
 
@@ -32,7 +32,7 @@ def _render_pdf(path: Path, max_pages: int) -> list[Image.Image]:
                 f"PDF has {pdf.page_count} pages; maximum is {max_pages}."
             )
         for page in pdf:
-            pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+            pixmap = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
             mode = "RGB" if pixmap.n < 4 else "RGBA"
             image = Image.frombytes(mode, (pixmap.width, pixmap.height), pixmap.samples)
             pages.append(image.convert("RGB"))
