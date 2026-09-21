@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from lao_document_ocr.benchmarking import benchmark_dataset, write_report
+from lao_document_ocr.conversion import convert_document_to_outputs
 from lao_document_ocr.corpus import (
     CorpusFilter,
     iter_jsonl,
@@ -32,6 +33,20 @@ def _parser() -> argparse.ArgumentParser:
         description="Lao Document OCR developer and benchmark utilities.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    convert = subparsers.add_parser(
+        "convert-document",
+        help="Convert one image/PDF into DOCX, Markdown, TXT, and JSON.",
+    )
+    convert.add_argument("--input", required=True, type=Path)
+    convert.add_argument("--output-dir", required=True, type=Path)
+    convert.add_argument("--engine", choices=["tesseract", "owned"], default="tesseract")
+    convert.add_argument("--languages", default="lao+eng")
+    convert.add_argument("--psm", type=int, default=3)
+    convert.add_argument("--model", type=Path)
+    convert.add_argument("--calibration", type=Path)
+    convert.add_argument("--max-pages", type=int, default=60)
+    convert.add_argument("--font", default="Noto Sans Lao")
 
     validate = subparsers.add_parser("validate-dataset", help="Validate a benchmark dataset.")
     validate.add_argument("--manifest", required=True, type=Path)
@@ -160,6 +175,30 @@ def _parser() -> argparse.ArgumentParser:
     recognize.add_argument("--calibration", type=Path)
 
     return parser
+
+
+def _convert_document(args: argparse.Namespace) -> int:
+    if args.engine == "tesseract":
+        engine = TesseractEngine(languages=args.languages, psm=args.psm)
+    else:
+        if args.model is None:
+            raise ValueError("--model is required when --engine=owned")
+        from lao_document_ocr.ocr import OwnedRecognizerEngine
+
+        engine = OwnedRecognizerEngine(
+            args.model,
+            calibration_path=args.calibration,
+        )
+
+    outputs = convert_document_to_outputs(
+        args.input,
+        args.output_dir,
+        engine=engine,
+        max_pages=args.max_pages,
+        font_name=args.font,
+    )
+    print(json.dumps(outputs.to_dict(), indent=2))
+    return 0
 
 
 def _validate(args: argparse.Namespace) -> int:
@@ -371,6 +410,8 @@ def main() -> int:
     parser = _parser()
     args = parser.parse_args()
     try:
+        if args.command == "convert-document":
+            return _convert_document(args)
         if args.command == "validate-dataset":
             return _validate(args)
         if args.command == "add-dataset-sample":

@@ -34,6 +34,20 @@ It does **not** claim robust:
 
 Those remain Phase 3 work.
 
+
+## Local document conversion
+
+```bash
+lao-ocr convert-document \
+  --input scan.pdf \
+  --output-dir output \
+  --engine owned \
+  --model recognizer.pt2 \
+  --calibration calibration.json
+```
+
+This runs the same page preprocessing, line detection, recognizer, document AST, and exporters as the API path.
+
 ## API configuration
 
 The normal API defaults to Tesseract:

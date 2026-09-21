@@ -79,6 +79,30 @@ pnpm install
 pnpm dev
 ```
 
+## Local CLI conversion
+
+Convert a document without running the web app/API:
+
+```bash
+lao-ocr convert-document \
+  --input scan.pdf \
+  --output-dir output \
+  --engine tesseract
+```
+
+Use the project-owned recognizer instead:
+
+```bash
+lao-ocr convert-document \
+  --input scan.pdf \
+  --output-dir output \
+  --engine owned \
+  --model models/recognizer.pt2 \
+  --calibration models/calibration.json
+```
+
+Both modes write editable `.docx` plus `.md`, `.txt`, and structured `.json`.
+
 ## API
 
 ### Health
