@@ -111,6 +111,25 @@ SHA-256 of the source page. Public benchmark releases should include hashes.
 
 Anything reviewers need to understand about the sample.
 
+### `tags`
+
+Optional multi-axis benchmark labels. Tags are normalized to lowercase, deduplicated, and sorted. Allowed characters are lowercase letters, numbers, `.`, `_`, `:`, and `-`.
+
+Examples:
+
+```json
+{
+  "tags": [
+    "capture:phone-photo",
+    "layout:multi-column",
+    "language:mixed",
+    "content:table"
+  ]
+}
+```
+
+Use tags when one page belongs to several meaningful benchmark dimensions at once. The legacy `subset` field remains the primary bucket for backward compatibility, while benchmark reports also aggregate CER/WER per tag.
+
 ## Path rules
 
 `source` and `ground_truth` must be relative and may not contain parent traversal (`..`).

@@ -58,6 +58,8 @@ def test_generate_capture_pack_writes_pages_truth_pdf_and_manifest(tmp_path) -> 
     assert all((root / page.image).is_file() for page in manifest.pages)
     assert all((root / page.ground_truth).is_file() for page in manifest.pages)
     assert all(len(page.sha256) == 64 for page in manifest.pages)
+    assert all("layout:plain" in page.tags for page in manifest.pages)
+    assert any("language:mixed" in page.tags for page in manifest.pages)
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert payload["pages"][0]["id"] == "baseline-p0001"

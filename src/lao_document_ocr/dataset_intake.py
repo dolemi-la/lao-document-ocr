@@ -87,6 +87,7 @@ def add_dataset_sample(
     source_url: str | None = None,
     license_url: str | None = None,
     notes: str | None = None,
+    tags: list[str] | tuple[str, ...] | None = None,
     split: DatasetSplit | None = None,
     rights_confirmed: bool = False,
 ) -> DatasetSample:
@@ -164,6 +165,7 @@ def add_dataset_sample(
         license_url=license_url,
         sha256=sha256_file(destination_image),
         notes=notes,
+        tags=list(tags or []),
     )
 
     payload = json.dumps(sample.model_dump(mode="json", exclude_none=True), ensure_ascii=False)

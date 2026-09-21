@@ -100,5 +100,10 @@ def register_capture(
         license=release_license.strip(),
         provenance=provenance,
         notes=combined_notes,
+        tags=[
+            *page.tags,
+            f"capture:{capture_mode.value}",
+            "source:real-capture",
+        ],
         rights_confirmed=True,
     )

@@ -164,3 +164,17 @@ Then manually review:
 - no unrelated personal/private material
 
 Freeze the final test document IDs before comparing OCR models.
+
+## Multi-axis benchmark tags
+
+Registered capture-pack samples automatically receive tags such as:
+
+- `capture:flatbed-scan`
+- `capture:degraded-scan`
+- `capture:phone-photo`
+- `layout:plain`
+- `language:lao` or `language:mixed`
+- `source:capture-pack`
+- `source:real-capture`
+
+This matters because one real page can simultaneously be a phone photo, mixed Lao/English, multi-column, and table-heavy. The primary `subset` field is retained for compatibility, but CER/WER reports also aggregate by every tag.

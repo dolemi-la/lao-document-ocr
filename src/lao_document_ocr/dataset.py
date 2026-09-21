@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Iterable
 from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
+
+_TAG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,63}$")
 
 
 class DatasetSplit(StrEnum):
@@ -42,6 +45,22 @@ class DatasetSample(BaseModel):
     license_url: str | None = None
     sha256: str | None = None
     notes: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, value: list[str]) -> list[str]:
+        normalized: set[str] = set()
+        for raw in value:
+            tag = raw.strip().lower()
+            if not tag:
+                continue
+            if not _TAG_PATTERN.fullmatch(tag):
+                raise ValueError(
+                    "tags may contain lowercase letters, numbers, '.', '_', ':' and '-'"
+                )
+            normalized.add(tag)
+        return sorted(normalized)
 
     @field_validator("source", "ground_truth")
     @classmethod

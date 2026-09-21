@@ -77,6 +77,7 @@ def benchmark_dataset(
     root = Path(dataset_root)
     overall = MetricCounts()
     subsets: dict[str, MetricCounts] = defaultdict(MetricCounts)
+    tags: dict[str, MetricCounts] = defaultdict(MetricCounts)
     sample_results: list[dict] = []
     started = time.perf_counter()
 
@@ -99,12 +100,15 @@ def benchmark_dataset(
         sample_counts.add(reference, hypothesis)
         overall.add(reference, hypothesis)
         subsets[sample.subset.value].add(reference, hypothesis)
+        for tag in sample.tags:
+            tags[tag].add(reference, hypothesis)
 
         sample_results.append(
             {
                 "id": sample.id,
                 "document_id": sample.document_id,
                 "subset": sample.subset.value,
+                "tags": sample.tags,
                 "cer": sample_counts.cer,
                 "wer": sample_counts.wer,
                 "elapsed_seconds": elapsed,
@@ -126,6 +130,7 @@ def benchmark_dataset(
         "elapsed_seconds": elapsed_total,
         "overall": overall.to_dict(),
         "subsets": {name: counts.to_dict() for name, counts in sorted(subsets.items())},
+        "tags": {name: counts.to_dict() for name, counts in sorted(tags.items())},
         "samples": sample_results,
     }
 

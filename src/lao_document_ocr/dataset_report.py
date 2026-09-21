@@ -32,6 +32,7 @@ def build_dataset_report(
     by_subset = Counter(sample.subset.value for sample in samples)
     by_license = Counter(sample.license for sample in samples)
     by_language = Counter(sample.language for sample in samples)
+    by_tag = Counter(tag for sample in samples for tag in sample.tags)
 
     document_splits: dict[str, DatasetSplit] = {}
     captures_per_document: Counter[str] = Counter()
@@ -65,6 +66,7 @@ def build_dataset_report(
         "by_subset": dict(sorted(by_subset.items())),
         "by_license": dict(sorted(by_license.items())),
         "by_language": dict(sorted(by_language.items())),
+        "by_tag": dict(sorted(by_tag.items())),
         "split_document_counts": dict(sorted(split_document_counts.items())),
         "coverage_matrix": {
             split: dict(sorted(counts.items()))

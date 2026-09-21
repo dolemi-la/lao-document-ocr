@@ -74,6 +74,13 @@ def test_register_phone_capture_uses_pack_truth_and_phone_subset(tmp_path) -> No
     assert sample.subset == DatasetSubset.PHONE_PHOTO
     assert "Unit-test corpus" in sample.provenance
     assert "text_license=CC0-1.0" in (sample.notes or "")
+    assert "capture:phone-photo" in sample.tags
+    assert "layout:plain" in sample.tags
+    assert "source:real-capture" in sample.tags
+    assert (
+        "language:lao" in sample.tags
+        or "language:mixed" in sample.tags
+    )
     assert (dataset_root / sample.ground_truth).read_text(encoding="utf-8")
 
 

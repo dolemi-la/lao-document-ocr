@@ -48,6 +48,7 @@ def test_benchmark_dataset_reports_subset_metrics(tmp_path) -> None:
         ground_truth="page.txt",
         license="CC0-1.0",
         provenance="Synthetic unit test",
+        tags=["capture:phone-photo", "language:mixed"],
     )
 
     report = benchmark_dataset([sample], tmp_path, FixedEngine())
@@ -55,4 +56,10 @@ def test_benchmark_dataset_reports_subset_metrics(tmp_path) -> None:
     assert report["overall"]["cer"] == 0
     assert report["overall"]["wer"] == 0
     assert report["subsets"]["clean-print"]["samples"] == 1
+    assert report["tags"]["capture:phone-photo"]["samples"] == 1
+    assert report["tags"]["language:mixed"]["cer"] == 0
+    assert report["samples"][0]["tags"] == [
+        "capture:phone-photo",
+        "language:mixed",
+    ]
     assert report["samples"][0]["id"] == "sample-001"

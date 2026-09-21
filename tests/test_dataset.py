@@ -163,3 +163,21 @@ def test_duplicate_source_hash_is_reported(tmp_path) -> None:
 
     assert any("duplicate source image sha256" in error for error in errors)
     assert any("a, b" in error for error in errors)
+
+
+def test_dataset_tags_are_normalized_and_deduplicated() -> None:
+    from lao_document_ocr.dataset import DatasetSample
+
+    sample = DatasetSample(
+        id="tagged",
+        document_id="tagged-doc",
+        split="test",
+        subset="clean-print",
+        source="page.png",
+        ground_truth="page.txt",
+        license="CC0-1.0",
+        provenance="unit test",
+        tags=[" Capture:Phone-Photo ", "language:mixed", "capture:phone-photo"],
+    )
+
+    assert sample.tags == ["capture:phone-photo", "language:mixed"]

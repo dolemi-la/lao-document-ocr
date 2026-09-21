@@ -5,7 +5,16 @@ from lao_document_ocr.dataset import load_manifest
 from lao_document_ocr.dataset_report import build_dataset_report, write_dataset_report
 
 
-def _sample_entry(sample_id, document_id, split, subset, source, truth, digest):
+def _sample_entry(
+    sample_id,
+    document_id,
+    split,
+    subset,
+    source,
+    truth,
+    digest,
+    tags=None,
+):
     return {
         "id": sample_id,
         "document_id": document_id,
@@ -17,6 +26,7 @@ def _sample_entry(sample_id, document_id, split, subset, source, truth, digest):
         "license": "CC0-1.0",
         "provenance": "Dataset report unit test",
         "sha256": digest,
+        "tags": tags or [],
     }
 
 
@@ -43,6 +53,7 @@ def test_dataset_report_summarizes_coverage(tmp_path) -> None:
                 image.name,
                 truth.name,
                 digest,
+                tags=[f"capture:{subset}"],
             )
         )
 
@@ -60,6 +71,7 @@ def test_dataset_report_summarizes_coverage(tmp_path) -> None:
     assert report["by_split"] == {"test": 1, "train": 2}
     assert report["by_subset"]["phone-photo"] == 1
     assert report["coverage_matrix"]["train"]["clean-print"] == 1
+    assert report["by_tag"]["capture:clean-print"] == 1
     assert report["captures_per_document"]["max"] == 2
     assert "complex-table" in report["missing_subsets"]
 

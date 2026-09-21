@@ -187,3 +187,7 @@ lao-ocr dataset-report \
 ```
 
 The report includes sample/document counts, split/subset/license coverage, captures per document, missing benchmark categories, and validation errors. Exact duplicate source-image hashes are rejected by dataset validation.
+
+## Multi-axis tag metrics
+
+Dataset samples may carry multiple tags in addition to their primary `subset`. OCR benchmark reports include a `tags` section with independent weighted CER/WER for every tag, so overlapping dimensions can be measured without duplicating samples.

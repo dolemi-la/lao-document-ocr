@@ -96,6 +96,10 @@ def test_add_dataset_sample_cli(tmp_path, monkeypatch, capsys) -> None:
             "CC0-1.0",
             "--provenance",
             "Created for CLI test",
+            "--tag",
+            "layout:plain",
+            "--tag",
+            "language:lao",
             "--confirm-redistributable",
         ],
     )
@@ -104,6 +108,7 @@ def test_add_dataset_sample_cli(tmp_path, monkeypatch, capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
     assert payload["id"] == "clean-001"
     assert len(payload["sha256"]) == 64
+    assert payload["tags"] == ["language:lao", "layout:plain"]
     assert (dataset_root / payload["source"]).is_file()
 
 

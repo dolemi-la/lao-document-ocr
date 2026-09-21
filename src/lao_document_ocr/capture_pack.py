@@ -21,6 +21,7 @@ class CapturePackPage:
     ground_truth: str
     sha256: str
     lines: tuple[str, ...]
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,20 @@ def wrap_text(
     if current:
         lines.append(current)
     return lines
+
+
+def _page_tags(lines: list[str]) -> tuple[str, ...]:
+    joined = "\n".join(lines)
+    has_lao = any("\u0e80" <= char <= "\u0eff" for char in joined)
+    has_latin = any(("A" <= char <= "Z") or ("a" <= char <= "z") for char in joined)
+    tags = {"layout:plain", "source:capture-pack"}
+    if has_lao and has_latin:
+        tags.add("language:mixed")
+    elif has_lao:
+        tags.add("language:lao")
+    elif has_latin:
+        tags.add("language:latin")
+    return tuple(sorted(tags))
 
 
 def _render_page(
@@ -270,6 +285,7 @@ def generate_capture_pack(
                 ground_truth=truth_path.relative_to(output).as_posix(),
                 sha256=_sha256(image_path),
                 lines=tuple(source_lines),
+                tags=_page_tags(source_lines),
             )
         )
         page_images.append(image)
@@ -337,6 +353,7 @@ def load_capture_pack(path: str | Path) -> tuple[Path, CapturePackManifest]:
             ),
             sha256=str(item["sha256"]),
             lines=tuple(str(line) for line in item.get("lines", [])),
+            tags=tuple(str(tag) for tag in item.get("tags", [])),
         )
         for item in page_entries
     )

@@ -27,6 +27,7 @@ Status: in progress
 - [x] rights-clear printable capture-pack + real-capture registration workflow
 - [x] benchmark source review registry/policy
 - [x] dataset coverage/integrity report + duplicate-image detection
+- [x] multi-axis benchmark tags and per-tag CER/WER
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos

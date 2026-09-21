@@ -83,6 +83,7 @@ def _parser() -> argparse.ArgumentParser:
     intake.add_argument("--source-url")
     intake.add_argument("--license-url")
     intake.add_argument("--notes")
+    intake.add_argument("--tag", action="append", default=[])
     intake.add_argument(
         "--split",
         choices=[split.value for split in DatasetSplit],
@@ -333,6 +334,7 @@ def _add_dataset_sample(args: argparse.Namespace) -> int:
         source_url=args.source_url,
         license_url=args.license_url,
         notes=args.notes,
+        tags=args.tag,
         split=DatasetSplit(args.split) if args.split else None,
         rights_confirmed=args.confirm_redistributable,
     )
