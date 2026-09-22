@@ -1,0 +1,7 @@
+services:
+  api:
+    build:
+      args:
+        INSTALL_S3: "true"
+    environment:
+      RESULT_STORAGE_BACKEND: s3

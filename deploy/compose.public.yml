@@ -1,0 +1,18 @@
+services:
+  api:
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: 4g
+    cpus: 2.0
+
+  web:
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true

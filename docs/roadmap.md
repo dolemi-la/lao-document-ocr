@@ -98,6 +98,6 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [ ] external deployment penetration/security review
 - accessibility
 - localization
-- optional deployment presets
+- [x] local/public/S3 deployment presets
 
 The open-source core remains usable locally without authentication or billing.

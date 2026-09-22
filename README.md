@@ -205,6 +205,9 @@ Override them with:
 - `RATE_LIMIT_WINDOW_SECONDS`
 - `RATE_LIMIT_MAX_CLIENTS`
 - `RATE_LIMIT_TRUST_PROXY_HEADERS`
+- `API_BIND_ADDRESS` / `API_PORT`
+- `WEB_BIND_ADDRESS` / `WEB_PORT`
+- `VITE_API_URL`
 
 The project-owned engine is experimental and requires the optional PyTorch dependencies. See [docs/owned-ocr-engine.md](docs/owned-ocr-engine.md).
 
