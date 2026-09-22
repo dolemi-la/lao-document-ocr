@@ -52,6 +52,7 @@ def extract_pdf_embedded_images(
     rendered_height: int,
     min_area_ratio: float = 0.002,
     max_area_ratio: float = 0.75,
+    max_source_pixels: int = 40_000_000,
 ) -> list[EmbeddedImageAsset]:
     page_rect = page.rect
     page_area = max(1.0, float(page_rect.width * page_rect.height))
@@ -63,6 +64,14 @@ def extract_pdf_embedded_images(
 
     for image_info in page.get_images(full=True):
         xref = int(image_info[0])
+        source_width = int(image_info[2]) if len(image_info) > 3 else 0
+        source_height = int(image_info[3]) if len(image_info) > 3 else 0
+        if (
+            source_width > 0
+            and source_height > 0
+            and source_width * source_height > max_source_pixels
+        ):
+            continue
         try:
             extracted = pdf.extract_image(xref)
             raw = extracted.get("image")

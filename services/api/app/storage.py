@@ -52,7 +52,8 @@ def _safe_relative_key(key: str) -> Path:
 class FilesystemArtifactStorage:
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root).resolve()
-        self.root.mkdir(parents=True, exist_ok=True)
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.root.chmod(0o700)
 
     def _path(self, key: str) -> Path:
         relative = _safe_relative_key(key)
@@ -76,13 +77,16 @@ class FilesystemArtifactStorage:
             raise FileNotFoundError(f"artifact source not found: {source_path}")
 
         destination = self._path(key)
-        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        destination.parent.chmod(0o700)
         temporary = destination.with_name(
             f".{destination.name}.{uuid.uuid4().hex}.tmp"
         )
         try:
             shutil.copy2(source_path, temporary)
+            temporary.chmod(0o600)
             temporary.replace(destination)
+            destination.chmod(0o600)
         finally:
             temporary.unlink(missing_ok=True)
         return StoredArtifact(

@@ -563,3 +563,164 @@ def test_async_job_downloads_through_storage_adapter(tmp_path, monkeypatch) -> N
         assert missing.status_code == 410
     finally:
         manager.shutdown()
+
+
+def test_api_security_headers_are_present() -> None:
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+    assert "default-src 'none'" in response.headers["content-security-policy"]
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_upload_rejects_extension_content_mismatch(tmp_path, monkeypatch) -> None:
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-mismatch",
+        lambda record, cancel_event: record.workspace / "unused.zip",
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=0, window_seconds=60),
+    )
+    try:
+        response = client.post(
+            "/v1/jobs",
+            files={"file": ("forged.jpg", _png_upload_bytes(), "image/jpeg")},
+        )
+        assert response.status_code == 422
+        assert "does not match" in response.json()["detail"]
+        assert manager.snapshot()["active_jobs"] == 0
+    finally:
+        manager.shutdown()
+
+
+def test_sync_convert_rejects_fake_pdf_before_ocr() -> None:
+    response = client.post(
+        "/v1/convert",
+        files={"file": ("fake.pdf", b"not a pdf", "application/pdf")},
+    )
+    assert response.status_code == 422
+    assert "does not match" in response.json()["detail"]
+
+
+def test_api_enforces_max_page_pixels(tmp_path, monkeypatch) -> None:
+    import io
+
+    from PIL import Image
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (100, 100), "white").save(buffer, format="PNG")
+    manager = ConversionJobManager(
+        tmp_path / "jobs-pixel-cap",
+        lambda record, cancel_event: record.workspace / "unused.zip",
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(api_main, "MAX_PAGE_PIXELS", 5_000)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=0, window_seconds=60),
+    )
+    try:
+        response = client.post(
+            "/v1/jobs",
+            files={"file": ("large.png", buffer.getvalue(), "image/png")},
+        )
+        assert response.status_code == 422
+        assert "pixel limit" in response.json()["detail"]
+        assert manager.snapshot()["active_jobs"] == 0
+    finally:
+        manager.shutdown()
+
+
+def test_async_upload_filename_is_sanitized_and_private(tmp_path, monkeypatch) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    observed = {}
+
+    def runner(record, cancel_event):
+        observed["filename"] = record.filename
+        observed["mode"] = record.input_path.stat().st_mode & 0o777
+        output = record.workspace / "result.zip"
+        with zipfile.ZipFile(output, "w") as archive:
+            archive.writestr("result.txt", "done")
+        return output
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-private-upload",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=0, window_seconds=60),
+    )
+    try:
+        response = client.post(
+            "/v1/jobs",
+            files={
+                "file": (
+                    '../../ສະບາຍດີ?".png',
+                    _png_upload_bytes(),
+                    "image/png",
+                )
+            },
+        )
+        assert response.status_code == 202
+        job_id = response.json()["id"]
+        terminal = _poll_job(client, job_id)
+        assert terminal["status"] == "succeeded"
+        sanitized = observed["filename"]
+        assert sanitized.startswith("ສະບາຍດີ")
+        assert sanitized.endswith(".png")
+        assert "/" not in sanitized and "\\" not in sanitized
+        assert "?" not in sanitized and '"' not in sanitized
+        assert ".." not in sanitized
+        assert observed["mode"] == 0o600
+    finally:
+        manager.shutdown()
+
+
+def test_download_headers_use_ascii_fallback_and_utf8_filename() -> None:
+    import services.api.app.main as api_main
+
+    headers = api_main._download_headers("ສະບາຍດີ.zip")
+    disposition = headers["Content-Disposition"]
+    assert 'filename="' in disposition
+    assert "ສະບາຍດີ" not in disposition.split("filename*=", 1)[0]
+    assert "filename*=UTF-8''" in disposition
+    assert "%E0%BA" in disposition
+
+
+def test_docs_csp_keeps_swagger_ui_assets_allowed() -> None:
+    response = client.get("/docs")
+    assert response.status_code == 200
+    csp = response.headers["content-security-policy"]
+    assert "https://cdn.jsdelivr.net" in csp
+    assert "script-src 'unsafe-inline'" in csp
+    assert "connect-src 'self'" in csp
+    assert "frame-ancestors 'none'" in csp

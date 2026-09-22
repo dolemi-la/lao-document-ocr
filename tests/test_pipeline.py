@@ -80,3 +80,75 @@ def test_processing_cancels_between_pdf_pages(tmp_path) -> None:
         )
 
     assert state["calls"] == 1
+
+
+def test_image_pixel_limit_is_enforced_before_ocr(tmp_path) -> None:
+    import pytest
+
+    from lao_document_ocr.pipeline import DocumentProcessingError
+
+    image_path = tmp_path / "large.png"
+    Image.new("RGB", (100, 100), "white").save(image_path)
+
+    with pytest.raises(DocumentProcessingError, match="pixel limit"):
+        process_document(
+            image_path,
+            engine=FakeEngine(),
+            max_page_pixels=5_000,
+        )
+
+
+def test_pdf_render_pixel_limit_is_enforced(tmp_path) -> None:
+    import pymupdf
+    import pytest
+
+    from lao_document_ocr.pipeline import DocumentProcessingError
+
+    pdf_path = tmp_path / "large-page.pdf"
+    pdf = pymupdf.open()
+    pdf.new_page(width=100, height=100)
+    pdf.save(pdf_path)
+    pdf.close()
+
+    with pytest.raises(DocumentProcessingError, match="rendered pixel limit"):
+        process_document(
+            pdf_path,
+            engine=FakeEngine(),
+            max_page_pixels=30_000,
+        )
+
+
+def test_encrypted_pdf_is_rejected(tmp_path) -> None:
+    import pymupdf
+    import pytest
+
+    from lao_document_ocr.pipeline import DocumentProcessingError
+
+    pdf_path = tmp_path / "encrypted.pdf"
+    pdf = pymupdf.open()
+    pdf.new_page(width=100, height=100)
+    pdf.save(
+        pdf_path,
+        encryption=pymupdf.PDF_ENCRYPT_AES_256,
+        owner_pw="owner-secret",
+        user_pw="user-secret",
+    )
+    pdf.close()
+
+    with pytest.raises(DocumentProcessingError, match="Encrypted PDFs"):
+        process_document(pdf_path, engine=FakeEngine())
+
+
+def test_malformed_image_error_does_not_leak_temp_path(tmp_path) -> None:
+    import pytest
+
+    from lao_document_ocr.pipeline import DocumentProcessingError
+
+    image_path = tmp_path / "private-name.png"
+    image_path.write_bytes(b"not-an-image")
+
+    with pytest.raises(DocumentProcessingError) as captured:
+        process_document(image_path, engine=FakeEngine())
+
+    assert str(captured.value) == "Could not open image."
+    assert "private-name" not in str(captured.value)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import shutil
 import threading
 import uuid
@@ -12,6 +13,8 @@ from enum import StrEnum
 from pathlib import Path
 
 from services.api.app.storage import StoredArtifact
+
+logger = logging.getLogger(__name__)
 
 
 class JobStatus(StrEnum):
@@ -39,6 +42,10 @@ class JobNotFoundError(KeyError):
 
 
 class JobCancelledError(RuntimeError):
+    pass
+
+
+class JobPublicError(RuntimeError):
     pass
 
 
@@ -86,7 +93,8 @@ class ConversionJobManager:
             raise ValueError("retention_seconds must be non-negative")
 
         self.root_dir = Path(root_dir)
-        self.root_dir.mkdir(parents=True, exist_ok=True)
+        self.root_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.root_dir.chmod(0o700)
         self.runner = runner
         self.max_active_jobs = max_active_jobs
         self.retention_seconds = retention_seconds
@@ -140,7 +148,7 @@ class ConversionJobManager:
                 for filename, suffix in files:
                     job_id = uuid.uuid4().hex
                     workspace = self.root_dir / job_id
-                    workspace.mkdir(parents=True, exist_ok=False)
+                    workspace.mkdir(parents=True, exist_ok=False, mode=0o700)
                     input_path = workspace / f"input{suffix}"
                     record = JobRecord(
                         id=job_id,
@@ -216,10 +224,17 @@ class ConversionJobManager:
                 record.cancellation_requested = True
                 record.output_path = None
                 record.output_artifact = None
-        except Exception as exc:
+        except JobPublicError as exc:
             with self._lock:
                 record.status = JobStatus.FAILED
                 record.error = str(exc)
+                record.output_path = None
+                record.output_artifact = None
+        except Exception:
+            logger.exception("Unhandled conversion job failure", extra={"job_id": job_id})
+            with self._lock:
+                record.status = JobStatus.FAILED
+                record.error = "Internal conversion error."
                 record.output_path = None
                 record.output_artifact = None
         finally:

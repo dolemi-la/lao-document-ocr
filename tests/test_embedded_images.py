@@ -67,3 +67,30 @@ def test_excludes_near_full_page_scan_image(tmp_path) -> None:
     pdf.close()
 
     assert assets == []
+
+
+def test_skips_embedded_image_above_source_pixel_cap(tmp_path) -> None:
+    path = tmp_path / "large-embedded.pdf"
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=600, height=800)
+    page.insert_image(
+        pymupdf.Rect(100, 200, 300, 360),
+        stream=_png_bytes(),
+        keep_proportion=False,
+    )
+    pdf.save(path)
+    pdf.close()
+
+    pdf = pymupdf.open(path)
+    try:
+        assets = extract_pdf_embedded_images(
+            pdf,
+            pdf[0],
+            rendered_width=1200,
+            rendered_height=1600,
+            max_source_pixels=5_000,
+        )
+    finally:
+        pdf.close()
+
+    assert assets == []

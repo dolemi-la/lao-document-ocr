@@ -36,11 +36,17 @@ from services.api.app.jobs import (
     JobCancelledError,
     JobCapacityError,
     JobNotFoundError,
+    JobPublicError,
     JobRecord,
     JobStatus,
 )
 from services.api.app.metrics import ApiMetrics, RequestTimer
 from services.api.app.rate_limit import SlidingWindowRateLimiter
+from services.api.app.security import (
+    UploadValidationError,
+    sanitize_filename,
+    validate_uploaded_content,
+)
 from services.api.app.storage import (
     FilesystemArtifactStorage,
     StoredArtifact,
@@ -48,6 +54,7 @@ from services.api.app.storage import (
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 MAX_PAGES = int(os.getenv("MAX_PAGES", "60"))
+MAX_PAGE_PIXELS = int(os.getenv("MAX_PAGE_PIXELS", "40000000"))
 OCR_ENGINE = os.getenv("OCR_ENGINE", "tesseract").strip().lower()
 OCR_LANGUAGES = os.getenv("OCR_LANGUAGES", "lao+eng")
 OCR_PSM = int(os.getenv("OCR_PSM", "3"))
@@ -108,6 +115,20 @@ SUBMISSION_RATE_LIMITER = SlidingWindowRateLimiter(
 )
 
 
+def _content_security_policy(path: str) -> str:
+    if path in {"/docs", "/redoc"}:
+        return (
+            "default-src 'none'; "
+            "script-src 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "font-src https://fonts.gstatic.com; "
+            "img-src data: https://fastapi.tiangolo.com; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; base-uri 'none'"
+        )
+    return "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+
+
 def _request_id(request: Request) -> str:
     supplied = request.headers.get("x-request-id", "").strip()
     if supplied and len(supplied) <= 128 and all(
@@ -141,6 +162,16 @@ async def observe_request(request: Request, call_next):
         duration_seconds=timer.elapsed(),
     )
     response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=()"
+    )
+    response.headers["Content-Security-Policy"] = _content_security_policy(
+        request.url.path
+    )
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -158,7 +189,9 @@ RESULT_STORAGE = _build_result_storage()
 def _download_headers(filename: str) -> dict[str, str]:
     name = Path(filename).name or "result.zip"
     fallback = "".join(
-        char if char.isalnum() or char in "._-" else "_"
+        char
+        if char.isascii() and (char.isalnum() or char in "._-")
+        else "_"
         for char in name
     ) or "result.zip"
     encoded = quote(name, safe="")
@@ -213,13 +246,13 @@ def _engine() -> OcrEngine:
 
 
 def _safe_filename(filename: str | None) -> str:
-    name = Path(filename or "document").name
-    return name or "document"
+    return sanitize_filename(filename)
 
 
 async def _save_upload(upload: UploadFile, destination: Path) -> None:
     written = 0
     with destination.open("wb") as output:
+        os.chmod(destination, 0o600)
         while chunk := await upload.read(1024 * 1024):
             written += len(chunk)
             if written > MAX_UPLOAD_BYTES:
@@ -236,6 +269,18 @@ def _validate_suffix(filename: str) -> str:
         allowed = ", ".join(sorted(SUPPORTED_SUFFIXES))
         raise HTTPException(status_code=415, detail=f"Unsupported file type. Allowed: {allowed}")
     return suffix
+
+
+def _validate_saved_upload(path: Path, suffix: str) -> None:
+    try:
+        validate_uploaded_content(
+            path,
+            suffix,
+            max_pages=MAX_PAGES,
+            max_page_pixels=MAX_PAGE_PIXELS,
+        )
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def _write_outputs_archive(
@@ -268,10 +313,13 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
             source_name=record.filename,
             engine=_engine(),
             max_pages=MAX_PAGES,
+            max_page_pixels=MAX_PAGE_PIXELS,
             should_cancel=cancel_event.is_set,
         )
     except DocumentProcessingCancelled as exc:
         raise JobCancelledError(str(exc)) from exc
+    except DocumentProcessingError as exc:
+        raise JobPublicError(str(exc)) from exc
     if cancel_event.is_set():
         raise JobCancelledError("Document processing was cancelled.")
 
@@ -326,6 +374,11 @@ def health() -> dict:
         "engine": OCR_ENGINE,
         "metadata": metadata,
         "error": error,
+        "limits": {
+            "max_upload_bytes": MAX_UPLOAD_BYTES,
+            "max_pages": MAX_PAGES,
+            "max_page_pixels": MAX_PAGE_PIXELS,
+        },
         "jobs": {
             "max_workers": JOB_MAX_WORKERS,
             "max_active_jobs": JOB_MAX_ACTIVE,
@@ -366,12 +419,14 @@ async def parse_document(
     with tempfile.TemporaryDirectory(prefix="lao-ocr-") as temp_dir:
         input_path = Path(temp_dir) / f"input{suffix}"
         await _save_upload(file, input_path)
+        _validate_saved_upload(input_path, suffix)
         try:
             document = process_document(
                 input_path,
                 source_name=filename,
                 engine=_engine(),
                 max_pages=MAX_PAGES,
+                max_page_pixels=MAX_PAGE_PIXELS,
             )
         except DocumentProcessingError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -391,6 +446,7 @@ async def convert_document(
         work_dir = Path(temp_dir)
         input_path = work_dir / f"input{suffix}"
         await _save_upload(file, input_path)
+        _validate_saved_upload(input_path, suffix)
 
         try:
             document = process_document(
@@ -398,6 +454,7 @@ async def convert_document(
                 source_name=filename,
                 engine=_engine(),
                 max_pages=MAX_PAGES,
+                max_page_pixels=MAX_PAGE_PIXELS,
             )
         except DocumentProcessingError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -406,7 +463,7 @@ async def convert_document(
         archive = io.BytesIO(archive_path.read_bytes())
         archive.seek(0)
 
-    headers = {"Content-Disposition": f'attachment; filename="{Path(filename).stem}-ocr.zip"'}
+    headers = _download_headers(f"{Path(filename).stem}-ocr.zip")
     return StreamingResponse(archive, media_type="application/zip", headers=headers)
 
 
@@ -425,6 +482,7 @@ async def create_conversion_job(
 
     try:
         await _save_upload(file, record.input_path)
+        _validate_saved_upload(record.input_path, suffix)
         JOB_MANAGER.enqueue(record.id)
     except Exception:
         JOB_MANAGER.discard(record.id)
@@ -461,8 +519,9 @@ async def create_conversion_batch(
         raise HTTPException(status_code=429, detail=str(exc)) from exc
 
     try:
-        for (upload, _, _), record in zip(prepared, records, strict=True):
+        for (upload, _, suffix), record in zip(prepared, records, strict=True):
             await _save_upload(upload, record.input_path)
+            _validate_saved_upload(record.input_path, suffix)
     except Exception:
         for record in records:
             JOB_MANAGER.discard(record.id)

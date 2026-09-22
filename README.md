@@ -182,6 +182,7 @@ Override them with:
 
 - `MAX_UPLOAD_BYTES`
 - `MAX_PAGES`
+- `MAX_PAGE_PIXELS`
 - `OCR_ENGINE=tesseract|owned`
 - `OCR_LANGUAGES`
 - `OCR_PSM`

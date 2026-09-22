@@ -7,6 +7,7 @@ services:
       OCR_LANGUAGES: lao+eng
       OCR_PSM: "3"
       MAX_PAGES: "60"
+      MAX_PAGE_PIXELS: "${MAX_PAGE_PIXELS:-40000000}"
       MAX_UPLOAD_BYTES: "26214400"
       CORS_ORIGINS: http://localhost:5173
       JOB_MAX_WORKERS: "2"

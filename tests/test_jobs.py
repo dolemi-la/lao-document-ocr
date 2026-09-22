@@ -183,7 +183,7 @@ def test_failed_job_records_error_and_has_no_download(tmp_path) -> None:
         payload = _wait_for_terminal(manager, record.id)
 
         assert payload["status"] == "failed"
-        assert payload["error"] == "synthetic conversion failure"
+        assert payload["error"] == "Internal conversion error."
         assert payload["download_ready"] is False
     finally:
         manager.shutdown()
@@ -361,5 +361,59 @@ def test_missing_stored_artifact_is_not_download_ready(tmp_path) -> None:
         storage.delete(stored)
 
         assert manager.public(record.id)["download_ready"] is False
+    finally:
+        manager.shutdown()
+
+
+def test_public_job_error_is_exposed_safely(tmp_path) -> None:
+    from services.api.app.jobs import JobPublicError
+
+    def runner(record, cancel_event):
+        raise JobPublicError("Safe validation failure.")
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-public-error",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        record.input_path.write_bytes(b"image")
+        manager.enqueue(record.id)
+        payload = _wait_for_terminal(manager, record.id)
+        assert payload["status"] == "failed"
+        assert payload["error"] == "Safe validation failure."
+    finally:
+        manager.shutdown()
+
+
+def test_job_workspace_uses_private_permissions(tmp_path) -> None:
+    manager = ConversionJobManager(
+        tmp_path / "jobs-private",
+        lambda record, cancel_event: record.workspace / "unused.zip",
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        assert record.workspace.stat().st_mode & 0o777 == 0o700
+    finally:
+        manager.shutdown()
+
+
+def test_job_manager_tightens_existing_root_permissions(tmp_path) -> None:
+    root = tmp_path / "existing-jobs"
+    root.mkdir(mode=0o755)
+    root.chmod(0o755)
+
+    manager = ConversionJobManager(
+        root,
+        lambda record, cancel_event: record.workspace / "result.zip",
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        assert manager.root_dir.stat().st_mode & 0o777 == 0o700
     finally:
         manager.shutdown()

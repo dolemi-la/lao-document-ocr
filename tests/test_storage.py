@@ -56,3 +56,28 @@ def test_storage_metadata(tmp_path) -> None:
     metadata = storage.metadata()
     assert metadata["backend"] == "filesystem"
     assert metadata["root"].endswith("storage")
+
+
+def test_storage_artifact_uses_private_permissions(tmp_path) -> None:
+    source = tmp_path / "source.zip"
+    source.write_bytes(b"private")
+    storage = FilesystemArtifactStorage(tmp_path / "storage-private")
+    artifact = storage.put_file(
+        source,
+        key="jobs/job-1/result.zip",
+        filename="result.zip",
+        media_type="application/zip",
+    )
+    destination = storage.root / artifact.key
+    assert storage.root.stat().st_mode & 0o777 == 0o700
+    assert destination.stat().st_mode & 0o777 == 0o600
+
+
+def test_storage_tightens_existing_root_permissions(tmp_path) -> None:
+    root = tmp_path / "existing-storage"
+    root.mkdir(mode=0o755)
+    root.chmod(0o755)
+
+    storage = FilesystemArtifactStorage(root)
+
+    assert storage.root.stat().st_mode & 0o777 == 0o700

@@ -94,7 +94,8 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] disabled-by-default per-client submission rate-limit baseline
 - [x] filesystem result-storage adapter abstraction baseline
 - [ ] S3-compatible/object-storage result adapter
-- security review
+- [x] baseline security hardening/review (uploads, parser caps, headers, permissions, non-root API)
+- [ ] external deployment penetration/security review
 - accessibility
 - localization
 - optional deployment presets
