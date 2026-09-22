@@ -45,7 +45,7 @@ def test_borderless_table_reaches_editable_docx_table(tmp_path) -> None:
     assert len(document.pages[0].blocks) == 1
     block = document.pages[0].blocks[0]
     assert block.type == BlockType.TABLE
-    assert block.metadata["detector"] == "aligned-text-v1"
+    assert block.metadata["detector"] == "aligned-text-v2"
     assert block.metadata["rows"] == 4
     assert block.metadata["columns"] == 2
     assert block.cells[2].text == "Coffee"
@@ -58,3 +58,49 @@ def test_borderless_table_reaches_editable_docx_table(tmp_path) -> None:
     assert "<w:tbl>" in xml
     assert "Coffee" in xml
     assert "20,000" in xml
+
+
+class MergedBorderlessTableEngine(OcrEngine):
+    def is_available(self) -> bool:
+        return True
+
+    def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+        values = [
+            ("Items", 70, 80, 370),
+            ("Coffee", 70, 125, 110),
+            ("20,000 ₭", 330, 125, 110),
+            ("Tea", 70, 170, 110),
+            ("10,000 ₭", 330, 170, 110),
+        ]
+        return [
+            RecognizedLine(
+                text=text,
+                bbox=BoundingBox(x=x, y=y, width=width, height=24),
+                confidence=0.94,
+                block_id=index,
+                paragraph_id=index,
+                line_id=index,
+            )
+            for index, (text, x, y, width) in enumerate(values, start=1)
+        ]
+
+
+def test_borderless_merged_header_exports_as_word_grid_span(tmp_path) -> None:
+    source = tmp_path / "borderless-merged.png"
+    Image.new("RGB", (600, 300), "white").save(source)
+
+    document = process_document(source, engine=MergedBorderlessTableEngine())
+
+    assert len(document.pages[0].blocks) == 1
+    block = document.pages[0].blocks[0]
+    assert block.type == BlockType.TABLE
+    assert block.metadata["merged_cells"] == 1
+    assert block.cells[0].column_span == 2
+
+    path = export_docx(document, tmp_path / "borderless-merged.docx")
+    with zipfile.ZipFile(path) as package:
+        xml = package.read("word/document.xml").decode("utf-8")
+
+    assert "gridSpan" in xml
+    assert 'w:val="2"' in xml
+    assert "Items" in xml

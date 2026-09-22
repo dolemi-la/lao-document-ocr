@@ -30,7 +30,7 @@ Current OCR baseline:
 - numbered and bulleted lists with clean Word/Markdown list styles
 - conservative simple ruled-table reconstruction into editable Word tables
 - merged cells when interior ruled borders are clearly absent
-- conservative borderless aligned-text table reconstruction for strong row/column geometry
+- borderless aligned-text table reconstruction with stable column anchors and horizontal merged headers
 - region-first text detection that isolates columns/sections before line OCR
 - conservative 2–4 column reading order when clear gutters exist
 - repeated multi-page headers/footers exported into real Word header/footer parts

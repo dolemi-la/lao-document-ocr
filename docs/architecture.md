@@ -73,7 +73,7 @@ Detects clear ruled grids using horizontal/vertical morphology, assigns OCR line
 
 ### `src/lao_document_ocr/borderless_tables.py`
 
-Detects borderless tables only from strong repeated OCR geometry: stable column anchors, tight row spacing, short cell text, and real gaps between columns. Two-column candidates additionally require a consistently numeric/currency/date-style value column so ordinary two-column prose remains reading-order content instead of being converted into a table.
+Detects borderless tables only from strong repeated OCR geometry. `aligned-text-v2` infers stable columns from at least two full rows, keeps the numeric/value-column guard for two-column tables, and allows irregular rows only when every column is still covered by explicit horizontal spans. This supports merged headers while rejecting simple missing cells that do not geometrically span adjacent anchors. Vertical borderless merges remain intentionally unsupported.
 
 ### `src/lao_document_ocr/text_regions.py`
 

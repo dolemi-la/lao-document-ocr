@@ -71,10 +71,11 @@ Status: started
 - [ ] learned/general reading-order model
 - [x] simple ruled-table detection baseline
 - [x] row/column/cell structure for clear ruled grids
-- [x] conservative aligned-text borderless-table baseline
+- [x] aligned-text borderless-table v2 baseline with stable anchors
 - [ ] general/complex borderless table detection
 - [x] merged-cell baseline for clear ruled rectangular spans
-- [ ] merged cells in borderless/complex tables
+- [x] horizontal merged-cell baseline for aligned borderless tables
+- [ ] vertical/general merged cells in complex borderless tables
 - [x] repeated header/footer detection baseline and DOCX preservation
 - [x] native PDF embedded-image preservation baseline (excluding full-page scans)
 - [x] conservative photo-like raster-region detection for image/scanned inputs
