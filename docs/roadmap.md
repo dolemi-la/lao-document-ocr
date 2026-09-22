@@ -96,8 +96,8 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] S3-compatible/object-storage result adapter
 - [x] baseline security hardening/review (uploads, parser caps, headers, permissions, non-root API)
 - [ ] external deployment penetration/security review
-- accessibility
-- localization
+- [x] Lao/English web accessibility baseline
+- [x] Lao/English web localization baseline
 - [x] local/public/S3 deployment presets
 
 The open-source core remains usable locally without authentication or billing.

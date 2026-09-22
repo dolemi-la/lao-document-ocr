@@ -1,4 +1,6 @@
-import { ChangeEvent, DragEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useState } from "react";
+
+import { initialLocale, Locale, MESSAGES, persistLocale } from "./i18n";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 const ACCEPTED = [".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"];
@@ -23,11 +25,19 @@ const sleep = (milliseconds: number) =>
   new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
 function App() {
+  const [locale, setLocale] = useState<Locale>(initialLocale);
   const [file, setFile] = useState<File | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [job, setJob] = useState<ConversionJob | null>(null);
+  const m = MESSAGES[locale];
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    document.title = m.pageTitle;
+    persistLocale(locale);
+  }, [locale, m.pageTitle]);
 
   useEffect(() => {
     fetch(`${API_URL}/health`)
@@ -36,16 +46,15 @@ function App() {
       .catch(() => setHealth(null));
   }, []);
 
-  const fileDescription = useMemo(() => {
-    if (!file) return "PDF, PNG, JPG, TIFF or WebP · up to 25 MB · PDFs up to 60 pages";
-    return `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-  }, [file]);
+  const fileDescription = file
+    ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`
+    : m.fileHelp;
 
   function choose(next: File | undefined) {
     if (!next || busy) return;
     const lower = next.name.toLowerCase();
     if (!ACCEPTED.some((extension) => lower.endsWith(extension))) {
-      setMessage("Unsupported file type.");
+      setMessage(m.unsupported);
       return;
     }
     setFile(next);
@@ -70,7 +79,7 @@ function App() {
   async function downloadResult(currentJob: ConversionJob, sourceFile: File) {
     const response = await fetch(`${API_URL}/v1/jobs/${currentJob.id}/download`);
     if (!response.ok) {
-      throw new Error(await readError(response, `Download failed (${response.status})`));
+      throw new Error(await readError(response, m.downloadFailed(response.status)));
     }
 
     const blob = await response.blob();
@@ -93,19 +102,15 @@ function App() {
 
     while (["uploading", "queued", "running"].includes(current.status)) {
       if (current.status === "queued") {
-        setMessage("Queued for local OCR processing…");
+        setMessage(m.queued);
       } else if (current.status === "running") {
-        setMessage(
-          current.cancellation_requested
-            ? "Cancellation requested…"
-            : "Reading document and building editable outputs…",
-        );
+        setMessage(current.cancellation_requested ? m.cancelling : m.running);
       }
 
       await sleep(650);
       const response = await fetch(`${API_URL}/v1/jobs/${current.id}`);
       if (!response.ok) {
-        throw new Error(await readError(response, `Job status failed (${response.status})`));
+        throw new Error(await readError(response, m.jobStatusFailed(response.status)));
       }
       current = await response.json();
       setJob(current);
@@ -113,21 +118,21 @@ function App() {
 
     if (current.status === "succeeded") {
       await downloadResult(current, sourceFile);
-      setMessage("Done. The ZIP contains DOCX, Markdown, TXT and structured JSON.");
+      setMessage(m.done);
       return;
     }
     if (current.status === "cancelled") {
-      setMessage("Conversion cancelled.");
+      setMessage(m.cancelled);
       return;
     }
-    throw new Error(current.error || "Conversion failed.");
+    throw new Error(current.error || m.conversionFailed);
   }
 
   async function convert() {
     if (!file || busy) return;
     setBusy(true);
     setJob(null);
-    setMessage("Uploading document…");
+    setMessage(m.uploading);
 
     try {
       const form = new FormData();
@@ -138,13 +143,13 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error(await readError(response, `Conversion failed (${response.status})`));
+        throw new Error(await readError(response, m.conversionFailedStatus(response.status)));
       }
 
       const created: ConversionJob = await response.json();
       await pollJob(created, file);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Conversion failed.");
+      setMessage(error instanceof Error ? error.message : m.conversionFailed);
     } finally {
       setBusy(false);
     }
@@ -152,50 +157,79 @@ function App() {
 
   async function cancel() {
     if (!job || !["uploading", "queued", "running"].includes(job.status)) return;
-    setMessage("Cancellation requested…");
+    setMessage(m.cancelling);
     try {
       const response = await fetch(`${API_URL}/v1/jobs/${job.id}`, {
         method: "DELETE",
       });
       if (!response.ok) {
-        throw new Error(await readError(response, `Cancellation failed (${response.status})`));
+        throw new Error(await readError(response, m.cancellationFailedStatus(response.status)));
       }
       setJob(await response.json());
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Cancellation failed.");
+      setMessage(error instanceof Error ? error.message : m.cancellationFailed);
     }
   }
 
   const canCancel = Boolean(job && ["uploading", "queued", "running"].includes(job.status));
 
   return (
-    <main>
+    <main aria-labelledby="page-heading">
       <section className="shell">
         <header>
-          <div className="brand">LO</div>
-          <div>
-            <p className="eyebrow">OPEN-SOURCE · LOCAL-FIRST</p>
-            <h1>Lao Document OCR</h1>
+          <div className="brandLockup">
+            <div className="brand" aria-hidden="true">
+              LO
+            </div>
+            <div>
+              <p className="eyebrow">{m.eyebrow}</p>
+              <h1>{m.title}</h1>
+            </div>
+          </div>
+
+          <div className="languageSwitch" role="group" aria-label={m.languageSelector}>
+            <button
+              type="button"
+              className={locale === "lo" ? "active" : ""}
+              aria-pressed={locale === "lo"}
+              aria-label={m.languageLao}
+              lang="lo"
+              onClick={() => setLocale("lo")}
+            >
+              ລາວ
+            </button>
+            <button
+              type="button"
+              className={locale === "en" ? "active" : ""}
+              aria-pressed={locale === "en"}
+              aria-label={m.languageEnglish}
+              lang="en"
+              onClick={() => setLocale("en")}
+            >
+              EN
+            </button>
           </div>
         </header>
 
         <div className="hero">
           <div>
-            <p className="kicker">ຈາກເອກະສານສະແກນ → Word ທີ່ແກ້ໄຂໄດ້</p>
-            <h2>Turn Lao scans and PDFs into editable documents.</h2>
-            <p className="lede">
-              No account, no credits, no cloud requirement. Run it yourself and keep your documents
-              on infrastructure you control.
-            </p>
+            <p className="kicker">{m.kicker}</p>
+            <h2 id="page-heading">{m.headline}</h2>
+            <p className="lede">{m.lede}</p>
           </div>
 
-          <div className="status" data-ready={health?.ocr_ready === true}>
-            <span className="dot" />
+          <div
+            className="status"
+            data-ready={health?.ocr_ready === true}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="dot" aria-hidden="true" />
             {health
               ? health.ocr_ready
-                ? `OCR engine ready · ${health.engine}`
-                : "API online · OCR engine needs setup"
-              : "Checking local OCR engine…"}
+                ? m.ready(health.engine)
+                : m.needsSetup
+              : m.checking}
           </div>
         </div>
 
@@ -203,12 +237,22 @@ function App() {
           className={`dropzone ${busy ? "disabled" : ""}`}
           onDragOver={(event) => event.preventDefault()}
           onDrop={onDrop}
+          aria-disabled={busy}
         >
-          <input type="file" accept={ACCEPTED.join(",")} onChange={onInput} disabled={busy} />
-          <div className="uploadIcon">↑</div>
-          <strong>{file ? "Document selected" : "Drop a document here"}</strong>
-          <span>{fileDescription}</span>
-          <span className="browse">{file ? "Choose another file" : "Browse files"}</span>
+          <input
+            className="fileInput"
+            type="file"
+            accept={ACCEPTED.join(",")}
+            onChange={onInput}
+            disabled={busy}
+            aria-describedby="file-help"
+          />
+          <div className="uploadIcon" aria-hidden="true">
+            ↑
+          </div>
+          <strong>{file ? m.selected : m.drop}</strong>
+          <span id="file-help">{fileDescription}</span>
+          <span className="browse">{file ? m.chooseAnother : m.browse}</span>
         </label>
 
         <div className="actions">
@@ -216,23 +260,30 @@ function App() {
             type="button"
             disabled={!file || busy || health?.ocr_ready === false}
             onClick={convert}
+            aria-busy={busy}
           >
-            {busy ? "Processing…" : "Convert to editable files"}
+            {busy ? m.processing : m.convert}
           </button>
           {canCancel && (
             <button type="button" className="secondary" onClick={cancel}>
-              Cancel
+              {m.cancel}
             </button>
           )}
         </div>
 
-        {job && busy && <p className="jobStatus">Job status: {job.status}</p>}
-        {message && <p className="message">{message}</p>}
-        {health?.error && <p className="warning">{health.error}</p>}
+        <div className="announcements" aria-live="polite" aria-atomic="true">
+          {job && busy && <p className="jobStatus">{m.jobStatus(job.status)}</p>}
+          {message && <p className="message">{message}</p>}
+        </div>
+        {health?.error && (
+          <p className="warning" role="alert">
+            {health.error}
+          </p>
+        )}
 
         <footer>
-          <span>Outputs: .docx · .md · .txt · .json</span>
-          <span>Apache-2.0</span>
+          <span>{m.outputs}</span>
+          <span>{m.license}</span>
         </footer>
       </section>
     </main>
