@@ -191,6 +191,12 @@ Override them with:
 - `OCR_MODEL_PATH` (required for `OCR_ENGINE=owned`)
 - `OCR_CALIBRATION_PATH` (optional for the owned recognizer)
 - `OCR_DEVICE` (`cpu`, `cuda`, `mps`, or `auto`; default `cpu`)
+- `OCR_LAYOUT_DETECTOR` (`morphology` or `learned`)
+- `OCR_LAYOUT_MODEL_PATH`
+- `OCR_LAYOUT_CONFIDENCE`
+- `OCR_READING_ORDER` (`deterministic` or `learned`)
+- `OCR_READING_ORDER_MODEL_PATH`
+- `OCR_READING_ORDER_MAX_BLOCKS`
 - `CORS_ORIGINS`
 - `JOB_MAX_WORKERS`
 - `JOB_MAX_ACTIVE`
@@ -264,6 +270,8 @@ lao-ocr prepare-layout-training-manifest --manifest <manifest.jsonl> --dataset-r
 lao-ocr prepare-layout-targets --training-manifest training/layout.jsonl --dataset-root <dataset> --output training/layout-targets
 lao-ocr train-layout-detector --targets-manifest training/layout-targets/targets.jsonl --dataset-root <dataset> --output training/layout/runs/tiny-unet-v1 --device auto
 lao-ocr export-layout-detector --checkpoint training/layout/runs/tiny-unet-v1/layout-detector.pt --output training/layout/runs/tiny-unet-v1/layout-detector.pt2
+lao-ocr train-reading-order --training-manifest training/layout.jsonl --dataset-root <dataset> --output training/layout/runs/reading-order-v1 --device auto
+lao-ocr export-reading-order --checkpoint training/layout/runs/reading-order-v1/reading-order.pt --output training/layout/runs/reading-order-v1/reading-order.pt2
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
 lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
@@ -332,3 +340,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 Apache License 2.0.
 
 Learned layout detector: [docs/layout-model-training.md](docs/layout-model-training.md).
+
+Learned reading order: [docs/reading-order-model.md](docs/reading-order-model.md).

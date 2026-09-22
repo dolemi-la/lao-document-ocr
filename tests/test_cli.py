@@ -819,3 +819,29 @@ def test_prepare_layout_targets_cli(tmp_path, monkeypatch, capsys) -> None:
     captured = capsys.readouterr().out
     assert "Layout targets:" in captured
     assert "Samples: 1" in captured
+
+
+def test_convert_document_learned_reading_order_requires_model(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    source = tmp_path / "page.png"
+    Image.new("RGB", (100, 60), "white").save(source)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "convert-document",
+            "--input",
+            str(source),
+            "--output-dir",
+            str(tmp_path / "output"),
+            "--reading-order",
+            "learned",
+        ],
+    )
+
+    assert main() == 1
+    assert "--reading-order-model is required" in capsys.readouterr().err

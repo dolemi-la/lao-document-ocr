@@ -72,7 +72,7 @@ Status: started
 - [x] learned semantic-region hints propagated into owned OCR/AST blocks
 - [x] heuristic heading hierarchy + body/list classification baseline
 - [x] conservative 2–4 column reading-order baseline
-- [ ] learned/general reading-order model
+- [x] learned pairwise reading-order train/export/inference pipeline (quality not yet benchmark-ready)
 - [x] simple ruled-table detection baseline
 - [x] row/column/cell structure for clear ruled grids
 - [x] aligned-text borderless-table v2 baseline with stable anchors

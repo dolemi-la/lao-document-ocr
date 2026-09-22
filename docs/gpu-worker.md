@@ -165,3 +165,19 @@ Set the S3 environment variables separately.
 The current owned recognizer is still experimental and has not yet beaten a real-document benchmark baseline.
 
 GPU support improves inference throughput/latency; it does not turn an undertrained model into a production-quality OCR model.
+
+## Optional learned layout + reading order
+
+The GPU preset can load all project-owned models from the same `/models` mount. Keep deterministic defaults unless you have trained/exported artifacts:
+
+```text
+OCR_LAYOUT_DETECTOR=learned
+OCR_LAYOUT_MODEL_PATH=/models/layout-detector.pt2
+OCR_LAYOUT_CONFIDENCE=0.55
+
+OCR_READING_ORDER=learned
+OCR_READING_ORDER_MODEL_PATH=/models/reading-order.pt2
+OCR_READING_ORDER_MAX_BLOCKS=256
+```
+
+Both optional models use the same `OCR_DEVICE` as the recognizer.

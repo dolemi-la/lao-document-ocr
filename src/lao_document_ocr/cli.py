@@ -61,6 +61,17 @@ def _parser() -> argparse.ArgumentParser:
         type=float,
         default=0.55,
     )
+    convert.add_argument(
+        "--reading-order",
+        choices=["deterministic", "learned"],
+        default="deterministic",
+    )
+    convert.add_argument("--reading-order-model", type=Path)
+    convert.add_argument(
+        "--reading-order-max-blocks",
+        type=int,
+        default=256,
+    )
     convert.add_argument("--max-pages", type=int, default=60)
     convert.add_argument("--font", default="Noto Sans Lao")
 
@@ -319,6 +330,32 @@ def _parser() -> argparse.ArgumentParser:
     layout_export.add_argument("--checkpoint", required=True, type=Path)
     layout_export.add_argument("--output", required=True, type=Path)
 
+    reading_order_train = subparsers.add_parser(
+        "train-reading-order",
+        help="Train the project-owned pairwise reading-order model.",
+    )
+    reading_order_train.add_argument("--training-manifest", required=True, type=Path)
+    reading_order_train.add_argument("--dataset-root", required=True, type=Path)
+    reading_order_train.add_argument("--output", required=True, type=Path)
+    reading_order_train.add_argument("--epochs", type=int, default=10)
+    reading_order_train.add_argument("--batch-size", type=int, default=64)
+    reading_order_train.add_argument("--learning-rate", type=float, default=1e-3)
+    reading_order_train.add_argument("--seed", type=int, default=20260923)
+    reading_order_train.add_argument("--hidden-size", type=int, default=64)
+    reading_order_train.add_argument("--num-workers", type=int, default=0)
+    reading_order_train.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="auto",
+    )
+
+    reading_order_export = subparsers.add_parser(
+        "export-reading-order",
+        help="Export a trained reading-order checkpoint as a torch.export artifact.",
+    )
+    reading_order_export.add_argument("--checkpoint", required=True, type=Path)
+    reading_order_export.add_argument("--output", required=True, type=Path)
+
     train = subparsers.add_parser(
         "train-recognizer",
         help="Train the CRNN+CTC Lao line recognizer.",
@@ -399,12 +436,29 @@ def _convert_document(args: argparse.Namespace) -> int:
             layout_confidence_threshold=args.layout_confidence,
         )
 
+    reading_order_resolver = None
+    if args.reading_order == "learned":
+        if args.reading_order_model is None:
+            raise ValueError(
+                "--reading-order-model is required when --reading-order=learned"
+            )
+        from lao_document_ocr.reading_order_inference import (
+            ExportedReadingOrderResolver,
+        )
+
+        reading_order_resolver = ExportedReadingOrderResolver(
+            args.reading_order_model,
+            device=args.device,
+            max_blocks=args.reading_order_max_blocks,
+        )
+
     outputs = convert_document_to_outputs(
         args.input,
         args.output_dir,
         engine=engine,
         max_pages=args.max_pages,
         font_name=args.font,
+        reading_order_resolver=reading_order_resolver,
     )
     print(json.dumps(outputs.to_dict(), indent=2))
     return 0
@@ -828,6 +882,56 @@ def _export_layout_detector(args: argparse.Namespace) -> int:
     return 0
 
 
+def _train_reading_order(args: argparse.Namespace) -> int:
+    try:
+        from lao_document_ocr.reading_order_training import (
+            ReadingOrderTrainingConfig,
+            train_reading_order_model,
+        )
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    result = train_reading_order_model(
+        args.training_manifest,
+        args.dataset_root,
+        args.output,
+        training_config=ReadingOrderTrainingConfig(
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            learning_rate=args.learning_rate,
+            seed=args.seed,
+            hidden_size=args.hidden_size,
+            num_workers=args.num_workers,
+            device=args.device,
+        ),
+    )
+    print(f"Checkpoint: {result['checkpoint']}")
+    print(f"Metadata: {result['metadata']}")
+    print(
+        "Best dev pair accuracy: "
+        f"{result['best_dev_pair_accuracy']:.4f}"
+    )
+    return 0
+
+
+def _export_reading_order(args: argparse.Namespace) -> int:
+    try:
+        from lao_document_ocr.reading_order_training import (
+            export_reading_order_model,
+        )
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    artifact = export_reading_order_model(
+        args.checkpoint,
+        args.output,
+    )
+    print(f"Exported reading-order model: {artifact}")
+    return 0
+
+
 def _train_recognizer(args: argparse.Namespace) -> int:
     try:
         from lao_document_ocr.recognizer_training import TrainingConfig, train_recognizer
@@ -969,6 +1073,10 @@ def main() -> int:
             return _train_layout_detector(args)
         if args.command == "export-layout-detector":
             return _export_layout_detector(args)
+        if args.command == "train-reading-order":
+            return _train_reading_order(args)
+        if args.command == "export-reading-order":
+            return _export_reading_order(args)
         if args.command == "train-recognizer":
             return _train_recognizer(args)
         if args.command == "export-recognizer":

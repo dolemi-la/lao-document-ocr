@@ -11,6 +11,7 @@ from lao_document_ocr.exporters import (
 )
 from lao_document_ocr.ocr.base import OcrEngine
 from lao_document_ocr.pipeline import process_document
+from lao_document_ocr.reading_order import ReadingOrderResolver
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,7 @@ def convert_document_to_outputs(
     engine: OcrEngine,
     max_pages: int = 60,
     font_name: str = "Noto Sans Lao",
+    reading_order_resolver: ReadingOrderResolver | None = None,
 ) -> ConversionOutputs:
     source = Path(input_path)
     if not source.is_file():
@@ -50,6 +52,7 @@ def convert_document_to_outputs(
         source_name=source.name,
         engine=engine,
         max_pages=max_pages,
+        reading_order_resolver=reading_order_resolver,
     )
 
     return ConversionOutputs(

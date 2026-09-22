@@ -16,7 +16,10 @@ from lao_document_ocr.ocr.base import OcrEngine, OcrEngineError
 from lao_document_ocr.ocr.tesseract import TesseractEngine
 from lao_document_ocr.preprocessing import preprocess_image
 from lao_document_ocr.raster_regions import detect_raster_regions
-from lao_document_ocr.reading_order import order_blocks
+from lao_document_ocr.reading_order import (
+    DeterministicReadingOrderResolver,
+    ReadingOrderResolver,
+)
 from lao_document_ocr.structure import build_page_blocks
 
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}
@@ -128,9 +131,11 @@ def process_document(
     max_pages: int = 60,
     max_page_pixels: int = DEFAULT_MAX_PAGE_PIXELS,
     should_cancel: Callable[[], bool] | None = None,
+    reading_order_resolver: ReadingOrderResolver | None = None,
 ) -> Document:
     path = Path(path)
     engine = engine or TesseractEngine()
+    resolver = reading_order_resolver or DeterministicReadingOrderResolver()
     _raise_if_cancelled(should_cancel)
     if max_page_pixels < 1:
         raise ValueError("max_page_pixels must be at least 1")
@@ -191,7 +196,11 @@ def process_document(
             *raster_blocks,
             *diagram_blocks,
         ]
-        blocks = order_blocks(blocks, page_width=cleaned.width)
+        blocks = resolver.order(
+            blocks,
+            page_width=cleaned.width,
+            page_height=cleaned.height,
+        )
 
         output_pages.append(
             Page(
@@ -210,6 +219,7 @@ def process_document(
         pages=output_pages,
         metadata={
             "engine": engine.metadata(),
+            "reading_order": resolver.metadata(),
             "page_count": len(output_pages),
         },
     )

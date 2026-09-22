@@ -32,6 +32,7 @@ from lao_document_ocr.pipeline import (
     DocumentProcessingError,
     process_document,
 )
+from lao_document_ocr.reading_order import DeterministicReadingOrderResolver
 from services.api.app.jobs import (
     ConversionJobManager,
     JobCancelledError,
@@ -70,6 +71,16 @@ OCR_LAYOUT_DETECTOR = os.getenv(
 OCR_LAYOUT_MODEL_PATH = os.getenv("OCR_LAYOUT_MODEL_PATH") or None
 OCR_LAYOUT_CONFIDENCE = float(
     os.getenv("OCR_LAYOUT_CONFIDENCE", "0.55")
+)
+OCR_READING_ORDER = os.getenv(
+    "OCR_READING_ORDER",
+    "deterministic",
+).strip().lower()
+OCR_READING_ORDER_MODEL_PATH = os.getenv(
+    "OCR_READING_ORDER_MODEL_PATH"
+) or None
+OCR_READING_ORDER_MAX_BLOCKS = int(
+    os.getenv("OCR_READING_ORDER_MAX_BLOCKS", "256")
 )
 JOB_ROOT = Path(
     os.getenv(
@@ -282,6 +293,47 @@ def _cached_owned_engine(
     )
 
 
+@lru_cache(maxsize=4)
+def _cached_reading_order_resolver(
+    model_path: str,
+    device: str,
+    max_blocks: int,
+):
+    from lao_document_ocr.reading_order_inference import (
+        ExportedReadingOrderResolver,
+    )
+
+    return ExportedReadingOrderResolver(
+        model_path,
+        device=device,
+        max_blocks=max_blocks,
+    )
+
+
+def _reading_order_resolver():
+    if OCR_READING_ORDER == "deterministic":
+        return None
+    if OCR_READING_ORDER == "learned":
+        if not OCR_READING_ORDER_MODEL_PATH:
+            raise OcrEngineError(
+                "OCR_READING_ORDER_MODEL_PATH is required when "
+                "OCR_READING_ORDER=learned"
+            )
+        try:
+            return _cached_reading_order_resolver(
+                OCR_READING_ORDER_MODEL_PATH,
+                OCR_DEVICE,
+                OCR_READING_ORDER_MAX_BLOCKS,
+            )
+        except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            raise OcrEngineError(
+                f"Could not load learned reading-order resolver: {exc}"
+            ) from exc
+    raise OcrEngineError(
+        "OCR_READING_ORDER must be 'deterministic' or 'learned'"
+    )
+
+
 def _engine() -> OcrEngine:
     if OCR_ENGINE == "tesseract":
         return TesseractEngine(languages=OCR_LANGUAGES, psm=OCR_PSM)
@@ -369,6 +421,7 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
             max_pages=MAX_PAGES,
             max_page_pixels=MAX_PAGE_PIXELS,
             should_cancel=cancel_event.is_set,
+            reading_order_resolver=_reading_order_resolver(),
         )
     except DocumentProcessingCancelled as exc:
         raise JobCancelledError(str(exc)) from exc
@@ -415,11 +468,18 @@ def health() -> dict:
         engine = _engine()
         ready = engine.is_available()
         metadata = engine.metadata()
+        resolver = _reading_order_resolver()
+        reading_order_metadata = (
+            resolver.metadata()
+            if resolver is not None
+            else DeterministicReadingOrderResolver().metadata()
+        )
         error = None
     except Exception as exc:
         engine = None
         ready = False
         metadata = None
+        reading_order_metadata = None
         error = str(exc)
 
     payload = {
@@ -427,6 +487,7 @@ def health() -> dict:
         "ocr_ready": ready,
         "engine": OCR_ENGINE,
         "metadata": metadata,
+        "reading_order": reading_order_metadata,
         "error": error,
         "limits": {
             "max_upload_bytes": MAX_UPLOAD_BYTES,
@@ -481,6 +542,7 @@ async def parse_document(
                 engine=_engine(),
                 max_pages=MAX_PAGES,
                 max_page_pixels=MAX_PAGE_PIXELS,
+                reading_order_resolver=_reading_order_resolver(),
             )
         except DocumentProcessingError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -509,6 +571,7 @@ async def convert_document(
                 engine=_engine(),
                 max_pages=MAX_PAGES,
                 max_page_pixels=MAX_PAGE_PIXELS,
+                reading_order_resolver=_reading_order_resolver(),
             )
         except DocumentProcessingError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

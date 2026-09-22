@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from lao_document_ocr.models import Block, BoundingBox
 
@@ -289,3 +290,36 @@ def order_blocks(
         + ordered_columns
         + sorted(bottom, key=by_position)
     )
+
+
+class ReadingOrderResolver(Protocol):
+    def order(
+        self,
+        blocks: list[Block],
+        *,
+        page_width: int,
+        page_height: int,
+    ) -> list[Block]: ...
+
+    def metadata(self) -> dict: ...
+
+
+class DeterministicReadingOrderResolver:
+    def metadata(self) -> dict:
+        return {
+            "name": self.__class__.__name__,
+            "version": "multi-column-v2",
+        }
+
+    def order(
+        self,
+        blocks: list[Block],
+        *,
+        page_width: int,
+        page_height: int,
+    ) -> list[Block]:
+        del page_height
+        return order_blocks(
+            blocks,
+            page_width=page_width,
+        )

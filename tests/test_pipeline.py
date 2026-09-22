@@ -152,3 +152,68 @@ def test_malformed_image_error_does_not_leak_temp_path(tmp_path) -> None:
 
     assert str(captured.value) == "Could not open image."
     assert "private-name" not in str(captured.value)
+
+
+def test_custom_reading_order_resolver_controls_final_page_order(tmp_path) -> None:
+    class TwoBlockEngine(OcrEngine):
+        def is_available(self) -> bool:
+            return True
+
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            return [
+                RecognizedLine(
+                    text="First",
+                    bbox=BoundingBox(x=20, y=20, width=100, height=20),
+                    confidence=0.99,
+                    block_id=1,
+                    paragraph_id=1,
+                    line_id=1,
+                ),
+                RecognizedLine(
+                    text="Second",
+                    bbox=BoundingBox(x=20, y=80, width=100, height=20),
+                    confidence=0.99,
+                    block_id=2,
+                    paragraph_id=2,
+                    line_id=1,
+                ),
+            ]
+
+    class ReverseResolver:
+        def metadata(self):
+            return {"name": "ReverseResolver", "version": "test-v1"}
+
+        def order(self, blocks, *, page_width, page_height):
+            assert page_width == 320
+            assert page_height == 180
+            return list(reversed(blocks))
+
+    image_path = tmp_path / "ordered.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    document = process_document(
+        image_path,
+        engine=TwoBlockEngine(),
+        reading_order_resolver=ReverseResolver(),
+    )
+
+    assert [block.text for block in document.pages[0].blocks] == [
+        "Second",
+        "First",
+    ]
+    assert document.metadata["reading_order"] == {
+        "name": "ReverseResolver",
+        "version": "test-v1",
+    }
+
+
+def test_default_reading_order_metadata_is_recorded(tmp_path) -> None:
+    image_path = tmp_path / "default-order.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    document = process_document(image_path, engine=FakeEngine())
+
+    assert document.metadata["reading_order"]["name"] == (
+        "DeterministicReadingOrderResolver"
+    )
+    assert document.metadata["reading_order"]["version"] == "multi-column-v2"

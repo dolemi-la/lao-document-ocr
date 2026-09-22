@@ -838,3 +838,34 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
         ]
     finally:
         api_main._cached_owned_engine.cache_clear()
+
+
+def test_health_reports_deterministic_reading_order(monkeypatch) -> None:
+    import services.api.app.main as api_main
+
+    monkeypatch.setattr(api_main, "OCR_READING_ORDER", "deterministic")
+    monkeypatch.setattr(api_main, "OCR_READING_ORDER_MODEL_PATH", None)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["reading_order"]["name"] == "DeterministicReadingOrderResolver"
+    assert payload["reading_order"]["version"] == "multi-column-v2"
+
+
+def test_health_fails_early_when_learned_reading_order_model_is_missing(
+    monkeypatch,
+) -> None:
+    import services.api.app.main as api_main
+
+    monkeypatch.setattr(api_main, "OCR_READING_ORDER", "learned")
+    monkeypatch.setattr(api_main, "OCR_READING_ORDER_MODEL_PATH", None)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ocr_ready"] is False
+    assert payload["reading_order"] is None
+    assert "OCR_READING_ORDER_MODEL_PATH" in payload["error"]
