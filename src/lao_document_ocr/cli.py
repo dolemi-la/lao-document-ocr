@@ -67,6 +67,20 @@ def _parser() -> argparse.ArgumentParser:
     dataset_report.add_argument("--output", required=True, type=Path)
     dataset_report.add_argument("--no-hash-check", action="store_true")
 
+    layout_training = subparsers.add_parser(
+        "prepare-layout-training-manifest",
+        help="Build a JSONL training manifest from layout-labeled dataset samples.",
+    )
+    layout_training.add_argument("--manifest", required=True, type=Path)
+    layout_training.add_argument("--dataset-root", required=True, type=Path)
+    layout_training.add_argument("--output", required=True, type=Path)
+    layout_training.add_argument(
+        "--split",
+        action="append",
+        choices=[split.value for split in DatasetSplit],
+        help="Repeat to select splits. Omit to include all labeled splits.",
+    )
+
     intake = subparsers.add_parser(
         "add-dataset-sample",
         help="Copy a rights-cleared benchmark page into the public dataset.",
@@ -387,6 +401,31 @@ def _dataset_report(args: argparse.Namespace) -> int:
     print(f"Validation: {'ok' if report['validation']['ok'] else 'failed'}")
     print(f"Missing subsets: {len(report['missing_subsets'])}")
     return 0 if report["validation"]["ok"] else 1
+
+
+def _prepare_layout_training_manifest(args: argparse.Namespace) -> int:
+    from lao_document_ocr.layout_training_manifest import (
+        build_layout_training_entries,
+        summarize_layout_training_entries,
+        write_layout_training_manifest,
+    )
+
+    samples = load_manifest(args.manifest)
+    splits = (
+        {DatasetSplit(value) for value in args.split}
+        if args.split
+        else None
+    )
+    entries = build_layout_training_entries(
+        samples,
+        args.dataset_root,
+        splits=splits,
+    )
+    output = write_layout_training_manifest(entries, args.output)
+    summary = summarize_layout_training_entries(entries)
+    print(f"Layout training manifest: {output}")
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
 
 
 def _add_dataset_sample(args: argparse.Namespace) -> int:
@@ -762,6 +801,8 @@ def main() -> int:
             return _validate(args)
         if args.command == "dataset-report":
             return _dataset_report(args)
+        if args.command == "prepare-layout-training-manifest":
+            return _prepare_layout_training_manifest(args)
         if args.command == "add-dataset-sample":
             return _add_dataset_sample(args)
         if args.command == "benchmark-layout":

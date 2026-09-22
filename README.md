@@ -260,6 +260,7 @@ Useful commands:
 lao-ocr add-dataset-sample --help
 lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
 lao-ocr dataset-report --manifest <manifest.jsonl> --dataset-root <dataset> --output dataset-report.json
+lao-ocr prepare-layout-training-manifest --manifest <manifest.jsonl> --dataset-root <dataset> --output training/layout.jsonl
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
 lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
@@ -302,6 +303,8 @@ See [docs/architecture.md](docs/architecture.md).
 See [docs/roadmap.md](docs/roadmap.md).
 
 Recognizer development: [docs/recognizer-training.md](docs/recognizer-training.md).
+
+Layout training data: [docs/layout-training-data.md](docs/layout-training-data.md).
 
 High-level direction:
 

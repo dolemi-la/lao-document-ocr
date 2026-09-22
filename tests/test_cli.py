@@ -643,3 +643,92 @@ def test_add_dataset_sample_cli_with_layout_ground_truth(
         "layout-ground-truth/clean-print/layout-cli.json"
     )
     assert (dataset_root / payload["layout_ground_truth"]).is_file()
+
+
+def test_prepare_layout_training_manifest_cli(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import hashlib
+
+    from lao_document_ocr.layout_ground_truth import write_layout_ground_truth
+    from lao_document_ocr.models import Block, BlockType, BoundingBox, Document, Page
+
+    image = tmp_path / "layout-train.png"
+    truth = tmp_path / "layout-train.txt"
+    layout = tmp_path / "layout-train.json"
+    Image.new("RGB", (120, 80), (230, 255, 255)).save(image)
+    truth.write_text("ສະບາຍດີ", encoding="utf-8")
+    write_layout_ground_truth(
+        Document(
+            pages=[
+                Page(
+                    number=1,
+                    width=120,
+                    height=80,
+                    blocks=[
+                        Block(
+                            type=BlockType.HEADING,
+                            text="ສະບາຍດີ",
+                            bbox=BoundingBox(
+                                x=10,
+                                y=10,
+                                width=90,
+                                height=25,
+                            ),
+                        )
+                    ],
+                )
+            ]
+        ),
+        layout,
+    )
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    manifest = tmp_path / "layout-train-manifest.jsonl"
+    manifest.write_text(
+        json.dumps(
+            {
+                "id": "layout-train",
+                "document_id": "layout-train-doc",
+                "split": "train",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "layout_ground_truth": layout.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI layout training test",
+                "sha256": digest,
+                "tags": ["layout:plain"],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "layout-training.jsonl"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "prepare-layout-training-manifest",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output",
+            str(output),
+            "--split",
+            "train",
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["id"] == "layout-train"
+    assert payload["block_counts"] == {"heading": 1}
+    captured = capsys.readouterr().out
+    assert "Layout training manifest:" in captured
+    assert '"samples": 1' in captured
