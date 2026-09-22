@@ -5,7 +5,11 @@ from typing import Protocol
 
 from PIL import Image
 
-from lao_document_ocr.line_detection import detect_text_lines
+from lao_document_ocr.line_detection import detect_region_aware_lines
+from lao_document_ocr.text_regions import (
+    MorphologyTextRegionDetector,
+    TextRegionDetector,
+)
 
 from .base import OcrEngine, OcrEngineError, RecognizedLine
 
@@ -26,7 +30,10 @@ class OwnedRecognizerEngine(OcrEngine):
         calibration_path: str | Path | None = None,
         device: str = "cpu",
         recognizer: ImageLineRecognizer | None = None,
+        region_detector: TextRegionDetector | None = None,
     ) -> None:
+        self.region_detector = region_detector or MorphologyTextRegionDetector()
+
         if recognizer is not None:
             self.recognizer = recognizer
             self.model_path = Path(model_path) if model_path is not None else None
@@ -56,10 +63,14 @@ class OwnedRecognizerEngine(OcrEngine):
         return {
             "name": self.__class__.__name__,
             "model": metadata,
+            "text_region_detector": self.region_detector.metadata(),
         }
 
     def recognize(self, image: Image.Image) -> list[RecognizedLine]:
-        boxes = detect_text_lines(image)
+        boxes = detect_region_aware_lines(
+            image,
+            region_detector=self.region_detector,
+        )
         lines: list[RecognizedLine] = []
 
         for line_index, box in enumerate(boxes, start=1):

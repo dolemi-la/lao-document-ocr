@@ -75,6 +75,14 @@ Detects clear ruled grids using horizontal/vertical morphology, assigns OCR line
 
 Detects borderless tables only from strong repeated OCR geometry: stable column anchors, tight row spacing, short cell text, and real gaps between columns. Two-column candidates additionally require a consistently numeric/currency/date-style value column so ordinary two-column prose remains reading-order content instead of being converted into a table.
 
+### `src/lao_document_ocr/text_regions.py`
+
+Defines the text-region detector interface and the current morphology-based implementation. Region-first detection separates columns/paragraph zones before line detection, reducing cross-column interference while keeping the interface replaceable by a learned detector later.
+
+### `src/lao_document_ocr/line_detection.py`
+
+Provides both the original whole-page line detector and region-aware line extraction. Region-local line merging uses wider safe horizontal gaps because the surrounding column/section has already been isolated.
+
 ### `src/lao_document_ocr/reading_order.py`
 
 Applies conservative two-column reading order only when a clear central gutter separates at least two blocks per side. Ambiguous/spanning layouts keep normal top-to-bottom ordering instead of guessing.

@@ -58,7 +58,12 @@ def _merge_line_boxes(
     return sorted(merged, key=lambda box: (box.y, box.x))
 
 
-def detect_text_lines(image: Image.Image) -> list[BoundingBox]:
+def detect_text_lines(
+    image: Image.Image,
+    *,
+    max_line_height_ratio: float = 0.2,
+    merge_gap_multiplier: float = 2.0,
+) -> list[BoundingBox]:
     """Detect likely printed text lines using deterministic morphology.
 
     This baseline intentionally favors clean scans. It is not a replacement for
@@ -83,7 +88,14 @@ def detect_text_lines(image: Image.Image) -> list[BoundingBox]:
 
     min_width = max(12, width // 100)
     min_height = max(6, height // 300)
-    max_height = max(min_height + 1, int(height * 0.2))
+    if not 0 < max_line_height_ratio <= 1:
+        raise ValueError("max_line_height_ratio must be in (0, 1]")
+    if merge_gap_multiplier <= 0:
+        raise ValueError("merge_gap_multiplier must be greater than 0")
+    max_height = max(
+        min_height + 1,
+        int(height * max_line_height_ratio),
+    )
 
     boxes: list[BoundingBox] = []
     for contour in contours:
@@ -109,4 +121,64 @@ def detect_text_lines(image: Image.Image) -> list[BoundingBox]:
             )
         )
 
-    return _merge_line_boxes(boxes, max_horizontal_gap=horizontal_kernel * 2)
+    return _merge_line_boxes(
+        boxes,
+        max_horizontal_gap=max(1, int(horizontal_kernel * merge_gap_multiplier)),
+    )
+
+
+def _offset_box(box: BoundingBox, *, offset_x: int, offset_y: int) -> BoundingBox:
+    return BoundingBox(
+        x=box.x + offset_x,
+        y=box.y + offset_y,
+        width=box.width,
+        height=box.height,
+    )
+
+
+def detect_region_aware_lines(
+    image: Image.Image,
+    *,
+    region_detector=None,
+) -> list[BoundingBox]:
+    """Detect text lines inside independent text regions.
+
+    Region-first detection keeps neighboring columns/sections from influencing
+    the line morphology kernel. If no regions are found, the legacy whole-page
+    line detector remains the fallback.
+    """
+    if region_detector is None:
+        from lao_document_ocr.text_regions import MorphologyTextRegionDetector
+
+        region_detector = MorphologyTextRegionDetector()
+
+    regions = region_detector.detect(image)
+    if not regions:
+        return detect_text_lines(image)
+
+    lines: list[BoundingBox] = []
+    for region in regions:
+        box = region.bbox
+        crop = image.crop(
+            (
+                box.x,
+                box.y,
+                box.x + box.width,
+                box.y + box.height,
+            )
+        )
+        local_lines = detect_text_lines(
+            crop,
+            max_line_height_ratio=0.85,
+            merge_gap_multiplier=3.5,
+        )
+        lines.extend(
+            _offset_box(
+                local,
+                offset_x=box.x,
+                offset_y=box.y,
+            )
+            for local in local_lines
+        )
+
+    return sorted(lines, key=lambda box: (box.y, box.x))

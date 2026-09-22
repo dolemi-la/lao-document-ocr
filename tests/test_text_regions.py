@@ -1,0 +1,56 @@
+from PIL import Image, ImageDraw
+
+from lao_document_ocr.text_regions import (
+    MorphologyTextRegionDetector,
+    detect_text_regions,
+)
+
+
+def _draw_words(draw: ImageDraw.ImageDraw, x_values, y: int) -> None:
+    for x in x_values:
+        draw.rectangle((x, y, x + 34, y + 16), fill=0)
+
+
+def test_detects_two_separate_column_regions() -> None:
+    image = Image.new("L", (800, 600), 255)
+    draw = ImageDraw.Draw(image)
+
+    for y in (80, 125, 170):
+        _draw_words(draw, (50, 105, 165), y)
+        _draw_words(draw, (470, 525, 585), y)
+
+    regions = detect_text_regions(image)
+
+    assert len(regions) == 2
+    assert regions[0].bbox.x < 250
+    assert regions[1].bbox.x > 350
+    assert regions[0].bbox.height > 100
+    assert regions[1].bbox.height > 100
+
+
+def test_full_width_heading_stays_separate_from_columns() -> None:
+    image = Image.new("L", (800, 700), 255)
+    draw = ImageDraw.Draw(image)
+
+    _draw_words(draw, (70, 145, 225, 305, 385, 465), 40)
+    for y in (150, 195, 240):
+        _draw_words(draw, (50, 105, 165), y)
+        _draw_words(draw, (470, 525, 585), y)
+
+    regions = detect_text_regions(image)
+
+    assert len(regions) == 3
+    heading = min(regions, key=lambda region: region.bbox.y)
+    assert heading.bbox.width > 400
+    assert heading.bbox.y < 80
+
+
+def test_blank_page_has_no_regions() -> None:
+    image = Image.new("L", (500, 400), 255)
+    assert detect_text_regions(image) == []
+
+
+def test_detector_exposes_metadata() -> None:
+    metadata = MorphologyTextRegionDetector().metadata()
+    assert metadata["name"] == "MorphologyTextRegionDetector"
+    assert metadata["version"] == "morphology-region-v1"

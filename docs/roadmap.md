@@ -64,7 +64,8 @@ Exit condition: our recognizer beats the published Tesseract baseline on the fix
 Status: started
 
 - [x] deterministic clean-scan text-line detection baseline
-- [ ] learned/general text-region detection
+- [x] general deterministic text-region detector interface/baseline
+- [ ] learned text-region detector
 - [x] heuristic heading hierarchy + body/list classification baseline
 - [x] conservative two-column reading-order baseline
 - [ ] general learned reading order

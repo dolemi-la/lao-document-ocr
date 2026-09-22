@@ -109,11 +109,23 @@ Never fit calibration on the final test set.
 
 The current calibration target is observed character accuracy (`1 - CER`) using quantile bins. This is deliberately simple and reviewable; more sophisticated calibration can be added once the real benchmark is large enough.
 
-## Line detection
+## Region-first detection
 
-The current line detector uses thresholding plus horizontal morphology.
+The owned OCR path now detects text regions before text lines:
 
-It exists so the project-owned recognizer can run through the complete document pipeline today. It should eventually be replaced or complemented by learned text/layout detection for difficult page structures.
+```text
+page
+  -> morphology text regions
+  -> independent region crops
+  -> line detection inside each region
+  -> project-owned recognizer
+```
+
+This handles separated columns/sections more safely than applying one horizontal morphology kernel across the whole page.
+
+The detector is behind a `TextRegionDetector` interface so a learned detector can replace the morphology implementation without changing the recognizer/export pipeline.
+
+The current region detector is still deterministic morphology, not a trained layout model.
 
 ## Accelerator runtime
 
