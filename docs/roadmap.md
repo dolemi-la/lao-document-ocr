@@ -93,7 +93,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
 - [x] disabled-by-default per-client submission rate-limit baseline
 - [x] filesystem result-storage adapter abstraction baseline
-- [ ] S3-compatible/object-storage result adapter
+- [x] S3-compatible/object-storage result adapter
 - [x] baseline security hardening/review (uploads, parser caps, headers, permissions, non-root API)
 - [ ] external deployment penetration/security review
 - accessibility

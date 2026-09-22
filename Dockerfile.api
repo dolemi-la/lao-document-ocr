@@ -18,12 +18,18 @@ RUN apt-get update \
 
 WORKDIR /app
 
+ARG INSTALL_S3=false
+
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY services ./services
 
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --timeout 120 --retries 10 .
+    if [ "$INSTALL_S3" = "true" ]; then \
+      pip install --timeout 120 --retries 10 ".[s3]"; \
+    else \
+      pip install --timeout 120 --retries 10 .; \
+    fi
 
 RUN groupadd --gid 10001 appuser \
     && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin appuser \

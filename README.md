@@ -194,14 +194,21 @@ Override them with:
 - `JOB_RETENTION_SECONDS`
 - `JOB_ROOT`
 - `BATCH_MAX_FILES`
-- `RESULT_STORAGE_BACKEND` (currently `filesystem`)
+- `RESULT_STORAGE_BACKEND` (`filesystem` or `s3`)
 - `RESULT_STORAGE_ROOT`
+- `RESULT_STORAGE_S3_BUCKET`
+- `RESULT_STORAGE_S3_PREFIX`
+- `RESULT_STORAGE_S3_ENDPOINT_URL`
+- `RESULT_STORAGE_S3_REGION`
+- `RESULT_STORAGE_S3_FORCE_PATH_STYLE`
 - `RATE_LIMIT_REQUESTS` (0 disables the in-process limiter)
 - `RATE_LIMIT_WINDOW_SECONDS`
 - `RATE_LIMIT_MAX_CLIENTS`
 - `RATE_LIMIT_TRUST_PROXY_HEADERS`
 
 The project-owned engine is experimental and requires the optional PyTorch dependencies. See [docs/owned-ocr-engine.md](docs/owned-ocr-engine.md).
+
+S3-compatible storage requires the optional `s3` dependency extra or `INSTALL_S3=true` for the API Docker build. See [docs/storage-adapters.md](docs/storage-adapters.md).
 
 ## Document AST
 

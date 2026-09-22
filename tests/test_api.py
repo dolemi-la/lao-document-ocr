@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from services.api.app.main import app
@@ -724,3 +725,62 @@ def test_docs_csp_keeps_swagger_ui_assets_allowed() -> None:
     assert "script-src 'unsafe-inline'" in csp
     assert "connect-src 'self'" in csp
     assert "frame-ancestors 'none'" in csp
+
+
+def test_build_result_storage_supports_s3(monkeypatch) -> None:
+    import services.api.app.main as api_main
+
+    captured = {}
+
+    class FakeS3Storage:
+        def __init__(
+            self,
+            bucket,
+            *,
+            prefix,
+            endpoint_url,
+            region_name,
+            force_path_style,
+        ):
+            captured.update(
+                {
+                    "bucket": bucket,
+                    "prefix": prefix,
+                    "endpoint_url": endpoint_url,
+                    "region_name": region_name,
+                    "force_path_style": force_path_style,
+                }
+            )
+
+    monkeypatch.setattr(api_main, "RESULT_STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(api_main, "RESULT_STORAGE_S3_BUCKET", "ocr-results")
+    monkeypatch.setattr(api_main, "RESULT_STORAGE_S3_PREFIX", "prod/results")
+    monkeypatch.setattr(
+        api_main,
+        "RESULT_STORAGE_S3_ENDPOINT_URL",
+        "https://r2.example.invalid",
+    )
+    monkeypatch.setattr(api_main, "RESULT_STORAGE_S3_REGION", "auto")
+    monkeypatch.setattr(api_main, "RESULT_STORAGE_S3_FORCE_PATH_STYLE", True)
+    monkeypatch.setattr(api_main, "S3ArtifactStorage", FakeS3Storage)
+
+    storage = api_main._build_result_storage()
+
+    assert isinstance(storage, FakeS3Storage)
+    assert captured == {
+        "bucket": "ocr-results",
+        "prefix": "prod/results",
+        "endpoint_url": "https://r2.example.invalid",
+        "region_name": "auto",
+        "force_path_style": True,
+    }
+
+
+def test_build_result_storage_requires_s3_bucket(monkeypatch) -> None:
+    import services.api.app.main as api_main
+
+    monkeypatch.setattr(api_main, "RESULT_STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(api_main, "RESULT_STORAGE_S3_BUCKET", "")
+
+    with pytest.raises(RuntimeError, match="RESULT_STORAGE_S3_BUCKET"):
+        api_main._build_result_storage()

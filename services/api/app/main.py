@@ -49,6 +49,7 @@ from services.api.app.security import (
 )
 from services.api.app.storage import (
     FilesystemArtifactStorage,
+    S3ArtifactStorage,
     StoredArtifact,
 )
 
@@ -76,6 +77,14 @@ RESULT_STORAGE_ROOT = Path(
         str(Path(tempfile.gettempdir()) / "lao-document-ocr-results"),
     )
 )
+RESULT_STORAGE_S3_BUCKET = os.getenv("RESULT_STORAGE_S3_BUCKET", "").strip()
+RESULT_STORAGE_S3_PREFIX = os.getenv("RESULT_STORAGE_S3_PREFIX", "").strip()
+RESULT_STORAGE_S3_ENDPOINT_URL = os.getenv("RESULT_STORAGE_S3_ENDPOINT_URL")
+RESULT_STORAGE_S3_REGION = os.getenv("RESULT_STORAGE_S3_REGION")
+RESULT_STORAGE_S3_FORCE_PATH_STYLE = os.getenv(
+    "RESULT_STORAGE_S3_FORCE_PATH_STYLE",
+    "false",
+).strip().lower() in {"1", "true", "yes", "on"}
 JOB_MAX_WORKERS = int(os.getenv("JOB_MAX_WORKERS", "2"))
 JOB_MAX_ACTIVE = int(os.getenv("JOB_MAX_ACTIVE", "8"))
 JOB_RETENTION_SECONDS = int(os.getenv("JOB_RETENTION_SECONDS", "3600"))
@@ -178,6 +187,18 @@ async def observe_request(request: Request, call_next):
 def _build_result_storage():
     if RESULT_STORAGE_BACKEND == "filesystem":
         return FilesystemArtifactStorage(RESULT_STORAGE_ROOT)
+    if RESULT_STORAGE_BACKEND == "s3":
+        if not RESULT_STORAGE_S3_BUCKET:
+            raise RuntimeError(
+                "RESULT_STORAGE_S3_BUCKET is required when RESULT_STORAGE_BACKEND=s3"
+            )
+        return S3ArtifactStorage(
+            RESULT_STORAGE_S3_BUCKET,
+            prefix=RESULT_STORAGE_S3_PREFIX,
+            endpoint_url=RESULT_STORAGE_S3_ENDPOINT_URL,
+            region_name=RESULT_STORAGE_S3_REGION,
+            force_path_style=RESULT_STORAGE_S3_FORCE_PATH_STYLE,
+        )
     raise RuntimeError(
         f"Unsupported RESULT_STORAGE_BACKEND: {RESULT_STORAGE_BACKEND}"
     )
