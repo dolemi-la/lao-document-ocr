@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,13 +25,26 @@ class DocumentProcessingError(RuntimeError):
     pass
 
 
+class DocumentProcessingCancelled(DocumentProcessingError):
+    pass
+
+
+def _raise_if_cancelled(should_cancel: Callable[[], bool] | None) -> None:
+    if should_cancel is not None and should_cancel():
+        raise DocumentProcessingCancelled("Document processing was cancelled.")
+
+
 @dataclass(frozen=True)
 class LoadedPage:
     image: Image.Image
     embedded_images: tuple[EmbeddedImageAsset, ...] = ()
 
 
-def _render_pdf(path: Path, max_pages: int) -> list[LoadedPage]:
+def _render_pdf(
+    path: Path,
+    max_pages: int,
+    should_cancel: Callable[[], bool] | None = None,
+) -> list[LoadedPage]:
     pages: list[LoadedPage] = []
     try:
         pdf = pymupdf.open(path)
@@ -43,6 +57,7 @@ def _render_pdf(path: Path, max_pages: int) -> list[LoadedPage]:
                 f"PDF has {pdf.page_count} pages; maximum is {max_pages}."
             )
         for page in pdf:
+            _raise_if_cancelled(should_cancel)
             pixmap = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
             mode = "RGB" if pixmap.n < 4 else "RGBA"
             image = Image.frombytes(mode, (pixmap.width, pixmap.height), pixmap.samples)
@@ -63,10 +78,14 @@ def _render_pdf(path: Path, max_pages: int) -> list[LoadedPage]:
     return pages
 
 
-def _load_pages(path: Path, max_pages: int) -> list[LoadedPage]:
+def _load_pages(
+    path: Path,
+    max_pages: int,
+    should_cancel: Callable[[], bool] | None = None,
+) -> list[LoadedPage]:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
-        return _render_pdf(path, max_pages)
+        return _render_pdf(path, max_pages, should_cancel=should_cancel)
     if suffix in SUPPORTED_IMAGE_SUFFIXES:
         try:
             with Image.open(path) as image:
@@ -82,13 +101,20 @@ def process_document(
     source_name: str | None = None,
     engine: OcrEngine | None = None,
     max_pages: int = 60,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> Document:
     path = Path(path)
     engine = engine or TesseractEngine()
-    pages = _load_pages(path, max_pages=max_pages)
+    _raise_if_cancelled(should_cancel)
+    pages = _load_pages(
+        path,
+        max_pages=max_pages,
+        should_cancel=should_cancel,
+    )
 
     output_pages: list[Page] = []
     for page_number, loaded_page in enumerate(pages, start=1):
+        _raise_if_cancelled(should_cancel)
         cleaned = preprocess_image(loaded_page.image)
         try:
             lines = engine.recognize(cleaned)
@@ -116,6 +142,7 @@ def process_document(
             )
         )
 
+    _raise_if_cancelled(should_cancel)
     mark_repeated_headers_footers(output_pages)
 
     return Document(

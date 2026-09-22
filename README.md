@@ -130,6 +130,19 @@ Content-Type: multipart/form-data
 
 Upload field: `file`.
 
+### Asynchronous jobs
+
+The default web UI uses bounded background jobs for long conversions:
+
+```text
+POST   /v1/jobs
+GET    /v1/jobs/{job_id}
+DELETE /v1/jobs/{job_id}
+GET    /v1/jobs/{job_id}/download
+```
+
+See [docs/async-jobs.md](docs/async-jobs.md).
+
 ### Convert
 
 ```http
@@ -164,6 +177,10 @@ Override them with:
 - `OCR_MODEL_PATH` (required for `OCR_ENGINE=owned`)
 - `OCR_CALIBRATION_PATH` (optional for the owned recognizer)
 - `CORS_ORIGINS`
+- `JOB_MAX_WORKERS`
+- `JOB_MAX_ACTIVE`
+- `JOB_RETENTION_SECONDS`
+- `JOB_ROOT`
 
 The project-owned engine is experimental and requires the optional PyTorch dependencies. See [docs/owned-ocr-engine.md](docs/owned-ocr-engine.md).
 

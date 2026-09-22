@@ -34,3 +34,153 @@ def test_owned_engine_health_requires_model(monkeypatch) -> None:
     assert payload["engine"] == "owned"
     assert payload["ocr_ready"] is False
     assert "OCR_MODEL_PATH" in payload["error"]
+
+
+def _png_upload_bytes() -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (100, 60), "white").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _poll_job(client, job_id: str, terminal=None, timeout: float = 2.0):
+    import time
+
+    terminal = terminal or {"succeeded", "failed", "cancelled"}
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get(f"/v1/jobs/{job_id}")
+        assert response.status_code == 200
+        payload = response.json()
+        if payload["status"] in terminal:
+            return payload
+        time.sleep(0.01)
+    raise AssertionError("job did not reach expected state")
+
+
+def test_async_job_success_status_and_download(tmp_path, monkeypatch) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+
+    def runner(record, cancel_event):
+        path = record.workspace / "sample-ocr.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("sample.txt", "done")
+        return path
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    try:
+        response = client.post(
+            "/v1/jobs",
+            files={"file": ("sample.png", _png_upload_bytes(), "image/png")},
+        )
+        assert response.status_code == 202
+        job_id = response.json()["id"]
+
+        payload = _poll_job(client, job_id)
+        assert payload["status"] == "succeeded"
+        assert payload["download_ready"] is True
+
+        download = client.get(f"/v1/jobs/{job_id}/download")
+        assert download.status_code == 200
+        assert download.headers["content-type"].startswith("application/zip")
+        with zipfile.ZipFile(__import__("io").BytesIO(download.content)) as archive:
+            assert archive.read("sample.txt") == b"done"
+    finally:
+        manager.shutdown()
+
+
+def test_async_job_can_be_cancelled(tmp_path, monkeypatch) -> None:
+    import time
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager, JobCancelledError
+
+    def runner(record, cancel_event):
+        while True:
+            if cancel_event.is_set():
+                raise JobCancelledError()
+            time.sleep(0.01)
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    try:
+        response = client.post(
+            "/v1/jobs",
+            files={"file": ("sample.png", _png_upload_bytes(), "image/png")},
+        )
+        assert response.status_code == 202
+        job_id = response.json()["id"]
+
+        _poll_job(client, job_id, terminal={"running"})
+        cancelled = client.delete(f"/v1/jobs/{job_id}")
+        assert cancelled.status_code == 200
+        assert cancelled.json()["cancellation_requested"] is True
+
+        payload = _poll_job(client, job_id)
+        assert payload["status"] == "cancelled"
+        download = client.get(f"/v1/jobs/{job_id}/download")
+        assert download.status_code == 409
+    finally:
+        manager.shutdown()
+
+
+def test_async_job_capacity_returns_429(tmp_path, monkeypatch) -> None:
+    import time
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager, JobCancelledError
+
+    def runner(record, cancel_event):
+        while True:
+            if cancel_event.is_set():
+                raise JobCancelledError()
+            time.sleep(0.01)
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=1,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    try:
+        first = client.post(
+            "/v1/jobs",
+            files={"file": ("first.png", _png_upload_bytes(), "image/png")},
+        )
+        assert first.status_code == 202
+        job_id = first.json()["id"]
+
+        second = client.post(
+            "/v1/jobs",
+            files={"file": ("second.png", _png_upload_bytes(), "image/png")},
+        )
+        assert second.status_code == 429
+        assert "capacity" in second.json()["detail"].lower()
+
+        client.delete(f"/v1/jobs/{job_id}")
+        _poll_job(client, job_id)
+    finally:
+        manager.shutdown()
+
+
+def test_unknown_job_returns_404() -> None:
+    response = client.get("/v1/jobs/not-a-real-job")
+    assert response.status_code == 404

@@ -1,0 +1,189 @@
+import time
+from datetime import timedelta
+
+import pytest
+
+from services.api.app.jobs import (
+    ConversionJobManager,
+    JobCancelledError,
+    JobCapacityError,
+    JobStatus,
+)
+
+
+def _wait_for_terminal(manager, job_id: str, timeout: float = 2.0) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        payload = manager.public(job_id)
+        if payload["status"] in {"succeeded", "failed", "cancelled"}:
+            return payload
+        time.sleep(0.01)
+    raise AssertionError("job did not reach a terminal state")
+
+
+def test_job_manager_runs_and_exposes_download(tmp_path) -> None:
+    def runner(record, cancel_event):
+        output = record.workspace / "result.zip"
+        output.write_bytes(b"zip")
+        return output
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        record.input_path.write_bytes(b"image")
+        manager.enqueue(record.id)
+
+        payload = _wait_for_terminal(manager, record.id)
+
+        assert payload["status"] == "succeeded"
+        assert payload["download_ready"] is True
+        assert manager.get_record(record.id).output_path.read_bytes() == b"zip"
+    finally:
+        manager.shutdown()
+
+
+def test_job_manager_enforces_active_capacity(tmp_path) -> None:
+    gate = {"open": False}
+
+    def runner(record, cancel_event):
+        while not gate["open"]:
+            if cancel_event.is_set():
+                raise JobCancelledError()
+            time.sleep(0.01)
+        output = record.workspace / "result.zip"
+        output.write_bytes(b"zip")
+        return output
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=1,
+    )
+    try:
+        first = manager.reserve("first.png", ".png")
+        first.input_path.write_bytes(b"x")
+        manager.enqueue(first.id)
+
+        with pytest.raises(JobCapacityError, match="capacity"):
+            manager.reserve("second.png", ".png")
+
+        gate["open"] = True
+        assert _wait_for_terminal(manager, first.id)["status"] == "succeeded"
+    finally:
+        gate["open"] = True
+        manager.shutdown()
+
+
+def test_running_job_can_be_cancelled(tmp_path) -> None:
+    def runner(record, cancel_event):
+        while True:
+            if cancel_event.is_set():
+                raise JobCancelledError()
+            time.sleep(0.01)
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        record = manager.reserve("sample.pdf", ".pdf")
+        record.input_path.write_bytes(b"pdf")
+        manager.enqueue(record.id)
+
+        deadline = time.monotonic() + 1.0
+        while manager.public(record.id)["status"] != "running":
+            if time.monotonic() > deadline:
+                raise AssertionError("job never started")
+            time.sleep(0.01)
+
+        cancel_payload = manager.cancel(record.id)
+        assert cancel_payload["cancellation_requested"] is True
+
+        terminal = _wait_for_terminal(manager, record.id)
+        assert terminal["status"] == "cancelled"
+        assert terminal["download_ready"] is False
+    finally:
+        manager.shutdown()
+
+
+def test_cleanup_removes_expired_job_workspace(tmp_path) -> None:
+    def runner(record, cancel_event):
+        output = record.workspace / "result.zip"
+        output.write_bytes(b"zip")
+        return output
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+        retention_seconds=60,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        record.input_path.write_bytes(b"x")
+        manager.enqueue(record.id)
+        _wait_for_terminal(manager, record.id)
+
+        completed = manager.get_record(record.id).completed_at
+        removed = manager.cleanup_expired(
+            now=completed + timedelta(seconds=61)
+        )
+
+        assert removed == 1
+        assert not record.workspace.exists()
+        with pytest.raises(KeyError):
+            manager.get_record(record.id)
+    finally:
+        manager.shutdown()
+
+
+def test_cancel_before_enqueue_marks_job_cancelled(tmp_path) -> None:
+    def runner(record, cancel_event):
+        raise AssertionError("runner should not execute")
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        manager.cancel(record.id)
+        payload = manager.enqueue(record.id)
+        assert payload.status == JobStatus.CANCELLED
+    finally:
+        manager.shutdown()
+
+
+def test_failed_job_records_error_and_has_no_download(tmp_path) -> None:
+    def runner(record, cancel_event):
+        raise RuntimeError("synthetic conversion failure")
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        record.input_path.write_bytes(b"image")
+        manager.enqueue(record.id)
+
+        payload = _wait_for_terminal(manager, record.id)
+
+        assert payload["status"] == "failed"
+        assert payload["error"] == "synthetic conversion failure"
+        assert payload["download_ready"] is False
+    finally:
+        manager.shutdown()

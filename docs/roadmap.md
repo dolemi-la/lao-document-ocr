@@ -85,11 +85,11 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 
 ## Phase 4 — production hardening
 
-- async jobs
-- resource limits
+- [x] bounded local async conversion jobs
+- [x] upload/page/active-job concurrency limits baseline
 - GPU worker option
 - batch processing
-- cancellation
+- [x] cooperative job cancellation at page boundaries
 - observability
 - rate limiting for public deployments
 - storage adapters

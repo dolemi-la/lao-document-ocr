@@ -9,6 +9,9 @@ services:
       MAX_PAGES: "60"
       MAX_UPLOAD_BYTES: "26214400"
       CORS_ORIGINS: http://localhost:5173
+      JOB_MAX_WORKERS: "2"
+      JOB_MAX_ACTIVE: "8"
+      JOB_RETENTION_SECONDS: "3600"
     ports:
       - "8000:8000"
 

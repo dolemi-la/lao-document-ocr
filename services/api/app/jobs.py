@@ -1,0 +1,253 @@
+from __future__ import annotations
+
+import shutil
+import threading
+import uuid
+from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from pathlib import Path
+
+
+class JobStatus(StrEnum):
+    UPLOADING = "uploading"
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+_TERMINAL_STATUSES = {
+    JobStatus.SUCCEEDED,
+    JobStatus.FAILED,
+    JobStatus.CANCELLED,
+}
+
+
+class JobCapacityError(RuntimeError):
+    pass
+
+
+class JobNotFoundError(KeyError):
+    pass
+
+
+class JobCancelledError(RuntimeError):
+    pass
+
+
+@dataclass
+class JobRecord:
+    id: str
+    filename: str
+    workspace: Path
+    input_path: Path
+    status: JobStatus = JobStatus.UPLOADING
+    output_path: Path | None = None
+    error: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    cancellation_requested: bool = False
+    cancel_event: threading.Event = field(default_factory=threading.Event, repr=False)
+    future: Future | None = field(default=None, repr=False)
+
+
+JobRunner = Callable[[JobRecord, threading.Event], Path]
+
+
+class ConversionJobManager:
+    def __init__(
+        self,
+        root_dir: str | Path,
+        runner: JobRunner,
+        *,
+        max_workers: int = 2,
+        max_active_jobs: int = 8,
+        retention_seconds: int = 3600,
+    ) -> None:
+        if max_workers < 1:
+            raise ValueError("max_workers must be at least 1")
+        if max_active_jobs < max_workers:
+            raise ValueError("max_active_jobs must be >= max_workers")
+        if retention_seconds < 0:
+            raise ValueError("retention_seconds must be non-negative")
+
+        self.root_dir = Path(root_dir)
+        self.root_dir.mkdir(parents=True, exist_ok=True)
+        self.runner = runner
+        self.max_active_jobs = max_active_jobs
+        self.retention_seconds = retention_seconds
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="lao-ocr-job",
+        )
+        self._jobs: dict[str, JobRecord] = {}
+        self._lock = threading.RLock()
+
+    def _active_count(self) -> int:
+        return sum(
+            record.status not in _TERMINAL_STATUSES
+            for record in self._jobs.values()
+        )
+
+    def reserve(self, filename: str, suffix: str) -> JobRecord:
+        self.cleanup_expired()
+        with self._lock:
+            if self._active_count() >= self.max_active_jobs:
+                raise JobCapacityError(
+                    f"Job capacity reached ({self.max_active_jobs} active jobs)."
+                )
+
+            job_id = uuid.uuid4().hex
+            workspace = self.root_dir / job_id
+            workspace.mkdir(parents=True, exist_ok=False)
+            input_path = workspace / f"input{suffix}"
+            record = JobRecord(
+                id=job_id,
+                filename=filename,
+                workspace=workspace,
+                input_path=input_path,
+            )
+            self._jobs[job_id] = record
+            return record
+
+    def discard(self, job_id: str) -> None:
+        with self._lock:
+            record = self._jobs.pop(job_id, None)
+        if record is not None:
+            shutil.rmtree(record.workspace, ignore_errors=True)
+
+    def enqueue(self, job_id: str) -> JobRecord:
+        with self._lock:
+            record = self._require(job_id)
+            if record.status != JobStatus.UPLOADING:
+                raise RuntimeError(
+                    f"Job {job_id} cannot be enqueued from status {record.status.value}."
+                )
+            if record.cancel_event.is_set():
+                record.status = JobStatus.CANCELLED
+                record.cancellation_requested = True
+                record.completed_at = datetime.now(UTC)
+                return record
+
+            record.status = JobStatus.QUEUED
+            record.future = self._executor.submit(self._run, job_id)
+            return record
+
+    def _run(self, job_id: str) -> None:
+        with self._lock:
+            record = self._require(job_id)
+            if record.cancel_event.is_set():
+                record.status = JobStatus.CANCELLED
+                record.completed_at = datetime.now(UTC)
+                return
+            record.status = JobStatus.RUNNING
+            record.started_at = datetime.now(UTC)
+
+        try:
+            output = self.runner(record, record.cancel_event)
+            with self._lock:
+                if record.cancel_event.is_set():
+                    record.status = JobStatus.CANCELLED
+                    record.cancellation_requested = True
+                    record.output_path = None
+                else:
+                    record.output_path = Path(output)
+                    record.status = JobStatus.SUCCEEDED
+        except JobCancelledError:
+            with self._lock:
+                record.status = JobStatus.CANCELLED
+                record.cancellation_requested = True
+                record.output_path = None
+        except Exception as exc:
+            with self._lock:
+                record.status = JobStatus.FAILED
+                record.error = str(exc)
+                record.output_path = None
+        finally:
+            with self._lock:
+                record.completed_at = datetime.now(UTC)
+
+    def cancel(self, job_id: str) -> dict:
+        with self._lock:
+            record = self._require(job_id)
+            if record.status in _TERMINAL_STATUSES:
+                return self._public(record)
+
+            record.cancellation_requested = True
+            record.cancel_event.set()
+            if record.future is not None and record.future.cancel():
+                record.status = JobStatus.CANCELLED
+                record.completed_at = datetime.now(UTC)
+            return self._public(record)
+
+    def get_record(self, job_id: str) -> JobRecord:
+        self.cleanup_expired()
+        with self._lock:
+            return self._require(job_id)
+
+    def public(self, job_id: str) -> dict:
+        self.cleanup_expired()
+        with self._lock:
+            return self._public(self._require(job_id))
+
+    def _public(self, record: JobRecord) -> dict:
+        return {
+            "id": record.id,
+            "filename": record.filename,
+            "status": record.status.value,
+            "created_at": record.created_at.isoformat(),
+            "started_at": (
+                record.started_at.isoformat()
+                if record.started_at is not None
+                else None
+            ),
+            "completed_at": (
+                record.completed_at.isoformat()
+                if record.completed_at is not None
+                else None
+            ),
+            "cancellation_requested": record.cancellation_requested,
+            "error": record.error,
+            "download_ready": (
+                record.status == JobStatus.SUCCEEDED
+                and record.output_path is not None
+                and record.output_path.is_file()
+            ),
+        }
+
+    def _require(self, job_id: str) -> JobRecord:
+        record = self._jobs.get(job_id)
+        if record is None:
+            raise JobNotFoundError(job_id)
+        return record
+
+    def cleanup_expired(self, *, now: datetime | None = None) -> int:
+        if self.retention_seconds == 0:
+            cutoff = now or datetime.now(UTC)
+        else:
+            cutoff = (now or datetime.now(UTC)) - timedelta(
+                seconds=self.retention_seconds
+            )
+
+        expired: list[JobRecord] = []
+        with self._lock:
+            for job_id, record in list(self._jobs.items()):
+                if (
+                    record.status in _TERMINAL_STATUSES
+                    and record.completed_at is not None
+                    and record.completed_at <= cutoff
+                ):
+                    expired.append(record)
+                    del self._jobs[job_id]
+
+        for record in expired:
+            shutil.rmtree(record.workspace, ignore_errors=True)
+        return len(expired)
+
+    def shutdown(self, *, wait: bool = True) -> None:
+        self._executor.shutdown(wait=wait, cancel_futures=True)

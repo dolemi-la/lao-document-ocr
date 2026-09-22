@@ -31,3 +31,52 @@ def test_process_image_with_fake_engine(tmp_path) -> None:
     assert len(document.pages) == 1
     assert document.pages[0].blocks[0].text == "Hello OCR"
     assert document.metadata["engine"]["name"] == "FakeEngine"
+
+
+def test_processing_can_be_cancelled_before_start(tmp_path) -> None:
+    import pytest
+
+    from lao_document_ocr.pipeline import DocumentProcessingCancelled
+
+    image_path = tmp_path / "cancel.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    with pytest.raises(DocumentProcessingCancelled, match="cancelled"):
+        process_document(
+            image_path,
+            engine=FakeEngine(),
+            should_cancel=lambda: True,
+        )
+
+
+def test_processing_cancels_between_pdf_pages(tmp_path) -> None:
+    import pymupdf
+    import pytest
+
+    from lao_document_ocr.pipeline import DocumentProcessingCancelled
+
+    pdf_path = tmp_path / "multi.pdf"
+    pdf = pymupdf.open()
+    pdf.new_page(width=300, height=200)
+    pdf.new_page(width=300, height=200)
+    pdf.save(pdf_path)
+    pdf.close()
+
+    state = {"calls": 0, "cancel": False}
+
+    class CancellingEngine(FakeEngine):
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            state["calls"] += 1
+            result = super().recognize(image)
+            if state["calls"] == 1:
+                state["cancel"] = True
+            return result
+
+    with pytest.raises(DocumentProcessingCancelled, match="cancelled"):
+        process_document(
+            pdf_path,
+            engine=CancellingEngine(),
+            should_cancel=lambda: state["cancel"],
+        )
+
+    assert state["calls"] == 1

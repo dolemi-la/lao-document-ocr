@@ -217,3 +217,50 @@ footer {
     min-height: 230px;
   }
 }
+
+.dropzone.disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.dropzone.disabled:hover {
+  border-color: #aab1bf;
+  transform: none;
+  box-shadow: none;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.actions button {
+  margin-top: 0;
+}
+
+.actions .secondary {
+  width: auto;
+  min-width: 120px;
+  border: 1px solid #c7c2e8;
+  background: white;
+  color: #5747c7;
+}
+
+.jobStatus {
+  margin: 12px 4px 0;
+  color: #6a7281;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+@media (max-width: 520px) {
+  .actions {
+    flex-direction: column;
+  }
+
+  .actions .secondary {
+    width: 100%;
+  }
+}
