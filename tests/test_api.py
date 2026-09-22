@@ -497,3 +497,69 @@ def test_async_batch_rate_limit_cost_is_per_document(tmp_path, monkeypatch) -> N
         assert extra.status_code == 429
     finally:
         manager.shutdown()
+
+
+def test_async_job_downloads_through_storage_adapter(tmp_path, monkeypatch) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+    from services.api.app.storage import FilesystemArtifactStorage
+
+    storage = FilesystemArtifactStorage(tmp_path / "results-api")
+
+    def runner(record, cancel_event):
+        local = record.workspace / "stored-result.zip"
+        with zipfile.ZipFile(local, "w") as archive:
+            archive.writestr("result.txt", "stored")
+        return storage.put_file(
+            local,
+            key=f"jobs/{record.id}/stored-result.zip",
+            filename="stored-result.zip",
+            media_type="application/zip",
+        )
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-storage-api",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+        artifact_exists=storage.exists,
+        artifact_cleanup=storage.delete,
+    )
+    monkeypatch.setattr(api_main, "RESULT_STORAGE", storage)
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=0, window_seconds=60),
+    )
+    try:
+        response = client.post(
+            "/v1/jobs",
+            files={"file": ("sample.png", _png_upload_bytes(), "image/png")},
+        )
+        assert response.status_code == 202
+        job_id = response.json()["id"]
+        payload = _poll_job(client, job_id)
+        assert payload["status"] == "succeeded"
+        assert payload["download_ready"] is True
+
+        record = manager.get_record(job_id)
+        artifact = record.output_artifact
+        assert artifact is not None
+        assert storage.exists(artifact) is True
+
+        download = client.get(f"/v1/jobs/{job_id}/download")
+        assert download.status_code == 200
+        assert download.headers["content-type"].startswith("application/zip")
+        assert "stored-result.zip" in download.headers["content-disposition"]
+        with zipfile.ZipFile(__import__("io").BytesIO(download.content)) as archive:
+            assert archive.read("result.txt") == b"stored"
+
+        storage.delete(artifact)
+        missing = client.get(f"/v1/jobs/{job_id}/download")
+        assert missing.status_code == 410
+    finally:
+        manager.shutdown()

@@ -92,7 +92,8 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] cooperative job cancellation at page boundaries
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
 - [x] disabled-by-default per-client submission rate-limit baseline
-- storage adapters
+- [x] filesystem result-storage adapter abstraction baseline
+- [ ] S3-compatible/object-storage result adapter
 - security review
 - accessibility
 - localization

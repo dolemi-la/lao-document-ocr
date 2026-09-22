@@ -278,3 +278,88 @@ def test_reserve_many_creates_all_workspaces(tmp_path) -> None:
         assert manager.snapshot()["active_jobs"] == 2
     finally:
         manager.shutdown()
+
+
+def test_stored_artifact_download_readiness_and_cleanup(tmp_path) -> None:
+    from services.api.app.storage import FilesystemArtifactStorage
+
+    storage = FilesystemArtifactStorage(tmp_path / "results")
+
+    def runner(record, cancel_event):
+        local = record.workspace / "result.zip"
+        local.write_bytes(b"stored-result")
+        return storage.put_file(
+            local,
+            key=f"jobs/{record.id}/result.zip",
+            filename="result.zip",
+            media_type="application/zip",
+        )
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-artifact",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+        retention_seconds=60,
+        artifact_exists=storage.exists,
+        artifact_cleanup=storage.delete,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        record.input_path.write_bytes(b"image")
+        manager.enqueue(record.id)
+        terminal = _wait_for_terminal(manager, record.id)
+
+        assert terminal["status"] == "succeeded"
+        assert terminal["download_ready"] is True
+        stored = manager.get_record(record.id).output_artifact
+        assert stored is not None
+        assert b"".join(storage.iter_bytes(stored)) == b"stored-result"
+
+        completed = manager.get_record(record.id).completed_at
+        removed = manager.cleanup_expired(
+            now=completed + timedelta(seconds=61)
+        )
+
+        assert removed == 1
+        assert storage.exists(stored) is False
+    finally:
+        manager.shutdown()
+
+
+def test_missing_stored_artifact_is_not_download_ready(tmp_path) -> None:
+    from services.api.app.storage import FilesystemArtifactStorage
+
+    storage = FilesystemArtifactStorage(tmp_path / "results")
+
+    def runner(record, cancel_event):
+        local = record.workspace / "result.zip"
+        local.write_bytes(b"stored-result")
+        return storage.put_file(
+            local,
+            key=f"jobs/{record.id}/result.zip",
+            filename="result.zip",
+            media_type="application/zip",
+        )
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-artifact-missing",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+        artifact_exists=storage.exists,
+        artifact_cleanup=storage.delete,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        record.input_path.write_bytes(b"image")
+        manager.enqueue(record.id)
+        _wait_for_terminal(manager, record.id)
+        stored = manager.get_record(record.id).output_artifact
+        assert stored is not None
+
+        storage.delete(stored)
+
+        assert manager.public(record.id)["download_ready"] is False
+    finally:
+        manager.shutdown()

@@ -7,6 +7,7 @@ import uuid
 import zipfile
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,6 +41,10 @@ from services.api.app.jobs import (
 )
 from services.api.app.metrics import ApiMetrics, RequestTimer
 from services.api.app.rate_limit import SlidingWindowRateLimiter
+from services.api.app.storage import (
+    FilesystemArtifactStorage,
+    StoredArtifact,
+)
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 MAX_PAGES = int(os.getenv("MAX_PAGES", "60"))
@@ -52,6 +57,16 @@ JOB_ROOT = Path(
     os.getenv(
         "JOB_ROOT",
         str(Path(tempfile.gettempdir()) / "lao-document-ocr-jobs"),
+    )
+)
+RESULT_STORAGE_BACKEND = os.getenv(
+    "RESULT_STORAGE_BACKEND",
+    "filesystem",
+).strip().lower()
+RESULT_STORAGE_ROOT = Path(
+    os.getenv(
+        "RESULT_STORAGE_ROOT",
+        str(Path(tempfile.gettempdir()) / "lao-document-ocr-results"),
     )
 )
 JOB_MAX_WORKERS = int(os.getenv("JOB_MAX_WORKERS", "2"))
@@ -127,6 +142,31 @@ async def observe_request(request: Request, call_next):
     )
     response.headers["X-Request-ID"] = request_id
     return response
+
+
+def _build_result_storage():
+    if RESULT_STORAGE_BACKEND == "filesystem":
+        return FilesystemArtifactStorage(RESULT_STORAGE_ROOT)
+    raise RuntimeError(
+        f"Unsupported RESULT_STORAGE_BACKEND: {RESULT_STORAGE_BACKEND}"
+    )
+
+
+RESULT_STORAGE = _build_result_storage()
+
+
+def _download_headers(filename: str) -> dict[str, str]:
+    name = Path(filename).name or "result.zip"
+    fallback = "".join(
+        char if char.isalnum() or char in "._-" else "_"
+        for char in name
+    ) or "result.zip"
+    encoded = quote(name, safe="")
+    return {
+        "Content-Disposition": (
+            f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
+        )
+    }
 
 
 def _client_rate_limit_key(request: Request) -> str:
@@ -221,7 +261,7 @@ def _write_outputs_archive(
     return archive_path
 
 
-def _run_conversion_job(record: JobRecord, cancel_event) -> Path:
+def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
     try:
         document = process_document(
             record.input_path,
@@ -234,7 +274,18 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> Path:
         raise JobCancelledError(str(exc)) from exc
     if cancel_event.is_set():
         raise JobCancelledError("Document processing was cancelled.")
-    return _write_outputs_archive(document, record.workspace, record.filename)
+
+    archive = _write_outputs_archive(document, record.workspace, record.filename)
+    artifact = RESULT_STORAGE.put_file(
+        archive,
+        key=f"jobs/{record.id}/{archive.name}",
+        filename=archive.name,
+        media_type="application/zip",
+    )
+    if cancel_event.is_set():
+        RESULT_STORAGE.delete(artifact)
+        raise JobCancelledError("Document processing was cancelled.")
+    return artifact
 
 
 JOB_MANAGER = ConversionJobManager(
@@ -243,6 +294,8 @@ JOB_MANAGER = ConversionJobManager(
     max_workers=JOB_MAX_WORKERS,
     max_active_jobs=JOB_MAX_ACTIVE,
     retention_seconds=JOB_RETENTION_SECONDS,
+    artifact_exists=RESULT_STORAGE.exists,
+    artifact_cleanup=RESULT_STORAGE.delete,
 )
 
 
@@ -280,6 +333,9 @@ def health() -> dict:
             "batch_max_files": BATCH_MAX_FILES,
         },
         "submission_rate_limit": SUBMISSION_RATE_LIMITER.snapshot(),
+        "result_storage": {
+            "backend": RESULT_STORAGE.metadata().get("backend", "unknown"),
+        },
     }
     if OCR_ENGINE == "tesseract":
         try:
@@ -452,10 +508,29 @@ def download_conversion_job(job_id: str):
     except JobNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Job not found.") from exc
 
-    if record.status != JobStatus.SUCCEEDED or record.output_path is None:
+    if record.status != JobStatus.SUCCEEDED:
         raise HTTPException(
             status_code=409,
             detail=f"Job is not ready for download (status={record.status.value}).",
+        )
+
+    if record.output_artifact is not None:
+        artifact = record.output_artifact
+        if not RESULT_STORAGE.exists(artifact):
+            raise HTTPException(
+                status_code=410,
+                detail="Job result is no longer available.",
+            )
+        return StreamingResponse(
+            RESULT_STORAGE.iter_bytes(artifact),
+            media_type=artifact.media_type,
+            headers=_download_headers(artifact.filename),
+        )
+
+    if record.output_path is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Job completed without a downloadable result.",
         )
     if not record.output_path.is_file():
         raise HTTPException(status_code=410, detail="Job result is no longer available.")

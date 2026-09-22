@@ -193,6 +193,8 @@ Override them with:
 - `JOB_RETENTION_SECONDS`
 - `JOB_ROOT`
 - `BATCH_MAX_FILES`
+- `RESULT_STORAGE_BACKEND` (currently `filesystem`)
+- `RESULT_STORAGE_ROOT`
 - `RATE_LIMIT_REQUESTS` (0 disables the in-process limiter)
 - `RATE_LIMIT_WINDOW_SECONDS`
 - `RATE_LIMIT_MAX_CLIENTS`

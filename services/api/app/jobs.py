@@ -11,6 +11,8 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 
+from services.api.app.storage import StoredArtifact
+
 
 class JobStatus(StrEnum):
     UPLOADING = "uploading"
@@ -48,6 +50,7 @@ class JobRecord:
     input_path: Path
     status: JobStatus = JobStatus.UPLOADING
     output_path: Path | None = None
+    output_artifact: StoredArtifact | None = None
     error: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     started_at: datetime | None = None
@@ -58,7 +61,9 @@ class JobRecord:
     terminal_recorded: bool = field(default=False, repr=False)
 
 
-JobRunner = Callable[[JobRecord, threading.Event], Path]
+JobRunner = Callable[[JobRecord, threading.Event], Path | StoredArtifact]
+ArtifactExists = Callable[[StoredArtifact], bool]
+ArtifactCleanup = Callable[[StoredArtifact], None]
 
 
 class ConversionJobManager:
@@ -70,6 +75,8 @@ class ConversionJobManager:
         max_workers: int = 2,
         max_active_jobs: int = 8,
         retention_seconds: int = 3600,
+        artifact_exists: ArtifactExists | None = None,
+        artifact_cleanup: ArtifactCleanup | None = None,
     ) -> None:
         if max_workers < 1:
             raise ValueError("max_workers must be at least 1")
@@ -83,6 +90,8 @@ class ConversionJobManager:
         self.runner = runner
         self.max_active_jobs = max_active_jobs
         self.retention_seconds = retention_seconds
+        self.artifact_exists = artifact_exists
+        self.artifact_cleanup = artifact_cleanup
         self._executor = ThreadPoolExecutor(
             max_workers=max_workers,
             thread_name_prefix="lao-ocr-job",
@@ -194,18 +203,25 @@ class ConversionJobManager:
                     record.cancellation_requested = True
                     record.output_path = None
                 else:
-                    record.output_path = Path(output)
+                    if isinstance(output, StoredArtifact):
+                        record.output_artifact = output
+                        record.output_path = None
+                    else:
+                        record.output_path = Path(output)
+                        record.output_artifact = None
                     record.status = JobStatus.SUCCEEDED
         except JobCancelledError:
             with self._lock:
                 record.status = JobStatus.CANCELLED
                 record.cancellation_requested = True
                 record.output_path = None
+                record.output_artifact = None
         except Exception as exc:
             with self._lock:
                 record.status = JobStatus.FAILED
                 record.error = str(exc)
                 record.output_path = None
+                record.output_artifact = None
         finally:
             with self._lock:
                 record.completed_at = datetime.now(UTC)
@@ -253,12 +269,20 @@ class ConversionJobManager:
             ),
             "cancellation_requested": record.cancellation_requested,
             "error": record.error,
-            "download_ready": (
-                record.status == JobStatus.SUCCEEDED
-                and record.output_path is not None
-                and record.output_path.is_file()
-            ),
+            "download_ready": self._download_ready(record),
         }
+
+    def _download_ready(self, record: JobRecord) -> bool:
+        if record.status != JobStatus.SUCCEEDED:
+            return False
+        if record.output_artifact is not None:
+            if self.artifact_exists is None:
+                return True
+            try:
+                return bool(self.artifact_exists(record.output_artifact))
+            except Exception:
+                return False
+        return record.output_path is not None and record.output_path.is_file()
 
     def _require(self, job_id: str) -> JobRecord:
         record = self._jobs.get(job_id)
@@ -301,6 +325,11 @@ class ConversionJobManager:
                     del self._jobs[job_id]
 
         for record in expired:
+            if record.output_artifact is not None and self.artifact_cleanup is not None:
+                try:
+                    self.artifact_cleanup(record.output_artifact)
+                except Exception:
+                    pass
             shutil.rmtree(record.workspace, ignore_errors=True)
         return len(expired)
 
