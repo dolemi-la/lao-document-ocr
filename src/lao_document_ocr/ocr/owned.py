@@ -31,8 +31,37 @@ class OwnedRecognizerEngine(OcrEngine):
         device: str = "cpu",
         recognizer: ImageLineRecognizer | None = None,
         region_detector: TextRegionDetector | None = None,
+        region_detector_name: str = "morphology",
+        layout_model_path: str | Path | None = None,
+        layout_confidence_threshold: float = 0.55,
     ) -> None:
-        self.region_detector = region_detector or MorphologyTextRegionDetector()
+        if region_detector is not None:
+            self.region_detector = region_detector
+        elif region_detector_name == "morphology":
+            self.region_detector = MorphologyTextRegionDetector()
+        elif region_detector_name == "learned":
+            if layout_model_path is None:
+                raise OcrEngineError(
+                    "Learned text-region detection requires a layout model path"
+                )
+            try:
+                from lao_document_ocr.layout_detector_inference import (
+                    ExportedLayoutRegionDetector,
+                )
+
+                self.region_detector = ExportedLayoutRegionDetector(
+                    layout_model_path,
+                    device=device,
+                    confidence_threshold=layout_confidence_threshold,
+                )
+            except (FileNotFoundError, RuntimeError, ValueError) as exc:
+                raise OcrEngineError(
+                    f"Could not load learned text-region detector: {exc}"
+                ) from exc
+        else:
+            raise OcrEngineError(
+                "region_detector_name must be 'morphology' or 'learned'"
+            )
 
         if recognizer is not None:
             self.recognizer = recognizer

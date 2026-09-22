@@ -54,3 +54,44 @@ def test_detector_exposes_metadata() -> None:
     metadata = MorphologyTextRegionDetector().metadata()
     assert metadata["name"] == "MorphologyTextRegionDetector"
     assert metadata["version"] == "morphology-region-v1"
+
+
+def test_fallback_detector_uses_secondary_only_when_primary_empty() -> None:
+    from lao_document_ocr.models import BoundingBox
+    from lao_document_ocr.text_regions import (
+        FallbackTextRegionDetector,
+        TextRegion,
+    )
+
+    class FakeDetector:
+        def __init__(self, name, regions):
+            self.name = name
+            self.regions = regions
+            self.calls = 0
+
+        def metadata(self):
+            return {"name": self.name}
+
+        def detect(self, image):
+            self.calls += 1
+            return self.regions
+
+    fallback_region = TextRegion(
+        bbox=BoundingBox(x=10, y=10, width=100, height=40)
+    )
+    primary = FakeDetector("primary", [])
+    fallback = FakeDetector("fallback", [fallback_region])
+    detector = FallbackTextRegionDetector(primary, fallback)
+
+    assert detector.detect(Image.new("RGB", (200, 100), "white")) == [
+        fallback_region
+    ]
+    assert primary.calls == 1
+    assert fallback.calls == 1
+
+    primary.regions = [fallback_region]
+    assert detector.detect(Image.new("RGB", (200, 100), "white")) == [
+        fallback_region
+    ]
+    assert primary.calls == 2
+    assert fallback.calls == 1

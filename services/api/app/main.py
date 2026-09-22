@@ -63,6 +63,14 @@ OCR_PSM = int(os.getenv("OCR_PSM", "3"))
 OCR_MODEL_PATH = os.getenv("OCR_MODEL_PATH") or None
 OCR_CALIBRATION_PATH = os.getenv("OCR_CALIBRATION_PATH") or None
 OCR_DEVICE = os.getenv("OCR_DEVICE", "cpu").strip().lower()
+OCR_LAYOUT_DETECTOR = os.getenv(
+    "OCR_LAYOUT_DETECTOR",
+    "morphology",
+).strip().lower()
+OCR_LAYOUT_MODEL_PATH = os.getenv("OCR_LAYOUT_MODEL_PATH") or None
+OCR_LAYOUT_CONFIDENCE = float(
+    os.getenv("OCR_LAYOUT_CONFIDENCE", "0.55")
+)
 JOB_ROOT = Path(
     os.getenv(
         "JOB_ROOT",
@@ -255,16 +263,22 @@ def _enforce_submission_rate_limit(
     )
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def _cached_owned_engine(
     model_path: str,
     calibration_path: str | None,
     device: str,
+    region_detector_name: str,
+    layout_model_path: str | None,
+    layout_confidence_threshold: float,
 ) -> OwnedRecognizerEngine:
     return OwnedRecognizerEngine(
         model_path,
         calibration_path=calibration_path,
         device=device,
+        region_detector_name=region_detector_name,
+        layout_model_path=layout_model_path,
+        layout_confidence_threshold=layout_confidence_threshold,
     )
 
 
@@ -278,6 +292,9 @@ def _engine() -> OcrEngine:
             OCR_MODEL_PATH,
             OCR_CALIBRATION_PATH,
             OCR_DEVICE,
+            OCR_LAYOUT_DETECTOR,
+            OCR_LAYOUT_MODEL_PATH,
+            OCR_LAYOUT_CONFIDENCE,
         )
     raise OcrEngineError(f"Unsupported OCR_ENGINE: {OCR_ENGINE}")
 

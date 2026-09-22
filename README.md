@@ -262,6 +262,8 @@ lao-ocr validate-dataset --manifest <manifest.jsonl> --dataset-root <dataset>
 lao-ocr dataset-report --manifest <manifest.jsonl> --dataset-root <dataset> --output dataset-report.json
 lao-ocr prepare-layout-training-manifest --manifest <manifest.jsonl> --dataset-root <dataset> --output training/layout.jsonl
 lao-ocr prepare-layout-targets --training-manifest training/layout.jsonl --dataset-root <dataset> --output training/layout-targets
+lao-ocr train-layout-detector --targets-manifest training/layout-targets/targets.jsonl --dataset-root <dataset> --output training/layout/runs/tiny-unet-v1 --device auto
+lao-ocr export-layout-detector --checkpoint training/layout/runs/tiny-unet-v1/layout-detector.pt --output training/layout/runs/tiny-unet-v1/layout-detector.pt2
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
 lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
@@ -328,3 +330,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 Apache License 2.0.
+
+Learned layout detector: [docs/layout-model-training.md](docs/layout-model-training.md).

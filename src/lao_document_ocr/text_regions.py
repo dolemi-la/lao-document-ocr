@@ -210,3 +210,28 @@ class MorphologyTextRegionDetector:
 
 def detect_text_regions(image: Image.Image) -> list[TextRegion]:
     return MorphologyTextRegionDetector().detect(image)
+
+
+class FallbackTextRegionDetector:
+    """Use a primary detector, falling back only when it returns no regions."""
+
+    def __init__(
+        self,
+        primary: TextRegionDetector,
+        fallback: TextRegionDetector,
+    ) -> None:
+        self.primary = primary
+        self.fallback = fallback
+
+    def metadata(self) -> dict:
+        return {
+            "name": self.__class__.__name__,
+            "primary": self.primary.metadata(),
+            "fallback": self.fallback.metadata(),
+        }
+
+    def detect(self, image: Image.Image) -> list[TextRegion]:
+        regions = self.primary.detect(image)
+        if regions:
+            return regions
+        return self.fallback.detect(image)

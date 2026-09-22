@@ -130,3 +130,21 @@ The current region detector is still deterministic morphology, not a trained lay
 ## Accelerator runtime
 
 Owned recognizer inference supports explicit CPU/CUDA/MPS/auto device selection. The API caches one model instance per model/calibration/device key. See [gpu-worker.md](gpu-worker.md).
+
+## Text-region detector selection
+
+The owned engine supports two text-region detector modes:
+
+```text
+OCR_LAYOUT_DETECTOR=morphology   # default
+OCR_LAYOUT_DETECTOR=learned
+```
+
+For the learned mode also configure:
+
+```text
+OCR_LAYOUT_MODEL_PATH=/models/layout-detector.pt2
+OCR_LAYOUT_CONFIDENCE=0.55
+```
+
+The learned detector is experimental and should remain opt-in until it beats the deterministic baseline on the fixed layout benchmark. See [layout-model-training.md](layout-model-training.md).

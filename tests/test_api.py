@@ -792,12 +792,24 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
     calls = []
 
     class FakeOwnedEngine:
-        def __init__(self, model_path, *, calibration_path, device):
+        def __init__(
+            self,
+            model_path,
+            *,
+            calibration_path,
+            device,
+            region_detector_name,
+            layout_model_path,
+            layout_confidence_threshold,
+        ):
             calls.append(
                 {
                     "model_path": model_path,
                     "calibration_path": calibration_path,
                     "device": device,
+                    "region_detector_name": region_detector_name,
+                    "layout_model_path": layout_model_path,
+                    "layout_confidence_threshold": layout_confidence_threshold,
                 }
             )
 
@@ -806,6 +818,9 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
     monkeypatch.setattr(api_main, "OCR_MODEL_PATH", "/models/recognizer.pt2")
     monkeypatch.setattr(api_main, "OCR_CALIBRATION_PATH", "/models/calibration.json")
     monkeypatch.setattr(api_main, "OCR_DEVICE", "cuda")
+    monkeypatch.setattr(api_main, "OCR_LAYOUT_DETECTOR", "learned")
+    monkeypatch.setattr(api_main, "OCR_LAYOUT_MODEL_PATH", "/models/layout.pt2")
+    monkeypatch.setattr(api_main, "OCR_LAYOUT_CONFIDENCE", 0.61)
     monkeypatch.setattr(api_main, "OwnedRecognizerEngine", FakeOwnedEngine)
     try:
         first = api_main._engine()
@@ -816,6 +831,9 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
                 "model_path": "/models/recognizer.pt2",
                 "calibration_path": "/models/calibration.json",
                 "device": "cuda",
+                "region_detector_name": "learned",
+                "layout_model_path": "/models/layout.pt2",
+                "layout_confidence_threshold": 0.61,
             }
         ]
     finally:

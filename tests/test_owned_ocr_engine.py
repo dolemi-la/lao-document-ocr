@@ -76,3 +76,17 @@ def test_owned_engine_recognizes_two_column_lines_region_by_region() -> None:
     right = [line for line in lines if line.bbox.x > 350]
     assert len(left) == 3
     assert len(right) == 3
+
+
+def test_learned_region_detector_requires_model_path() -> None:
+    from lao_document_ocr.ocr.base import OcrEngineError
+
+    try:
+        OwnedRecognizerEngine(
+            recognizer=FakeLineRecognizer(),
+            region_detector_name="learned",
+        )
+    except OcrEngineError as exc:
+        assert "requires a layout model path" in str(exc)
+    else:
+        raise AssertionError("Expected learned layout detector without model to fail")

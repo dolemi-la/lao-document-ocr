@@ -50,6 +50,17 @@ def _parser() -> argparse.ArgumentParser:
         choices=["cpu", "cuda", "mps", "auto"],
         default="cpu",
     )
+    convert.add_argument(
+        "--layout-detector",
+        choices=["morphology", "learned"],
+        default="morphology",
+    )
+    convert.add_argument("--layout-model", type=Path)
+    convert.add_argument(
+        "--layout-confidence",
+        type=float,
+        default=0.55,
+    )
     convert.add_argument("--max-pages", type=int, default=60)
     convert.add_argument("--font", default="Noto Sans Lao")
 
@@ -280,6 +291,34 @@ def _parser() -> argparse.ArgumentParser:
     capture_register.add_argument("--notes")
     capture_register.add_argument("--confirm-release", action="store_true")
 
+    layout_train = subparsers.add_parser(
+        "train-layout-detector",
+        help="Train the project-owned semantic layout segmentation model.",
+    )
+    layout_train.add_argument("--targets-manifest", required=True, type=Path)
+    layout_train.add_argument("--dataset-root", required=True, type=Path)
+    layout_train.add_argument("--output", required=True, type=Path)
+    layout_train.add_argument("--epochs", type=int, default=5)
+    layout_train.add_argument("--batch-size", type=int, default=4)
+    layout_train.add_argument("--learning-rate", type=float, default=1e-3)
+    layout_train.add_argument("--seed", type=int, default=20260922)
+    layout_train.add_argument("--image-height", type=int, default=256)
+    layout_train.add_argument("--image-width", type=int, default=256)
+    layout_train.add_argument("--base-channels", type=int, default=32)
+    layout_train.add_argument("--num-workers", type=int, default=0)
+    layout_train.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="auto",
+    )
+
+    layout_export = subparsers.add_parser(
+        "export-layout-detector",
+        help="Export a trained layout detector checkpoint as a torch.export artifact.",
+    )
+    layout_export.add_argument("--checkpoint", required=True, type=Path)
+    layout_export.add_argument("--output", required=True, type=Path)
+
     train = subparsers.add_parser(
         "train-recognizer",
         help="Train the CRNN+CTC Lao line recognizer.",
@@ -355,6 +394,9 @@ def _convert_document(args: argparse.Namespace) -> int:
             args.model,
             calibration_path=args.calibration,
             device=args.device,
+            region_detector_name=args.layout_detector,
+            layout_model_path=args.layout_model,
+            layout_confidence_threshold=args.layout_confidence,
         )
 
     outputs = convert_document_to_outputs(
@@ -729,6 +771,63 @@ def _register_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def _train_layout_detector(args: argparse.Namespace) -> int:
+    try:
+        from lao_document_ocr.layout_segmentation_training import (
+            LayoutTrainingConfig,
+            load_layout_target_samples,
+            train_layout_detector,
+        )
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    samples = load_layout_target_samples(
+        args.targets_manifest,
+        dataset_root=args.dataset_root,
+    )
+    config = LayoutTrainingConfig(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        seed=args.seed,
+        image_height=args.image_height,
+        image_width=args.image_width,
+        base_channels=args.base_channels,
+        num_workers=args.num_workers,
+        device=args.device,
+    )
+    result = train_layout_detector(
+        samples,
+        args.output,
+        training_config=config,
+    )
+    print(f"Checkpoint: {result['checkpoint']}")
+    print(f"Metadata: {result['metadata']}")
+    print(
+        "Best dev foreground mIoU: "
+        f"{result['best_dev_foreground_mean_iou']:.4f}"
+    )
+    return 0
+
+
+def _export_layout_detector(args: argparse.Namespace) -> int:
+    try:
+        from lao_document_ocr.layout_segmentation_training import (
+            export_layout_detector,
+        )
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    artifact = export_layout_detector(
+        args.checkpoint,
+        args.output,
+    )
+    print(f"Exported layout detector: {artifact}")
+    return 0
+
+
 def _train_recognizer(args: argparse.Namespace) -> int:
     try:
         from lao_document_ocr.recognizer_training import TrainingConfig, train_recognizer
@@ -866,6 +965,10 @@ def main() -> int:
             return _capture_campaign_report(args)
         if args.command == "register-capture":
             return _register_capture(args)
+        if args.command == "train-layout-detector":
+            return _train_layout_detector(args)
+        if args.command == "export-layout-detector":
+            return _export_layout_detector(args)
         if args.command == "train-recognizer":
             return _train_recognizer(args)
         if args.command == "export-recognizer":
