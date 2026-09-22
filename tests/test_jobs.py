@@ -1,5 +1,5 @@
 import time
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -185,5 +185,37 @@ def test_failed_job_records_error_and_has_no_download(tmp_path) -> None:
         assert payload["status"] == "failed"
         assert payload["error"] == "synthetic conversion failure"
         assert payload["download_ready"] is False
+    finally:
+        manager.shutdown()
+
+
+def test_snapshot_keeps_completed_counters_after_cleanup(tmp_path) -> None:
+    def runner(record, cancel_event):
+        output = record.workspace / "result.zip"
+        output.write_bytes(b"zip")
+        return output
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+        retention_seconds=60,
+    )
+    try:
+        record = manager.reserve("sample.png", ".png")
+        record.input_path.write_bytes(b"image")
+        manager.enqueue(record.id)
+        terminal = _wait_for_terminal(manager, record.id)
+        assert terminal["status"] == "succeeded"
+
+        snapshot_before = manager.snapshot()
+        assert snapshot_before["completed_total"]["succeeded"] == 1
+        assert snapshot_before["duration_seconds_sum"]["succeeded"] >= 0
+
+        manager.cleanup_expired(now=datetime.now(UTC) + timedelta(seconds=61))
+        snapshot_after = manager.snapshot()
+        assert snapshot_after["current_by_status"].get("succeeded", 0) == 0
+        assert snapshot_after["completed_total"]["succeeded"] == 1
     finally:
         manager.shutdown()

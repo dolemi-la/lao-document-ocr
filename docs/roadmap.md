@@ -90,7 +90,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - GPU worker option
 - batch processing
 - [x] cooperative job cancellation at page boundaries
-- observability
+- [x] request IDs + Prometheus-format HTTP/job observability baseline
 - rate limiting for public deployments
 - storage adapters
 - security review

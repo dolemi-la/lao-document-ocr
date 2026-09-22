@@ -184,3 +184,35 @@ def test_async_job_capacity_returns_429(tmp_path, monkeypatch) -> None:
 def test_unknown_job_returns_404() -> None:
     response = client.get("/v1/jobs/not-a-real-job")
     assert response.status_code == 404
+
+
+def test_request_id_is_echoed() -> None:
+    response = client.get("/health", headers={"X-Request-ID": "req-123"})
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "req-123"
+
+
+def test_invalid_request_id_is_replaced() -> None:
+    response = client.get("/health", headers={"X-Request-ID": "bad request id"})
+    assert response.status_code == 200
+    generated = response.headers["x-request-id"]
+    assert generated != "bad request id"
+    assert len(generated) == 32
+
+
+def test_metrics_endpoint_normalizes_job_ids(monkeypatch) -> None:
+    import services.api.app.main as api_main
+    from services.api.app.metrics import ApiMetrics
+
+    monkeypatch.setattr(api_main, "API_METRICS", ApiMetrics())
+
+    response = client.get("/v1/jobs/not-a-real-job")
+    assert response.status_code == 404
+
+    metrics = client.get("/metrics")
+    assert metrics.status_code == 200
+    assert metrics.headers["content-type"].startswith("text/plain")
+    text = metrics.text
+    assert 'route="/v1/jobs/{job_id}"' in text
+    assert "not-a-real-job" not in text
+    assert 'status="404"' in text

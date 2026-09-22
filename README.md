@@ -130,6 +130,16 @@ Content-Type: multipart/form-data
 
 Upload field: `file`.
 
+### Observability
+
+Every response carries an `X-Request-ID`, and Prometheus-format metrics are available at:
+
+```text
+GET /metrics
+```
+
+The endpoint exposes normalized HTTP request counters/durations plus live/completed async-job metrics without adding a mandatory telemetry SDK. See [docs/observability.md](docs/observability.md).
+
 ### Asynchronous jobs
 
 The default web UI uses bounded background jobs for long conversions:

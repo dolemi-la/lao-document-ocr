@@ -3,13 +3,14 @@ from __future__ import annotations
 import io
 import os
 import tempfile
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 
 from lao_document_ocr.exporters import (
     export_docx,
@@ -37,6 +38,7 @@ from services.api.app.jobs import (
     JobRecord,
     JobStatus,
 )
+from services.api.app.metrics import ApiMetrics, RequestTimer
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 MAX_PAGES = int(os.getenv("MAX_PAGES", "60"))
@@ -73,6 +75,44 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
+
+API_METRICS = ApiMetrics()
+
+
+def _request_id(request: Request) -> str:
+    supplied = request.headers.get("x-request-id", "").strip()
+    if supplied and len(supplied) <= 128 and all(
+        char.isalnum() or char in "._-" for char in supplied
+    ):
+        return supplied
+    return uuid.uuid4().hex
+
+
+@app.middleware("http")
+async def observe_request(request: Request, call_next):
+    request_id = _request_id(request)
+    timer = RequestTimer()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+    except Exception:
+        API_METRICS.observe_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=status_code,
+            duration_seconds=timer.elapsed(),
+        )
+        raise
+
+    API_METRICS.observe_request(
+        method=request.method,
+        path=request.url.path,
+        status_code=status_code,
+        duration_seconds=timer.elapsed(),
+    )
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 def _engine() -> OcrEngine:
@@ -160,6 +200,14 @@ JOB_MANAGER = ConversionJobManager(
     max_active_jobs=JOB_MAX_ACTIVE,
     retention_seconds=JOB_RETENTION_SECONDS,
 )
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> PlainTextResponse:
+    return PlainTextResponse(
+        API_METRICS.render_prometheus(JOB_MANAGER.snapshot()),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @app.get("/health")

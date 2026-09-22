@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import threading
 import uuid
+from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -54,6 +55,7 @@ class JobRecord:
     cancellation_requested: bool = False
     cancel_event: threading.Event = field(default_factory=threading.Event, repr=False)
     future: Future | None = field(default=None, repr=False)
+    terminal_recorded: bool = field(default=False, repr=False)
 
 
 JobRunner = Callable[[JobRecord, threading.Event], Path]
@@ -86,6 +88,8 @@ class ConversionJobManager:
             thread_name_prefix="lao-ocr-job",
         )
         self._jobs: dict[str, JobRecord] = {}
+        self._completed_total: Counter[str] = Counter()
+        self._duration_seconds_sum: Counter[str] = Counter()
         self._lock = threading.RLock()
 
     def _active_count(self) -> int:
@@ -93,6 +97,18 @@ class ConversionJobManager:
             record.status not in _TERMINAL_STATUSES
             for record in self._jobs.values()
         )
+
+    def _record_terminal_unlocked(self, record: JobRecord) -> None:
+        if record.terminal_recorded or record.status not in _TERMINAL_STATUSES:
+            return
+        if record.completed_at is None:
+            record.completed_at = datetime.now(UTC)
+        start = record.started_at or record.created_at
+        duration = max(0.0, (record.completed_at - start).total_seconds())
+        status = record.status.value
+        self._completed_total[status] += 1
+        self._duration_seconds_sum[status] += duration
+        record.terminal_recorded = True
 
     def reserve(self, filename: str, suffix: str) -> JobRecord:
         self.cleanup_expired()
@@ -132,6 +148,7 @@ class ConversionJobManager:
                 record.status = JobStatus.CANCELLED
                 record.cancellation_requested = True
                 record.completed_at = datetime.now(UTC)
+                self._record_terminal_unlocked(record)
                 return record
 
             record.status = JobStatus.QUEUED
@@ -144,6 +161,7 @@ class ConversionJobManager:
             if record.cancel_event.is_set():
                 record.status = JobStatus.CANCELLED
                 record.completed_at = datetime.now(UTC)
+                self._record_terminal_unlocked(record)
                 return
             record.status = JobStatus.RUNNING
             record.started_at = datetime.now(UTC)
@@ -171,6 +189,7 @@ class ConversionJobManager:
         finally:
             with self._lock:
                 record.completed_at = datetime.now(UTC)
+                self._record_terminal_unlocked(record)
 
     def cancel(self, job_id: str) -> dict:
         with self._lock:
@@ -183,6 +202,7 @@ class ConversionJobManager:
             if record.future is not None and record.future.cancel():
                 record.status = JobStatus.CANCELLED
                 record.completed_at = datetime.now(UTC)
+                self._record_terminal_unlocked(record)
             return self._public(record)
 
     def get_record(self, job_id: str) -> JobRecord:
@@ -225,6 +245,21 @@ class ConversionJobManager:
         if record is None:
             raise JobNotFoundError(job_id)
         return record
+
+    def snapshot(self) -> dict:
+        self.cleanup_expired()
+        with self._lock:
+            current = Counter(record.status.value for record in self._jobs.values())
+            return {
+                "current_by_status": dict(sorted(current.items())),
+                "completed_total": dict(sorted(self._completed_total.items())),
+                "duration_seconds_sum": {
+                    status: float(total)
+                    for status, total in sorted(self._duration_seconds_sum.items())
+                },
+                "active_jobs": self._active_count(),
+                "max_active_jobs": self.max_active_jobs,
+            }
 
     def cleanup_expired(self, *, now: datetime | None = None) -> int:
         if self.retention_seconds == 0:
