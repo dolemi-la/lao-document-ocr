@@ -191,3 +191,7 @@ The report includes sample/document counts, split/subset/license coverage, captu
 ## Multi-axis tag metrics
 
 Dataset samples may carry multiple tags in addition to their primary `subset`. OCR benchmark reports include a `tags` section with independent weighted CER/WER for every tag, so overlapping dimensions can be measured without duplicating samples.
+
+## Layout-labeled coverage
+
+Samples may optionally reference reviewed Document-AST layout ground truth. `lao-ocr dataset-report` includes layout-labeled sample/document counts, coverage ratio, and breakdowns by split/subset so layout-training readiness is visible separately from OCR text coverage.

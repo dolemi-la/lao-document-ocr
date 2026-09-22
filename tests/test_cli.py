@@ -565,3 +565,81 @@ def test_capture_campaign_report_cli(tmp_path, monkeypatch, capsys) -> None:
     assert payload["completion_ratio"] == 0.75
     captured = capsys.readouterr()
     assert "Completion: 75.0%" in captured.out
+
+
+def test_add_dataset_sample_cli_with_layout_ground_truth(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    from lao_document_ocr.layout_ground_truth import write_layout_ground_truth
+    from lao_document_ocr.models import Block, BlockType, BoundingBox, Document, Page
+
+    image = tmp_path / "layout-cli.png"
+    truth = tmp_path / "layout-cli.txt"
+    layout = tmp_path / "layout-cli.json"
+    Image.new("RGB", (100, 50), "white").save(image)
+    truth.write_text("ສະບາຍດີ", encoding="utf-8")
+    write_layout_ground_truth(
+        Document(
+            pages=[
+                Page(
+                    number=1,
+                    width=100,
+                    height=50,
+                    blocks=[
+                        Block(
+                            type=BlockType.PARAGRAPH,
+                            text="ສະບາຍດີ",
+                            bbox=BoundingBox(
+                                x=5,
+                                y=5,
+                                width=80,
+                                height=20,
+                            ),
+                        )
+                    ],
+                )
+            ]
+        ),
+        layout,
+    )
+    dataset_root = tmp_path / "layout-dataset"
+    manifest = dataset_root / "manifest.jsonl"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "add-dataset-sample",
+            "--dataset-root",
+            str(dataset_root),
+            "--manifest",
+            str(manifest),
+            "--id",
+            "layout-cli",
+            "--document-id",
+            "layout-cli-doc",
+            "--subset",
+            "clean-print",
+            "--image",
+            str(image),
+            "--ground-truth",
+            str(truth),
+            "--layout-ground-truth",
+            str(layout),
+            "--license",
+            "CC0-1.0",
+            "--provenance",
+            "CLI layout ground-truth test",
+            "--confirm-redistributable",
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["layout_ground_truth"] == (
+        "layout-ground-truth/clean-print/layout-cli.json"
+    )
+    assert (dataset_root / payload["layout_ground_truth"]).is_file()

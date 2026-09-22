@@ -143,3 +143,79 @@ def test_manifest_entry_is_reviewable_json(tmp_path) -> None:
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert payload["license"] == "CC-BY-4.0"
     assert payload["source_url"] == "https://example.org/document"
+
+
+def _layout_file(tmp_path, *, width: int = 100, height: int = 50):
+    from lao_document_ocr.layout_ground_truth import write_layout_ground_truth
+    from lao_document_ocr.models import Block, BlockType, BoundingBox, Document, Page
+
+    path = tmp_path / f"layout-{width}x{height}.json"
+    document = Document(
+        pages=[
+            Page(
+                number=1,
+                width=width,
+                height=height,
+                blocks=[
+                    Block(
+                        type=BlockType.PARAGRAPH,
+                        text="ສະບາຍດີ ໂລກ",
+                        bbox=BoundingBox(x=5, y=5, width=80, height=20),
+                    )
+                ],
+            )
+        ]
+    )
+    write_layout_ground_truth(document, path)
+    return path
+
+
+def test_add_dataset_sample_copies_optional_layout_ground_truth(tmp_path) -> None:
+    image, truth = _source_files(tmp_path)
+    layout = _layout_file(tmp_path)
+    root = tmp_path / "public-layout"
+    manifest = root / "manifest.jsonl"
+
+    sample = add_dataset_sample(
+        dataset_root=root,
+        manifest_path=manifest,
+        sample_id="layout-001",
+        document_id="layout-doc-001",
+        subset=DatasetSubset.CLEAN_PRINT,
+        image_path=image,
+        ground_truth_path=truth,
+        layout_ground_truth_path=layout,
+        license="CC0-1.0",
+        provenance="Created for layout unit test",
+        rights_confirmed=True,
+    )
+
+    assert sample.layout_ground_truth == "layout-ground-truth/clean-print/layout-001.json"
+    assert (root / sample.layout_ground_truth).is_file()
+    loaded = load_manifest(manifest)
+    assert loaded[0].layout_ground_truth == sample.layout_ground_truth
+
+
+def test_layout_dimension_mismatch_is_rejected_before_dataset_mutation(tmp_path) -> None:
+    image, truth = _source_files(tmp_path)
+    layout = _layout_file(tmp_path, width=101, height=50)
+    root = tmp_path / "public-mismatch"
+    manifest = root / "manifest.jsonl"
+
+    with pytest.raises(ValueError, match="do not match"):
+        add_dataset_sample(
+            dataset_root=root,
+            manifest_path=manifest,
+            sample_id="layout-bad",
+            document_id="layout-bad-doc",
+            subset=DatasetSubset.CLEAN_PRINT,
+            image_path=image,
+            ground_truth_path=truth,
+            layout_ground_truth_path=layout,
+            license="CC0-1.0",
+            provenance="Created for layout unit test",
+            rights_confirmed=True,
+        )
+
+    assert not manifest.exists()
+    assert not (root / "data").exists()

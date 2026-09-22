@@ -181,3 +181,58 @@ def test_dataset_tags_are_normalized_and_deduplicated() -> None:
     )
 
     assert sample.tags == ["capture:phone-photo", "language:mixed"]
+
+
+def test_dataset_validation_checks_layout_ground_truth_bounds(tmp_path) -> None:
+    from PIL import Image
+
+    from lao_document_ocr.layout_ground_truth import write_layout_ground_truth
+    from lao_document_ocr.models import Block, BlockType, BoundingBox, Document, Page
+
+    image = tmp_path / "layout-page.png"
+    truth = tmp_path / "layout-page.txt"
+    layout = tmp_path / "layout-page.json"
+    Image.new("RGB", (100, 50), "white").save(image)
+    truth.write_text("layout truth", encoding="utf-8")
+    write_layout_ground_truth(
+        Document(
+            pages=[
+                Page(
+                    number=1,
+                    width=100,
+                    height=50,
+                    blocks=[
+                        Block(
+                            type=BlockType.PARAGRAPH,
+                            bbox=BoundingBox(x=90, y=10, width=30, height=20),
+                        )
+                    ],
+                )
+            ]
+        ),
+        layout,
+    )
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    manifest = tmp_path / "layout-manifest.jsonl"
+    manifest.write_text(
+        json.dumps(
+            {
+                "id": "layout-page",
+                "document_id": "layout-doc",
+                "split": "test",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "layout_ground_truth": layout.name,
+                "license": "CC0-1.0",
+                "provenance": "layout unit test",
+                "sha256": digest,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    errors = validate_dataset(load_manifest(manifest), tmp_path)
+
+    assert any("bbox exceeds page bounds" in error for error in errors)

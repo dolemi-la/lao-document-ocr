@@ -6,12 +6,19 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from PIL import Image
+
 from lao_document_ocr.dataset import (
     DatasetSample,
     DatasetSplit,
     DatasetSubset,
     load_manifest,
     sha256_file,
+)
+from lao_document_ocr.layout_ground_truth import (
+    load_layout_ground_truth,
+    validate_layout_ground_truth,
+    write_layout_ground_truth,
 )
 
 
@@ -81,6 +88,7 @@ def add_dataset_sample(
     subset: DatasetSubset,
     image_path: str | Path,
     ground_truth_path: str | Path,
+    layout_ground_truth_path: str | Path | None = None,
     license: str,
     provenance: str,
     language: str = "lo",
@@ -103,10 +111,33 @@ def add_dataset_sample(
 
     source_image = Path(image_path)
     source_truth = Path(ground_truth_path)
+    source_layout = (
+        Path(layout_ground_truth_path)
+        if layout_ground_truth_path is not None
+        else None
+    )
     if not source_image.is_file():
         raise FileNotFoundError(f"Source image not found: {source_image}")
     if not source_truth.is_file():
         raise FileNotFoundError(f"Ground truth not found: {source_truth}")
+    if source_layout is not None and not source_layout.is_file():
+        raise FileNotFoundError(
+            f"Layout ground truth not found: {source_layout}"
+        )
+
+    layout_document = None
+    if source_layout is not None:
+        layout_document = load_layout_ground_truth(source_layout)
+        with Image.open(source_image) as image:
+            layout_errors = validate_layout_ground_truth(
+                layout_document,
+                image_size=image.size,
+            )
+        if layout_errors:
+            raise ValueError(
+                "Invalid layout ground truth: "
+                + "; ".join(layout_errors)
+            )
 
     try:
         truth_text = source_truth.read_text(encoding="utf-8")
@@ -134,21 +165,39 @@ def add_dataset_sample(
     suffix = _safe_extension(source_image)
     image_relative = Path("data") / subset.value / f"{sample_id}{suffix}"
     truth_relative = Path("ground-truth") / subset.value / f"{sample_id}.txt"
+    layout_relative = (
+        Path("layout-ground-truth") / subset.value / f"{sample_id}.json"
+        if layout_document is not None
+        else None
+    )
     destination_image = root / image_relative
     destination_truth = root / truth_relative
+    destination_layout = root / layout_relative if layout_relative else None
 
-    if destination_image.exists() or destination_truth.exists():
+    destinations = [destination_image, destination_truth]
+    if destination_layout is not None:
+        destinations.append(destination_layout)
+    if any(destination.exists() for destination in destinations):
         raise FileExistsError(f"Destination for sample {sample_id} already exists")
 
     destination_image.parent.mkdir(parents=True, exist_ok=True)
     destination_truth.parent.mkdir(parents=True, exist_ok=True)
+    if destination_layout is not None:
+        destination_layout.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         shutil.copy2(source_image, destination_image)
         destination_truth.write_text(truth_text, encoding="utf-8")
+        if destination_layout is not None and layout_document is not None:
+            write_layout_ground_truth(
+                layout_document,
+                destination_layout,
+            )
     except Exception:
         destination_image.unlink(missing_ok=True)
         destination_truth.unlink(missing_ok=True)
+        if destination_layout is not None:
+            destination_layout.unlink(missing_ok=True)
         raise
 
     sample = DatasetSample(
@@ -158,6 +207,11 @@ def add_dataset_sample(
         subset=subset,
         source=image_relative.as_posix(),
         ground_truth=truth_relative.as_posix(),
+        layout_ground_truth=(
+            layout_relative.as_posix()
+            if layout_relative is not None
+            else None
+        ),
         language=language,
         license=license.strip(),
         provenance=provenance.strip(),

@@ -7,7 +7,14 @@ from collections.abc import Iterable
 from enum import StrEnum
 from pathlib import Path
 
+from PIL import Image
 from pydantic import BaseModel, Field, ValidationError, field_validator
+
+from lao_document_ocr.layout_ground_truth import (
+    LayoutGroundTruthError,
+    load_layout_ground_truth,
+    validate_layout_ground_truth,
+)
 
 _TAG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,63}$")
 
@@ -38,6 +45,7 @@ class DatasetSample(BaseModel):
     subset: DatasetSubset
     source: str = Field(min_length=1)
     ground_truth: str = Field(min_length=1)
+    layout_ground_truth: str | None = None
     language: str = "lo"
     license: str = Field(min_length=1)
     provenance: str = Field(min_length=1)
@@ -62,9 +70,11 @@ class DatasetSample(BaseModel):
             normalized.add(tag)
         return sorted(normalized)
 
-    @field_validator("source", "ground_truth")
+    @field_validator("source", "ground_truth", "layout_ground_truth")
     @classmethod
-    def relative_paths_only(cls, value: str) -> str:
+    def relative_paths_only(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         path = Path(value)
         if path.is_absolute() or ".." in path.parts:
             raise ValueError("dataset paths must be relative and stay inside the dataset root")
@@ -155,10 +165,17 @@ def validate_dataset(
     for sample in samples:
         source = (root / sample.source).resolve()
         truth = (root / sample.ground_truth).resolve()
+        layout = (
+            (root / sample.layout_ground_truth).resolve()
+            if sample.layout_ground_truth
+            else None
+        )
 
         try:
             source.relative_to(root)
             truth.relative_to(root)
+            if layout is not None:
+                layout.relative_to(root)
         except ValueError:
             errors.append(f"{sample.id}: path escapes dataset root")
             continue
@@ -167,6 +184,11 @@ def validate_dataset(
             errors.append(f"{sample.id}: missing source file {sample.source}")
         if not truth.is_file():
             errors.append(f"{sample.id}: missing ground truth file {sample.ground_truth}")
+        if layout is not None and not layout.is_file():
+            errors.append(
+                f"{sample.id}: missing layout ground truth file "
+                f"{sample.layout_ground_truth}"
+            )
 
         observed_hash = sample.sha256
         if verify_hashes and source.is_file():
@@ -188,6 +210,25 @@ def validate_dataset(
             else:
                 if not text.strip():
                     errors.append(f"{sample.id}: ground truth is empty")
+
+        if layout is not None and layout.is_file():
+            image_size = None
+            if source.is_file():
+                try:
+                    with Image.open(source) as image:
+                        image_size = image.size
+                except Exception:
+                    image_size = None
+            try:
+                layout_document = load_layout_ground_truth(layout)
+            except LayoutGroundTruthError as exc:
+                errors.append(f"{sample.id}: {exc}")
+            else:
+                for error in validate_layout_ground_truth(
+                    layout_document,
+                    image_size=image_size,
+                ):
+                    errors.append(f"{sample.id}: {error}")
 
     for digest, sample_ids in sorted(observed_hashes.items()):
         unique_ids = sorted(set(sample_ids))

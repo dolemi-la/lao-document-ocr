@@ -33,6 +33,14 @@ def build_dataset_report(
     by_license = Counter(sample.license for sample in samples)
     by_language = Counter(sample.language for sample in samples)
     by_tag = Counter(tag for sample in samples for tag in sample.tags)
+    layout_samples = [
+        sample
+        for sample in samples
+        if sample.layout_ground_truth is not None
+    ]
+    layout_by_split = Counter(sample.split.value for sample in layout_samples)
+    layout_by_subset = Counter(sample.subset.value for sample in layout_samples)
+    layout_documents = {sample.document_id for sample in layout_samples}
 
     document_splits: dict[str, DatasetSplit] = {}
     captures_per_document: Counter[str] = Counter()
@@ -67,6 +75,13 @@ def build_dataset_report(
         "by_license": dict(sorted(by_license.items())),
         "by_language": dict(sorted(by_language.items())),
         "by_tag": dict(sorted(by_tag.items())),
+        "layout_ground_truth": {
+            "sample_count": len(layout_samples),
+            "document_count": len(layout_documents),
+            "coverage_ratio": len(layout_samples) / len(samples),
+            "by_split": dict(sorted(layout_by_split.items())),
+            "by_subset": dict(sorted(layout_by_subset.items())),
+        },
         "split_document_counts": dict(sorted(split_document_counts.items())),
         "coverage_matrix": {
             split: dict(sorted(counts.items()))

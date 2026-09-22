@@ -26,6 +26,7 @@ Status: in progress
 - [x] document licensing/provenance metadata
 - [x] rights-clear printable capture-pack + real-capture registration workflow
 - [x] benchmark source review registry/policy
+- [x] optional reviewed layout AST labels in dataset manifests + coverage reporting
 - [x] dataset coverage/integrity report + duplicate-image detection
 - [x] multi-axis benchmark tags and per-tag CER/WER
 - [x] structured printable capture templates for multi-column/table/receipt/form collection

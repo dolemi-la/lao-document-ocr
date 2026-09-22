@@ -26,6 +26,7 @@ lao-ocr add-dataset-sample \
   --subset clean-print \
   --image /path/to/page.png \
   --ground-truth /path/to/page.txt \
+  --layout-ground-truth /path/to/page-layout.json \
   --license CC-BY-4.0 \
   --provenance "Scanned from Example Collection by Example Contributor" \
   --source-url https://example.org/source \
@@ -101,3 +102,9 @@ lao-ocr validate-dataset \
 ```
 
 Review the manifest diff before committing any new benchmark data.
+
+## Optional layout labels
+
+If a page has manually reviewed layout ground truth, pass `--layout-ground-truth`. Intake validates the one-page AST against the source image dimensions and stores a canonical copy under `layout-ground-truth/<subset>/`.
+
+Do not label raw model predictions as ground truth without review. The purpose of this field is training/evaluating future text-region, reading-order, table, and illustration models.

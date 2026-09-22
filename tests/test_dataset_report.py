@@ -105,3 +105,72 @@ def test_dataset_report_round_trip(tmp_path) -> None:
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["schema_version"] == "1"
     assert payload["sample_count"] == 1
+
+
+def test_dataset_report_counts_layout_labeled_samples(tmp_path) -> None:
+    from PIL import Image
+
+    from lao_document_ocr.layout_ground_truth import write_layout_ground_truth
+    from lao_document_ocr.models import Block, BlockType, BoundingBox, Document, Page
+
+    entries = []
+    for sample_id, split, with_layout in (
+        ("layout-a", "train", True),
+        ("layout-b", "test", False),
+    ):
+        image = tmp_path / f"{sample_id}.png"
+        truth = tmp_path / f"{sample_id}.txt"
+        Image.new("RGB", (120, 60), "white").save(image)
+        truth.write_text(sample_id, encoding="utf-8")
+        digest = hashlib.sha256(image.read_bytes()).hexdigest()
+        entry = _sample_entry(
+            sample_id,
+            f"doc-{sample_id}",
+            split,
+            "clean-print",
+            image.name,
+            truth.name,
+            digest,
+        )
+        if with_layout:
+            layout = tmp_path / f"{sample_id}.json"
+            write_layout_ground_truth(
+                Document(
+                    pages=[
+                        Page(
+                            number=1,
+                            width=120,
+                            height=60,
+                            blocks=[
+                                Block(
+                                    type=BlockType.PARAGRAPH,
+                                    bbox=BoundingBox(
+                                        x=10,
+                                        y=10,
+                                        width=80,
+                                        height=20,
+                                    ),
+                                )
+                            ],
+                        )
+                    ]
+                ),
+                layout,
+            )
+            entry["layout_ground_truth"] = layout.name
+        entries.append(entry)
+
+    manifest = tmp_path / "layout-report-manifest.jsonl"
+    manifest.write_text(
+        "\n".join(json.dumps(entry) for entry in entries) + "\n",
+        encoding="utf-8",
+    )
+
+    report = build_dataset_report(load_manifest(manifest), tmp_path)
+
+    layout = report["layout_ground_truth"]
+    assert layout["sample_count"] == 1
+    assert layout["document_count"] == 1
+    assert layout["coverage_ratio"] == 0.5
+    assert layout["by_split"] == {"train": 1}
+    assert layout["by_subset"] == {"clean-print": 1}

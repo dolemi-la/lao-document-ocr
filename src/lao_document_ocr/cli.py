@@ -82,6 +82,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     intake.add_argument("--image", required=True, type=Path)
     intake.add_argument("--ground-truth", required=True, type=Path)
+    intake.add_argument("--layout-ground-truth", type=Path)
     intake.add_argument("--license", required=True)
     intake.add_argument("--provenance", required=True)
     intake.add_argument("--language", default="lo")
@@ -397,6 +398,7 @@ def _add_dataset_sample(args: argparse.Namespace) -> int:
         subset=DatasetSubset(args.subset),
         image_path=args.image,
         ground_truth_path=args.ground_truth,
+        layout_ground_truth_path=args.layout_ground_truth,
         license=args.license,
         provenance=args.provenance,
         language=args.language,
