@@ -79,7 +79,7 @@ Status: started
 - [ ] general/complex borderless table detection
 - [x] merged-cell baseline for clear ruled rectangular spans
 - [x] horizontal merged-cell baseline for aligned borderless tables
-- [ ] vertical/general merged cells in complex borderless tables
+- [x] vertical + rectangular merged-cell baseline for strongly aligned borderless tables
 - [x] repeated header/footer detection baseline and DOCX preservation
 - [x] native PDF embedded-image preservation baseline (excluding full-page scans)
 - [x] conservative photo-like raster-region detection for image/scanned inputs

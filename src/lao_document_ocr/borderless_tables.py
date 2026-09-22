@@ -35,6 +35,7 @@ class RowCellAssignment:
     line: RecognizedLine
     column: int
     column_span: int
+    row_span: int = 1
 
 
 @dataclass(frozen=True)
@@ -53,17 +54,14 @@ def _cluster_rows(lines: list[RecognizedLine]) -> list[TextRow]:
     rows: list[list[RecognizedLine]] = []
 
     for line in sorted(lines, key=lambda item: (item.bbox.y, item.bbox.x)):
-        center_y = line.bbox.y + line.bbox.height / 2
+        top_y = line.bbox.y
         if not rows:
             rows.append([line])
             continue
 
-        previous_centers = [
-            item.bbox.y + item.bbox.height / 2
-            for item in rows[-1]
-        ]
-        previous_center = sum(previous_centers) / len(previous_centers)
-        if abs(center_y - previous_center) <= tolerance:
+        previous_tops = [item.bbox.y for item in rows[-1]]
+        previous_top = median(previous_tops)
+        if abs(top_y - previous_top) <= tolerance:
             rows[-1].append(line)
         else:
             rows.append([line])
@@ -191,6 +189,22 @@ def _assign_line_to_columns(
     )
 
 
+def _infer_row_span(
+    line: RecognizedLine,
+    row_index: int,
+    rows: list[TextRow],
+) -> int:
+    bottom = line.bbox.y + line.bbox.height
+    last_row = row_index
+    for future_index in range(row_index + 1, len(rows)):
+        center = rows[future_index].center_y
+        if line.bbox.y <= center <= bottom:
+            last_row = future_index
+            continue
+        break
+    return last_row - row_index + 1
+
+
 def _assign_rows(
     rows: list[TextRow],
     anchors: tuple[float, ...],
@@ -200,8 +214,9 @@ def _assign_rows(
     column_count = len(anchors)
     tolerance = max(14, int(page_width * 0.025))
     assigned_rows: list[tuple[RowCellAssignment, ...]] = []
+    spanning_columns: dict[int, set[int]] = {}
 
-    for row in rows:
+    for row_index, row in enumerate(rows):
         assignments: list[RowCellAssignment] = []
         for line in row.lines:
             assignment = _assign_line_to_columns(
@@ -211,11 +226,23 @@ def _assign_rows(
             )
             if assignment is None:
                 return None
-            assignments.append(assignment)
+            assignments.append(
+                RowCellAssignment(
+                    line=assignment.line,
+                    column=assignment.column,
+                    column_span=assignment.column_span,
+                    row_span=_infer_row_span(
+                        line,
+                        row_index,
+                        rows,
+                    ),
+                )
+            )
 
         assignments.sort(key=lambda item: item.column)
-        covered_columns: set[int] = set()
-        has_span = False
+        covered_columns = set(spanning_columns.get(row_index, set()))
+        has_span = bool(covered_columns)
+
         for assignment in assignments:
             columns = set(
                 range(
@@ -226,7 +253,26 @@ def _assign_rows(
             if covered_columns & columns:
                 return None
             covered_columns.update(columns)
-            has_span = has_span or assignment.column_span > 1
+            has_span = (
+                has_span
+                or assignment.column_span > 1
+                or assignment.row_span > 1
+            )
+
+            for future_row in range(
+                row_index + 1,
+                min(
+                    len(rows),
+                    row_index + assignment.row_span,
+                ),
+            ):
+                future_columns = spanning_columns.setdefault(
+                    future_row,
+                    set(),
+                )
+                if future_columns & columns:
+                    return None
+                future_columns.update(columns)
 
         if covered_columns != set(range(column_count)):
             return None
@@ -344,11 +390,12 @@ def _block_from_schema(
                     row=row_index,
                     column=assignment.column,
                     text=text,
+                    row_span=assignment.row_span,
                     column_span=assignment.column_span,
                 )
             )
             grid[row_index][assignment.column] = text
-            if assignment.column_span > 1:
+            if assignment.column_span > 1 or assignment.row_span > 1:
                 merged_cells += 1
 
     confidence = (
@@ -372,7 +419,15 @@ def _block_from_schema(
             "rows": len(rows),
             "columns": schema.column_count,
             "merged_cells": merged_cells,
-            "merge_support": "horizontal-only",
+            "merge_support": (
+                "horizontal+vertical"
+                if any(
+                    assignment.row_span > 1
+                    for assignments in schema.rows
+                    for assignment in assignments
+                )
+                else "horizontal-only"
+            ),
         },
     )
 
