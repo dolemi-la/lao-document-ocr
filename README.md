@@ -35,6 +35,7 @@ Current OCR baseline:
 - conservative 2–4 column reading order when clear gutters exist
 - repeated multi-page headers/footers exported into real Word header/footer parts
 - native PDF images/logos/figures preserved as real Word media assets (full-page scan backgrounds excluded)
+- learned layout image regions can preserve project-owned illustration/photo predictions before heuristic visual fallbacks
 - conservative photo-like raster regions from scanned/image inputs preserved as Word media
 - line-art/diagram regions preserved as Word media after text/table/image masking
 

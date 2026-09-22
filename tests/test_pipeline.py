@@ -217,3 +217,58 @@ def test_default_reading_order_metadata_is_recorded(tmp_path) -> None:
         "DeterministicReadingOrderResolver"
     )
     assert document.metadata["reading_order"]["version"] == "multi-column-v2"
+
+
+def test_engine_learned_visual_blocks_are_preserved_without_heuristic_duplicate(
+    tmp_path,
+) -> None:
+    import base64
+    import io
+
+    from lao_document_ocr.models import Block, BlockType
+
+    class VisualEngine(FakeEngine):
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            return []
+
+        def visual_blocks(
+            self,
+            image: Image.Image,
+            *,
+            source_image=None,
+            exclude_boxes=None,
+        ):
+            crop = Image.new("RGB", (80, 60), (80, 140, 210))
+            buffer = io.BytesIO()
+            crop.save(buffer, format="PNG")
+            return [
+                Block(
+                    type=BlockType.IMAGE,
+                    bbox=BoundingBox(x=100, y=80, width=80, height=60),
+                    metadata={
+                        "source": "learned-layout-image",
+                        "detector": "tiny-layout-unet-v1",
+                        "media_type": "image/png",
+                        "image_base64": base64.b64encode(
+                            buffer.getvalue()
+                        ).decode("ascii"),
+                        "width_ratio": 0.25,
+                        "area_ratio": 0.08,
+                    },
+                )
+            ]
+
+    image_path = tmp_path / "visual.png"
+    page = Image.new("RGB", (400, 300), "white")
+    page.paste(Image.new("RGB", (80, 60), (80, 140, 210)), (100, 80))
+    page.save(image_path)
+
+    document = process_document(image_path, engine=VisualEngine())
+
+    image_blocks = [
+        block
+        for block in document.pages[0].blocks
+        if block.type == BlockType.IMAGE
+    ]
+    assert len(image_blocks) == 1
+    assert image_blocks[0].metadata["source"] == "learned-layout-image"

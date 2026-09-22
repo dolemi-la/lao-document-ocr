@@ -130,3 +130,105 @@ def test_layout_detector_preserves_semantic_region_classes(tmp_path) -> None:
         BlockType.TABLE,
     ]
     assert all(region.detector == "tiny-layout-unet-v1" for region in regions)
+
+
+def test_layout_detector_extracts_image_class_as_visual_block(tmp_path) -> None:
+    from types import MethodType
+
+    image = Image.new("RGB", (100, 80), "white")
+    pixels = np.asarray(image).copy()
+    pixels[25:60, 30:80] = [80, 140, 210]
+    image = Image.fromarray(pixels)
+    _, transform = prepare_layout_inference_image(
+        image,
+        image_height=64,
+        image_width=64,
+    )
+    mask = np.zeros((64, 64), dtype=np.uint8)
+    mask[20:48, 18:52] = LAYOUT_CLASS_IDS["image"]
+
+    detector = object.__new__(ExportedLayoutRegionDetector)
+    detector.min_region_area_ratio = 0.0001
+    detector._cached_image = None
+    detector._cached_restored_mask = None
+
+    def fake_predict(self, source):
+        return mask, transform
+
+    detector._predict_mask = MethodType(fake_predict, detector)
+    blocks = detector.detect_visual_blocks(
+        image,
+        source_image=image,
+    )
+
+    assert len(blocks) == 1
+    block = blocks[0]
+    assert block.type.value == "image"
+    assert block.metadata["source"] == "learned-layout-image"
+    assert block.metadata["semantic_class"] == "image"
+    assert block.metadata["image_base64"]
+    assert 0 < block.metadata["area_ratio"] < 0.75
+
+
+def test_layout_detector_reuses_cached_mask_for_text_and_visual_regions() -> None:
+    from types import MethodType
+
+    image = Image.new("RGB", (64, 64), "white")
+    _, transform = prepare_layout_inference_image(
+        image,
+        image_height=64,
+        image_width=64,
+    )
+    mask = np.zeros((64, 64), dtype=np.uint8)
+    mask[4:18, 4:40] = LAYOUT_CLASS_IDS["paragraph"]
+    mask[30:55, 10:50] = LAYOUT_CLASS_IDS["image"]
+    calls = {"count": 0}
+
+    detector = object.__new__(ExportedLayoutRegionDetector)
+    detector.min_region_area_ratio = 0.0001
+    detector._cached_image = None
+    detector._cached_restored_mask = None
+
+    def fake_predict(self, source):
+        calls["count"] += 1
+        return mask, transform
+
+    detector._predict_mask = MethodType(fake_predict, detector)
+
+    text_regions = detector.detect(image)
+    visual_blocks = detector.detect_visual_blocks(image)
+
+    assert len(text_regions) == 1
+    assert len(visual_blocks) == 1
+    assert calls["count"] == 1
+
+
+def test_layout_visual_block_is_rejected_on_large_excluded_overlap() -> None:
+    from types import MethodType
+
+    from lao_document_ocr.models import BoundingBox
+
+    image = Image.new("RGB", (64, 64), "white")
+    _, transform = prepare_layout_inference_image(
+        image,
+        image_height=64,
+        image_width=64,
+    )
+    mask = np.zeros((64, 64), dtype=np.uint8)
+    mask[12:48, 12:52] = LAYOUT_CLASS_IDS["image"]
+
+    detector = object.__new__(ExportedLayoutRegionDetector)
+    detector.min_region_area_ratio = 0.0001
+    detector._cached_image = None
+    detector._cached_restored_mask = None
+
+    def fake_predict(self, source):
+        return mask, transform
+
+    detector._predict_mask = MethodType(fake_predict, detector)
+    blocks = detector.detect_visual_blocks(
+        image,
+        exclude_boxes=[BoundingBox(x=8, y=8, width=50, height=50)],
+    )
+
+    assert blocks == []

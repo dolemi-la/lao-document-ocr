@@ -84,7 +84,7 @@ Status: started
 - [x] native PDF embedded-image preservation baseline (excluding full-page scans)
 - [x] conservative photo-like raster-region detection for image/scanned inputs
 - [x] deterministic line-art/diagram region preservation baseline
-- [ ] learned/general diagram/illustration segmentation
+- [x] learned image/illustration segmentation pipeline via layout image class (quality not yet benchmark-ready)
 - [x] layout/table AST benchmark metrics pipeline
 - [x] optional DOCX visual fidelity benchmark pipeline (LibreOffice renderer)
 

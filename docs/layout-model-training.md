@@ -225,3 +225,19 @@ Likely model work after collecting enough real layout labels:
 - learned reading order
 - learned table structure
 - learned image/diagram segmentation
+
+## Learned visual / illustration regions
+
+The same semantic segmentation model also predicts the `image` class. When the exported layout detector is used by the owned OCR engine, runtime can convert connected `image` components into preserved image blocks for DOCX/JSON output.
+
+This path:
+
+1. reuses the same cached page segmentation used for text-region detection;
+2. crops from the original color page, not the grayscale OCR image;
+3. rejects near-full-page regions so scan backgrounds are not duplicated;
+4. suppresses candidates that substantially overlap recognized text, tables, or native PDF images;
+5. adds accepted regions as `BlockType.IMAGE` with `source=learned-layout-image`.
+
+The deterministic raster-photo and line-art/diagram detectors then run only on areas not already claimed by learned/native visual blocks.
+
+This completes the **learned visual-region pipeline**, but model quality still depends on reviewed `image` labels in the real layout dataset. It is not yet a benchmark-quality illustration segmentation claim.

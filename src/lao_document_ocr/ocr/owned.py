@@ -89,10 +89,16 @@ class OwnedRecognizerEngine(OcrEngine):
 
     def metadata(self) -> dict:
         metadata = getattr(self.recognizer, "metadata", None)
+        detector_metadata = self.region_detector.metadata()
         return {
             "name": self.__class__.__name__,
             "model": metadata,
-            "text_region_detector": self.region_detector.metadata(),
+            "text_region_detector": detector_metadata,
+            "visual_region_detector": (
+                detector_metadata
+                if hasattr(self.region_detector, "detect_visual_blocks")
+                else None
+            ),
         }
 
     def recognize(self, image: Image.Image) -> list[RecognizedLine]:
@@ -135,3 +141,21 @@ class OwnedRecognizerEngine(OcrEngine):
             )
 
         return lines
+
+
+    def visual_blocks(
+        self,
+        image: Image.Image,
+        *,
+        source_image: Image.Image | None = None,
+        exclude_boxes=None,
+    ):
+        detector = self.region_detector
+        detect_visual = getattr(detector, "detect_visual_blocks", None)
+        if detect_visual is None:
+            return []
+        return detect_visual(
+            image,
+            source_image=source_image,
+            exclude_boxes=exclude_boxes,
+        )

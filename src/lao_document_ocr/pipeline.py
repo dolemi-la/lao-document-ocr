@@ -166,12 +166,32 @@ def process_document(
             for asset in loaded_page.embedded_images
         ]
         embedded_boxes = [asset.bbox for asset in loaded_page.embedded_images]
+        line_boxes = [line.bbox for line in lines]
+
+        learned_visual_blocks = engine.visual_blocks(
+            cleaned,
+            source_image=loaded_page.image,
+            exclude_boxes=[
+                *table_boxes,
+                *embedded_boxes,
+                *line_boxes,
+            ],
+        )
+        learned_visual_boxes = [
+            block.bbox
+            for block in learned_visual_blocks
+            if block.bbox is not None
+        ]
 
         raster_blocks = detect_raster_regions(
             cleaned,
             lines,
             source_image=loaded_page.image,
-            exclude_boxes=[*table_boxes, *embedded_boxes],
+            exclude_boxes=[
+                *table_boxes,
+                *embedded_boxes,
+                *learned_visual_boxes,
+            ],
         )
         raster_boxes = [
             block.bbox
@@ -186,6 +206,7 @@ def process_document(
             exclude_boxes=[
                 *table_boxes,
                 *embedded_boxes,
+                *learned_visual_boxes,
                 *raster_boxes,
             ],
         )
@@ -193,6 +214,7 @@ def process_document(
         blocks = [
             *semantic_blocks,
             *embedded_blocks,
+            *learned_visual_blocks,
             *raster_blocks,
             *diagram_blocks,
         ]

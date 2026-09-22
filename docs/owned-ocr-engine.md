@@ -154,3 +154,9 @@ The learned detector is experimental and should remain opt-in until it beats the
 When `OCR_LAYOUT_DETECTOR=learned`, layout regions retain their semantic class (`heading`, `paragraph`, `list`, `table`) through line detection and OCR. Lines from one detected region share a stable block/paragraph ID, so multi-line learned paragraphs/lists remain grouped in the AST.
 
 The hints are applied conservatively and do not fabricate missing table cells or list markers.
+
+## Learned visual regions
+
+With `OCR_LAYOUT_DETECTOR=learned`, the same layout model can preserve predicted `image` regions as real image blocks in the document AST/DOCX. The owned engine exposes the layout model as both its text-region and visual-region detector.
+
+Learned visual boxes are de-duplicated against OCR text/table/native-PDF regions before the deterministic raster and diagram fallbacks run.

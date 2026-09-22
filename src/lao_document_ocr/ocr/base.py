@@ -6,7 +6,7 @@ from typing import Any
 
 from PIL import Image
 
-from lao_document_ocr.models import BlockType, BoundingBox
+from lao_document_ocr.models import Block, BlockType, BoundingBox
 
 
 class OcrEngineError(RuntimeError):
@@ -35,3 +35,13 @@ class OcrEngine(ABC):
 
     def metadata(self) -> dict[str, Any]:
         return {"name": self.__class__.__name__}
+
+    def visual_blocks(
+        self,
+        image: Image.Image,
+        *,
+        source_image: Image.Image | None = None,
+        exclude_boxes: list[BoundingBox] | None = None,
+    ) -> list[Block]:
+        del image, source_image, exclude_boxes
+        return []
