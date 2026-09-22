@@ -91,7 +91,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - batch processing
 - [x] cooperative job cancellation at page boundaries
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
-- rate limiting for public deployments
+- [x] disabled-by-default per-client submission rate-limit baseline
 - storage adapters
 - security review
 - accessibility

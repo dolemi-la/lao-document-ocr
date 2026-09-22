@@ -191,6 +191,10 @@ Override them with:
 - `JOB_MAX_ACTIVE`
 - `JOB_RETENTION_SECONDS`
 - `JOB_ROOT`
+- `RATE_LIMIT_REQUESTS` (0 disables the in-process limiter)
+- `RATE_LIMIT_WINDOW_SECONDS`
+- `RATE_LIMIT_MAX_CLIENTS`
+- `RATE_LIMIT_TRUST_PROXY_HEADERS`
 
 The project-owned engine is experimental and requires the optional PyTorch dependencies. See [docs/owned-ocr-engine.md](docs/owned-ocr-engine.md).
 

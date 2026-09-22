@@ -39,6 +39,7 @@ from services.api.app.jobs import (
     JobStatus,
 )
 from services.api.app.metrics import ApiMetrics, RequestTimer
+from services.api.app.rate_limit import SlidingWindowRateLimiter
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 MAX_PAGES = int(os.getenv("MAX_PAGES", "60"))
@@ -56,6 +57,13 @@ JOB_ROOT = Path(
 JOB_MAX_WORKERS = int(os.getenv("JOB_MAX_WORKERS", "2"))
 JOB_MAX_ACTIVE = int(os.getenv("JOB_MAX_ACTIVE", "8"))
 JOB_RETENTION_SECONDS = int(os.getenv("JOB_RETENTION_SECONDS", "3600"))
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "0"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+RATE_LIMIT_MAX_CLIENTS = int(os.getenv("RATE_LIMIT_MAX_CLIENTS", "10000"))
+RATE_LIMIT_TRUST_PROXY_HEADERS = os.getenv(
+    "RATE_LIMIT_TRUST_PROXY_HEADERS",
+    "false",
+).strip().lower() in {"1", "true", "yes", "on"}
 ALLOWED_ORIGINS = [
     item.strip()
     for item in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
@@ -77,6 +85,11 @@ app.add_middleware(
 )
 
 API_METRICS = ApiMetrics()
+SUBMISSION_RATE_LIMITER = SlidingWindowRateLimiter(
+    requests=RATE_LIMIT_REQUESTS,
+    window_seconds=RATE_LIMIT_WINDOW_SECONDS,
+    max_clients=RATE_LIMIT_MAX_CLIENTS,
+)
 
 
 def _request_id(request: Request) -> str:
@@ -113,6 +126,29 @@ async def observe_request(request: Request, call_next):
     )
     response.headers["X-Request-ID"] = request_id
     return response
+
+
+def _client_rate_limit_key(request: Request) -> str:
+    if RATE_LIMIT_TRUST_PROXY_HEADERS:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            candidate = forwarded.split(",", 1)[0].strip()
+            if candidate:
+                return candidate[:128]
+    if request.client is not None and request.client.host:
+        return request.client.host[:128]
+    return "unknown"
+
+
+def _enforce_submission_rate_limit(request: Request) -> None:
+    decision = SUBMISSION_RATE_LIMITER.check(_client_rate_limit_key(request))
+    if decision.allowed:
+        return
+    raise HTTPException(
+        status_code=429,
+        detail="OCR submission rate limit exceeded.",
+        headers={"Retry-After": str(decision.retry_after_seconds)},
+    )
 
 
 def _engine() -> OcrEngine:
@@ -234,6 +270,7 @@ def health() -> dict:
             "max_active_jobs": JOB_MAX_ACTIVE,
             "retention_seconds": JOB_RETENTION_SECONDS,
         },
+        "submission_rate_limit": SUBMISSION_RATE_LIMITER.snapshot(),
     }
     if OCR_ENGINE == "tesseract":
         try:
@@ -253,8 +290,12 @@ def health() -> dict:
 
 
 @app.post("/v1/parse")
-async def parse_document(file: Annotated[UploadFile, File(...)]) -> dict:
+async def parse_document(
+    request: Request,
+    file: Annotated[UploadFile, File(...)],
+) -> dict:
     filename = _safe_filename(file.filename)
+    _enforce_submission_rate_limit(request)
     suffix = _validate_suffix(filename)
 
     with tempfile.TemporaryDirectory(prefix="lao-ocr-") as temp_dir:
@@ -273,8 +314,12 @@ async def parse_document(file: Annotated[UploadFile, File(...)]) -> dict:
 
 
 @app.post("/v1/convert")
-async def convert_document(file: Annotated[UploadFile, File(...)]) -> StreamingResponse:
+async def convert_document(
+    request: Request,
+    file: Annotated[UploadFile, File(...)],
+) -> StreamingResponse:
     filename = _safe_filename(file.filename)
+    _enforce_submission_rate_limit(request)
     suffix = _validate_suffix(filename)
 
     with tempfile.TemporaryDirectory(prefix="lao-ocr-") as temp_dir:
@@ -301,8 +346,12 @@ async def convert_document(file: Annotated[UploadFile, File(...)]) -> StreamingR
 
 
 @app.post("/v1/jobs", status_code=202)
-async def create_conversion_job(file: Annotated[UploadFile, File(...)]) -> dict:
+async def create_conversion_job(
+    request: Request,
+    file: Annotated[UploadFile, File(...)],
+) -> dict:
     filename = _safe_filename(file.filename)
+    _enforce_submission_rate_limit(request)
     suffix = _validate_suffix(filename)
     try:
         record = JOB_MANAGER.reserve(filename, suffix)

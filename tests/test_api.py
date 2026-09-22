@@ -216,3 +216,142 @@ def test_metrics_endpoint_normalizes_job_ids(monkeypatch) -> None:
     assert 'route="/v1/jobs/{job_id}"' in text
     assert "not-a-real-job" not in text
     assert 'status="404"' in text
+
+
+def test_submission_rate_limit_returns_429_and_polling_still_works(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    def runner(record, cancel_event):
+        path = record.workspace / "result.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("result.txt", "done")
+        return path
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-rate-limit",
+        runner,
+        max_workers=1,
+        max_active_jobs=4,
+    )
+    limiter = SlidingWindowRateLimiter(requests=1, window_seconds=60)
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(api_main, "SUBMISSION_RATE_LIMITER", limiter)
+    try:
+        first = client.post(
+            "/v1/jobs",
+            files={"file": ("first.png", _png_upload_bytes(), "image/png")},
+        )
+        assert first.status_code == 202
+        job_id = first.json()["id"]
+
+        second = client.post(
+            "/v1/jobs",
+            files={"file": ("second.png", _png_upload_bytes(), "image/png")},
+        )
+        assert second.status_code == 429
+        assert second.headers["retry-after"]
+        assert "rate limit" in second.json()["detail"].lower()
+
+        status = client.get(f"/v1/jobs/{job_id}")
+        assert status.status_code == 200
+    finally:
+        manager.shutdown()
+
+
+def test_forwarded_for_is_ignored_unless_explicitly_trusted(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    def runner(record, cancel_event):
+        path = record.workspace / "result.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("result.txt", "done")
+        return path
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-forwarded",
+        runner,
+        max_workers=1,
+        max_active_jobs=4,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(api_main, "RATE_LIMIT_TRUST_PROXY_HEADERS", False)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=1, window_seconds=60),
+    )
+    try:
+        first = client.post(
+            "/v1/jobs",
+            headers={"X-Forwarded-For": "203.0.113.10"},
+            files={"file": ("first.png", _png_upload_bytes(), "image/png")},
+        )
+        second = client.post(
+            "/v1/jobs",
+            headers={"X-Forwarded-For": "203.0.113.11"},
+            files={"file": ("second.png", _png_upload_bytes(), "image/png")},
+        )
+        assert first.status_code == 202
+        assert second.status_code == 429
+    finally:
+        manager.shutdown()
+
+
+def test_forwarded_for_can_be_trusted_by_explicit_configuration(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    def runner(record, cancel_event):
+        path = record.workspace / "result.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("result.txt", "done")
+        return path
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-forwarded-trusted",
+        runner,
+        max_workers=1,
+        max_active_jobs=4,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(api_main, "RATE_LIMIT_TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=1, window_seconds=60),
+    )
+    try:
+        first = client.post(
+            "/v1/jobs",
+            headers={"X-Forwarded-For": "203.0.113.10"},
+            files={"file": ("first.png", _png_upload_bytes(), "image/png")},
+        )
+        second = client.post(
+            "/v1/jobs",
+            headers={"X-Forwarded-For": "203.0.113.11"},
+            files={"file": ("second.png", _png_upload_bytes(), "image/png")},
+        )
+        assert first.status_code == 202
+        assert second.status_code == 202
+    finally:
+        manager.shutdown()
