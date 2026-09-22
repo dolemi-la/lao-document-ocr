@@ -36,6 +36,7 @@ Current OCR baseline:
 - repeated multi-page headers/footers exported into real Word header/footer parts
 - native PDF images/logos/figures preserved as real Word media assets (full-page scan backgrounds excluded)
 - conservative photo-like raster regions from scanned/image inputs preserved as Word media
+- line-art/diagram regions preserved as Word media after text/table/image masking
 
 The OCR engine is behind a small interface so it can be replaced by our own Lao recognizer without changing the API or exporters.
 

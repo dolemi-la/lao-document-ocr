@@ -8,9 +8,10 @@ from pathlib import Path
 import pymupdf
 from PIL import Image
 
+from lao_document_ocr.diagram_regions import detect_diagram_regions
 from lao_document_ocr.embedded_images import EmbeddedImageAsset, extract_pdf_embedded_images
 from lao_document_ocr.header_footer import mark_repeated_headers_footers
-from lao_document_ocr.models import Document, Page
+from lao_document_ocr.models import BlockType, Document, Page
 from lao_document_ocr.ocr.base import OcrEngine, OcrEngineError
 from lao_document_ocr.ocr.tesseract import TesseractEngine
 from lao_document_ocr.preprocessing import preprocess_image
@@ -149,16 +150,47 @@ def process_document(
         except OcrEngineError as exc:
             raise DocumentProcessingError(str(exc)) from exc
 
-        blocks = build_page_blocks(lines, cleaned)
-        blocks.extend(asset.to_block() for asset in loaded_page.embedded_images)
-        blocks.extend(
-            detect_raster_regions(
-                cleaned,
-                lines,
-                source_image=loaded_page.image,
-                exclude_boxes=[asset.bbox for asset in loaded_page.embedded_images],
-            )
+        semantic_blocks = build_page_blocks(lines, cleaned)
+        table_boxes = [
+            block.bbox
+            for block in semantic_blocks
+            if block.type == BlockType.TABLE and block.bbox is not None
+        ]
+        embedded_blocks = [
+            asset.to_block()
+            for asset in loaded_page.embedded_images
+        ]
+        embedded_boxes = [asset.bbox for asset in loaded_page.embedded_images]
+
+        raster_blocks = detect_raster_regions(
+            cleaned,
+            lines,
+            source_image=loaded_page.image,
+            exclude_boxes=[*table_boxes, *embedded_boxes],
         )
+        raster_boxes = [
+            block.bbox
+            for block in raster_blocks
+            if block.bbox is not None
+        ]
+
+        diagram_blocks = detect_diagram_regions(
+            cleaned,
+            lines,
+            source_image=loaded_page.image,
+            exclude_boxes=[
+                *table_boxes,
+                *embedded_boxes,
+                *raster_boxes,
+            ],
+        )
+
+        blocks = [
+            *semantic_blocks,
+            *embedded_blocks,
+            *raster_blocks,
+            *diagram_blocks,
+        ]
         blocks = order_blocks(blocks, page_width=cleaned.width)
 
         output_pages.append(

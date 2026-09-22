@@ -107,6 +107,10 @@ Extracts native image objects from PDF pages, normalizes them to PNG, maps their
 
 Masks recognized text and known native-PDF image rectangles, then detects dense photo/logo-like raster regions. It rejects near-full-page regions to avoid duplicating scan backgrounds and crops from the original color page for DOCX preservation.
 
+### `src/lao_document_ocr/diagram_regions.py`
+
+Detects compact edge-dense line-art regions after masking recognized text and excluding editable tables, native PDF images, and already-detected photo regions. Nearby line-art fragments merge conservatively when their geometry indicates one connected figure. The resulting image blocks reuse the normal DOCX media exporter.
+
 ### `src/lao_document_ocr/models.py`
 
 The canonical document AST.

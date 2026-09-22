@@ -78,7 +78,8 @@ Status: started
 - [x] repeated header/footer detection baseline and DOCX preservation
 - [x] native PDF embedded-image preservation baseline (excluding full-page scans)
 - [x] conservative photo-like raster-region detection for image/scanned inputs
-- [ ] general diagram/illustration segmentation
+- [x] deterministic line-art/diagram region preservation baseline
+- [ ] learned/general diagram/illustration segmentation
 - [x] layout/table AST benchmark metrics pipeline
 - [x] optional DOCX visual fidelity benchmark pipeline (LibreOffice renderer)
 
