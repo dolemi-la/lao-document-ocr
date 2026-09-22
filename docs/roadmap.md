@@ -67,8 +67,8 @@ Status: started
 - [x] general deterministic text-region detector interface/baseline
 - [ ] learned text-region detector
 - [x] heuristic heading hierarchy + body/list classification baseline
-- [x] conservative two-column reading-order baseline
-- [ ] general learned reading order
+- [x] conservative 2–4 column reading-order baseline
+- [ ] learned/general reading-order model
 - [x] simple ruled-table detection baseline
 - [x] row/column/cell structure for clear ruled grids
 - [x] conservative aligned-text borderless-table baseline

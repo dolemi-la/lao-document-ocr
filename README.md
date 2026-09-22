@@ -32,7 +32,7 @@ Current OCR baseline:
 - merged cells when interior ruled borders are clearly absent
 - conservative borderless aligned-text table reconstruction for strong row/column geometry
 - region-first text detection that isolates columns/sections before line OCR
-- conservative two-column reading order when a clear gutter exists
+- conservative 2–4 column reading order when clear gutters exist
 - repeated multi-page headers/footers exported into real Word header/footer parts
 - native PDF images/logos/figures preserved as real Word media assets (full-page scan backgrounds excluded)
 - conservative photo-like raster regions from scanned/image inputs preserved as Word media

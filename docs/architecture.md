@@ -85,7 +85,7 @@ Provides both the original whole-page line detector and region-aware line extrac
 
 ### `src/lao_document_ocr/reading_order.py`
 
-Applies conservative two-column reading order only when a clear central gutter separates at least two blocks per side. Ambiguous/spanning layouts keep normal top-to-bottom ordering instead of guessing.
+Applies conservative multi-column reading order for 2–4 columns. Candidate columns require repeated x-geometry, real gutters, at least two blocks per column, and overlapping vertical body ranges. Full-width headings/footers outside the body are preserved; spanning or ambiguous body blocks force a normal top-to-bottom fallback instead of guessing.
 
 ### `src/lao_document_ocr/layout_metrics.py`
 
