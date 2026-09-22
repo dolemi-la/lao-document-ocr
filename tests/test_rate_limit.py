@@ -82,3 +82,32 @@ def test_invalid_configuration_is_rejected() -> None:
         SlidingWindowRateLimiter(requests=1, window_seconds=0)
     with pytest.raises(ValueError, match="max_clients"):
         SlidingWindowRateLimiter(requests=1, window_seconds=60, max_clients=0)
+
+
+def test_rate_limit_cost_consumes_multiple_slots_atomically() -> None:
+    limiter = SlidingWindowRateLimiter(requests=5, window_seconds=60)
+
+    first = limiter.check("client-a", now=10.0, cost=3)
+    blocked = limiter.check("client-a", now=11.0, cost=3)
+    second = limiter.check("client-a", now=11.0, cost=2)
+
+    assert first.allowed is True
+    assert first.remaining == 2
+    assert blocked.allowed is False
+    assert second.allowed is True
+    assert second.remaining == 0
+
+
+def test_rate_limit_rejects_cost_larger_than_window_capacity() -> None:
+    limiter = SlidingWindowRateLimiter(requests=2, window_seconds=60)
+
+    decision = limiter.check("client-a", now=1.0, cost=3)
+
+    assert decision.allowed is False
+    assert limiter.snapshot()["tracked_clients"] == 1
+
+
+def test_rate_limit_rejects_invalid_cost() -> None:
+    limiter = SlidingWindowRateLimiter(requests=2, window_seconds=60)
+    with pytest.raises(ValueError, match="cost"):
+        limiter.check("client-a", cost=0)

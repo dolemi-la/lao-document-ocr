@@ -88,7 +88,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] bounded local async conversion jobs
 - [x] upload/page/active-job concurrency limits baseline
 - GPU worker option
-- batch processing
+- [x] atomic bounded batch job submission baseline
 - [x] cooperative job cancellation at page boundaries
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
 - [x] disabled-by-default per-client submission rate-limit baseline

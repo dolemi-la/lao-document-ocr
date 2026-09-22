@@ -2,6 +2,7 @@ from services.api.app.metrics import ApiMetrics, normalize_route
 
 
 def test_job_routes_are_normalized() -> None:
+    assert normalize_route("/v1/jobs/batch") == "/v1/jobs/batch"
     assert normalize_route("/v1/jobs/abc123") == "/v1/jobs/{job_id}"
     assert (
         normalize_route("/v1/jobs/abc123/download")

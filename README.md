@@ -146,6 +146,7 @@ The default web UI uses bounded background jobs for long conversions:
 
 ```text
 POST   /v1/jobs
+POST   /v1/jobs/batch
 GET    /v1/jobs/{job_id}
 DELETE /v1/jobs/{job_id}
 GET    /v1/jobs/{job_id}/download
@@ -191,6 +192,7 @@ Override them with:
 - `JOB_MAX_ACTIVE`
 - `JOB_RETENTION_SECONDS`
 - `JOB_ROOT`
+- `BATCH_MAX_FILES`
 - `RATE_LIMIT_REQUESTS` (0 disables the in-process limiter)
 - `RATE_LIMIT_WINDOW_SECONDS`
 - `RATE_LIMIT_MAX_CLIENTS`

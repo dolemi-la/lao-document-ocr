@@ -219,3 +219,62 @@ def test_snapshot_keeps_completed_counters_after_cleanup(tmp_path) -> None:
         assert snapshot_after["completed_total"]["succeeded"] == 1
     finally:
         manager.shutdown()
+
+
+def test_reserve_many_is_atomic_when_capacity_is_insufficient(tmp_path) -> None:
+    def runner(record, cancel_event):
+        output = record.workspace / "result.zip"
+        output.write_bytes(b"zip")
+        return output
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-batch-capacity",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        existing = manager.reserve("existing.png", ".png")
+        existing.input_path.write_bytes(b"image")
+
+        with pytest.raises(JobCapacityError, match="slot"):
+            manager.reserve_many(
+                [
+                    ("a.png", ".png"),
+                    ("b.png", ".png"),
+                ]
+            )
+
+        snapshot = manager.snapshot()
+        assert snapshot["active_jobs"] == 1
+        assert len(list((tmp_path / "jobs-batch-capacity").iterdir())) == 1
+    finally:
+        manager.shutdown()
+
+
+def test_reserve_many_creates_all_workspaces(tmp_path) -> None:
+    def runner(record, cancel_event):
+        output = record.workspace / "result.zip"
+        output.write_bytes(b"zip")
+        return output
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-batch",
+        runner,
+        max_workers=1,
+        max_active_jobs=4,
+    )
+    try:
+        records = manager.reserve_many(
+            [
+                ("a.png", ".png"),
+                ("b.pdf", ".pdf"),
+            ]
+        )
+        assert len(records) == 2
+        assert records[0].input_path.name == "input.png"
+        assert records[1].input_path.name == "input.pdf"
+        assert all(record.workspace.is_dir() for record in records)
+        assert manager.snapshot()["active_jobs"] == 2
+    finally:
+        manager.shutdown()

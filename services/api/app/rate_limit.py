@@ -57,7 +57,10 @@ class SlidingWindowRateLimiter:
         key: str,
         *,
         now: float | None = None,
+        cost: int = 1,
     ) -> RateLimitDecision:
+        if cost < 1:
+            raise ValueError("cost must be at least 1")
         if not self.enabled:
             return RateLimitDecision(
                 allowed=True,
@@ -84,10 +87,14 @@ class SlidingWindowRateLimiter:
 
             self._prune_queue(queue, cutoff)
 
-            if len(queue) >= self.requests:
-                retry_after = max(
-                    1,
-                    math.ceil(queue[0] + self.window_seconds - timestamp),
+            if cost > self.requests or len(queue) + cost > self.requests:
+                retry_after = (
+                    self.window_seconds
+                    if not queue
+                    else max(
+                        1,
+                        math.ceil(queue[0] + self.window_seconds - timestamp),
+                    )
                 )
                 return RateLimitDecision(
                     allowed=False,
@@ -95,7 +102,7 @@ class SlidingWindowRateLimiter:
                     retry_after_seconds=retry_after,
                 )
 
-            queue.append(timestamp)
+            queue.extend([timestamp] * cost)
             return RateLimitDecision(
                 allowed=True,
                 remaining=max(0, self.requests - len(queue)),

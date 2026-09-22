@@ -57,6 +57,7 @@ JOB_ROOT = Path(
 JOB_MAX_WORKERS = int(os.getenv("JOB_MAX_WORKERS", "2"))
 JOB_MAX_ACTIVE = int(os.getenv("JOB_MAX_ACTIVE", "8"))
 JOB_RETENTION_SECONDS = int(os.getenv("JOB_RETENTION_SECONDS", "3600"))
+BATCH_MAX_FILES = int(os.getenv("BATCH_MAX_FILES", "10"))
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "0"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
 RATE_LIMIT_MAX_CLIENTS = int(os.getenv("RATE_LIMIT_MAX_CLIENTS", "10000"))
@@ -140,8 +141,15 @@ def _client_rate_limit_key(request: Request) -> str:
     return "unknown"
 
 
-def _enforce_submission_rate_limit(request: Request) -> None:
-    decision = SUBMISSION_RATE_LIMITER.check(_client_rate_limit_key(request))
+def _enforce_submission_rate_limit(
+    request: Request,
+    *,
+    cost: int = 1,
+) -> None:
+    decision = SUBMISSION_RATE_LIMITER.check(
+        _client_rate_limit_key(request),
+        cost=cost,
+    )
     if decision.allowed:
         return
     raise HTTPException(
@@ -269,6 +277,7 @@ def health() -> dict:
             "max_workers": JOB_MAX_WORKERS,
             "max_active_jobs": JOB_MAX_ACTIVE,
             "retention_seconds": JOB_RETENTION_SECONDS,
+            "batch_max_files": BATCH_MAX_FILES,
         },
         "submission_rate_limit": SUBMISSION_RATE_LIMITER.snapshot(),
     }
@@ -365,6 +374,59 @@ async def create_conversion_job(
         JOB_MANAGER.discard(record.id)
         raise
     return JOB_MANAGER.public(record.id)
+
+
+@app.post("/v1/jobs/batch", status_code=202)
+async def create_conversion_batch(
+    request: Request,
+    files: Annotated[list[UploadFile], File(...)],
+) -> dict:
+    if not files:
+        raise HTTPException(status_code=422, detail="At least one file is required.")
+    if len(files) > BATCH_MAX_FILES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Batch exceeds {BATCH_MAX_FILES} file limit.",
+        )
+
+    prepared: list[tuple[UploadFile, str, str]] = []
+    for upload in files:
+        filename = _safe_filename(upload.filename)
+        suffix = _validate_suffix(filename)
+        prepared.append((upload, filename, suffix))
+
+    _enforce_submission_rate_limit(request, cost=len(prepared))
+
+    try:
+        records = JOB_MANAGER.reserve_many(
+            [(filename, suffix) for _, filename, suffix in prepared]
+        )
+    except JobCapacityError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+
+    try:
+        for (upload, _, _), record in zip(prepared, records, strict=True):
+            await _save_upload(upload, record.input_path)
+    except Exception:
+        for record in records:
+            JOB_MANAGER.discard(record.id)
+        raise
+
+    try:
+        for record in records:
+            JOB_MANAGER.enqueue(record.id)
+    except Exception:
+        for record in records:
+            try:
+                JOB_MANAGER.cancel(record.id)
+            except JobNotFoundError:
+                pass
+        raise
+
+    return {
+        "count": len(records),
+        "jobs": [JOB_MANAGER.public(record.id) for record in records],
+    }
 
 
 @app.get("/v1/jobs/{job_id}")

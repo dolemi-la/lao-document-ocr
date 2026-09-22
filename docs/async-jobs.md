@@ -45,6 +45,40 @@ Example:
 
 A very fast job may already be `running` or `succeeded` by the time the upload response is returned.
 
+## Batch submission
+
+Queue multiple documents atomically:
+
+```http
+POST /v1/jobs/batch
+Content-Type: multipart/form-data
+```
+
+Repeat the form field name `files` for every document.
+
+Example response:
+
+```json
+{
+  "count": 2,
+  "jobs": [
+    {"id": "...", "filename": "a.pdf", "status": "queued"},
+    {"id": "...", "filename": "b.png", "status": "queued"}
+  ]
+}
+```
+
+Batch rules:
+
+- default maximum: 10 files (`BATCH_MAX_FILES`)
+- every file type is validated before reservation
+- the whole batch must fit current active-job capacity
+- if capacity is insufficient, no jobs are reserved
+- if any upload fails before enqueue, all reserved batch workspaces are discarded
+- submission rate limiting charges one unit per document, not one unit per HTTP request
+
+Each returned job is polled/downloaded/cancelled through the normal per-job endpoints.
+
 ## Check status
 
 ```http

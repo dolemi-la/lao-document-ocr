@@ -10,6 +10,8 @@ _JOB_DETAIL = re.compile(r"^/v1/jobs/[^/]+$")
 
 
 def normalize_route(path: str) -> str:
+    if path == "/v1/jobs/batch":
+        return path
     if _JOB_DOWNLOAD.match(path):
         return "/v1/jobs/{job_id}/download"
     if _JOB_DETAIL.match(path):

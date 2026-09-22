@@ -110,26 +110,46 @@ class ConversionJobManager:
         self._duration_seconds_sum[status] += duration
         record.terminal_recorded = True
 
-    def reserve(self, filename: str, suffix: str) -> JobRecord:
+    def reserve_many(
+        self,
+        files: list[tuple[str, str]],
+    ) -> list[JobRecord]:
+        if not files:
+            raise ValueError("At least one job reservation is required")
         self.cleanup_expired()
         with self._lock:
-            if self._active_count() >= self.max_active_jobs:
+            active = self._active_count()
+            if active + len(files) > self.max_active_jobs:
+                available = max(0, self.max_active_jobs - active)
                 raise JobCapacityError(
-                    f"Job capacity reached ({self.max_active_jobs} active jobs)."
+                    "Job capacity reached "
+                    f"({available} slot(s) available, {len(files)} requested)."
                 )
 
-            job_id = uuid.uuid4().hex
-            workspace = self.root_dir / job_id
-            workspace.mkdir(parents=True, exist_ok=False)
-            input_path = workspace / f"input{suffix}"
-            record = JobRecord(
-                id=job_id,
-                filename=filename,
-                workspace=workspace,
-                input_path=input_path,
-            )
-            self._jobs[job_id] = record
-            return record
+            records: list[JobRecord] = []
+            try:
+                for filename, suffix in files:
+                    job_id = uuid.uuid4().hex
+                    workspace = self.root_dir / job_id
+                    workspace.mkdir(parents=True, exist_ok=False)
+                    input_path = workspace / f"input{suffix}"
+                    record = JobRecord(
+                        id=job_id,
+                        filename=filename,
+                        workspace=workspace,
+                        input_path=input_path,
+                    )
+                    self._jobs[job_id] = record
+                    records.append(record)
+            except Exception:
+                for record in records:
+                    self._jobs.pop(record.id, None)
+                    shutil.rmtree(record.workspace, ignore_errors=True)
+                raise
+            return records
+
+    def reserve(self, filename: str, suffix: str) -> JobRecord:
+        return self.reserve_many([(filename, suffix)])[0]
 
     def discard(self, job_id: str) -> None:
         with self._lock:

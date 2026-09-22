@@ -355,3 +355,145 @@ def test_forwarded_for_can_be_trusted_by_explicit_configuration(
         assert second.status_code == 202
     finally:
         manager.shutdown()
+
+
+def test_async_batch_submission_creates_multiple_jobs(tmp_path, monkeypatch) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    def runner(record, cancel_event):
+        path = record.workspace / f"{record.id}.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("result.txt", record.filename)
+        return path
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-batch-api",
+        runner,
+        max_workers=2,
+        max_active_jobs=4,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=0, window_seconds=60),
+    )
+    try:
+        response = client.post(
+            "/v1/jobs/batch",
+            files=[
+                ("files", ("a.png", _png_upload_bytes(), "image/png")),
+                ("files", ("b.png", _png_upload_bytes(), "image/png")),
+            ],
+        )
+        assert response.status_code == 202
+        payload = response.json()
+        assert payload["count"] == 2
+        assert [job["filename"] for job in payload["jobs"]] == ["a.png", "b.png"]
+        assert len({job["id"] for job in payload["jobs"]}) == 2
+
+        terminals = [_poll_job(client, job["id"]) for job in payload["jobs"]]
+        assert [item["status"] for item in terminals] == ["succeeded", "succeeded"]
+    finally:
+        manager.shutdown()
+
+
+def test_async_batch_capacity_rejection_is_atomic(tmp_path, monkeypatch) -> None:
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    def runner(record, cancel_event):
+        raise AssertionError("runner should not execute")
+
+    root = tmp_path / "jobs-batch-capacity-api"
+    manager = ConversionJobManager(
+        root,
+        runner,
+        max_workers=1,
+        max_active_jobs=1,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=0, window_seconds=60),
+    )
+    try:
+        response = client.post(
+            "/v1/jobs/batch",
+            files=[
+                ("files", ("a.png", _png_upload_bytes(), "image/png")),
+                ("files", ("b.png", _png_upload_bytes(), "image/png")),
+            ],
+        )
+        assert response.status_code == 429
+        assert manager.snapshot()["active_jobs"] == 0
+        assert list(root.iterdir()) == []
+    finally:
+        manager.shutdown()
+
+
+def test_async_batch_respects_batch_file_cap(tmp_path, monkeypatch) -> None:
+    import services.api.app.main as api_main
+
+    monkeypatch.setattr(api_main, "BATCH_MAX_FILES", 1)
+
+    response = client.post(
+        "/v1/jobs/batch",
+        files=[
+            ("files", ("a.png", _png_upload_bytes(), "image/png")),
+            ("files", ("b.png", _png_upload_bytes(), "image/png")),
+        ],
+    )
+
+    assert response.status_code == 413
+    assert "1 file limit" in response.json()["detail"]
+
+
+def test_async_batch_rate_limit_cost_is_per_document(tmp_path, monkeypatch) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+    from services.api.app.rate_limit import SlidingWindowRateLimiter
+
+    def runner(record, cancel_event):
+        path = record.workspace / "result.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("result.txt", "done")
+        return path
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-batch-rate-api",
+        runner,
+        max_workers=2,
+        max_active_jobs=4,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    monkeypatch.setattr(
+        api_main,
+        "SUBMISSION_RATE_LIMITER",
+        SlidingWindowRateLimiter(requests=2, window_seconds=60),
+    )
+    try:
+        batch = client.post(
+            "/v1/jobs/batch",
+            files=[
+                ("files", ("a.png", _png_upload_bytes(), "image/png")),
+                ("files", ("b.png", _png_upload_bytes(), "image/png")),
+            ],
+        )
+        assert batch.status_code == 202
+
+        extra = client.post(
+            "/v1/jobs",
+            files={"file": ("c.png", _png_upload_bytes(), "image/png")},
+        )
+        assert extra.status_code == 429
+    finally:
+        manager.shutdown()
