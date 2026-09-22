@@ -24,6 +24,7 @@ class OwnedRecognizerEngine(OcrEngine):
         model_path: str | Path | None = None,
         *,
         calibration_path: str | Path | None = None,
+        device: str = "cpu",
         recognizer: ImageLineRecognizer | None = None,
     ) -> None:
         if recognizer is not None:
@@ -40,6 +41,7 @@ class OwnedRecognizerEngine(OcrEngine):
             self.recognizer = ExportedLineRecognizer(
                 model_path,
                 calibration_path=calibration_path,
+                device=device,
             )
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
             raise OcrEngineError(f"Could not load owned recognizer: {exc}") from exc

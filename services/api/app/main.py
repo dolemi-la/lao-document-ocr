@@ -5,6 +5,7 @@ import os
 import tempfile
 import uuid
 import zipfile
+from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
@@ -59,8 +60,9 @@ MAX_PAGE_PIXELS = int(os.getenv("MAX_PAGE_PIXELS", "40000000"))
 OCR_ENGINE = os.getenv("OCR_ENGINE", "tesseract").strip().lower()
 OCR_LANGUAGES = os.getenv("OCR_LANGUAGES", "lao+eng")
 OCR_PSM = int(os.getenv("OCR_PSM", "3"))
-OCR_MODEL_PATH = os.getenv("OCR_MODEL_PATH")
-OCR_CALIBRATION_PATH = os.getenv("OCR_CALIBRATION_PATH")
+OCR_MODEL_PATH = os.getenv("OCR_MODEL_PATH") or None
+OCR_CALIBRATION_PATH = os.getenv("OCR_CALIBRATION_PATH") or None
+OCR_DEVICE = os.getenv("OCR_DEVICE", "cpu").strip().lower()
 JOB_ROOT = Path(
     os.getenv(
         "JOB_ROOT",
@@ -253,15 +255,29 @@ def _enforce_submission_rate_limit(
     )
 
 
+@lru_cache(maxsize=4)
+def _cached_owned_engine(
+    model_path: str,
+    calibration_path: str | None,
+    device: str,
+) -> OwnedRecognizerEngine:
+    return OwnedRecognizerEngine(
+        model_path,
+        calibration_path=calibration_path,
+        device=device,
+    )
+
+
 def _engine() -> OcrEngine:
     if OCR_ENGINE == "tesseract":
         return TesseractEngine(languages=OCR_LANGUAGES, psm=OCR_PSM)
     if OCR_ENGINE == "owned":
         if not OCR_MODEL_PATH:
             raise OcrEngineError("OCR_MODEL_PATH is required when OCR_ENGINE=owned")
-        return OwnedRecognizerEngine(
+        return _cached_owned_engine(
             OCR_MODEL_PATH,
-            calibration_path=OCR_CALIBRATION_PATH,
+            OCR_CALIBRATION_PATH,
+            OCR_DEVICE,
         )
     raise OcrEngineError(f"Unsupported OCR_ENGINE: {OCR_ENGINE}")
 

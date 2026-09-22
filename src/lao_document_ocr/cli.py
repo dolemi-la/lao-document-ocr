@@ -45,6 +45,11 @@ def _parser() -> argparse.ArgumentParser:
     convert.add_argument("--psm", type=int, default=3)
     convert.add_argument("--model", type=Path)
     convert.add_argument("--calibration", type=Path)
+    convert.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="cpu",
+    )
     convert.add_argument("--max-pages", type=int, default=60)
     convert.add_argument("--font", default="Noto Sans Lao")
 
@@ -281,6 +286,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     recognize.add_argument("--model", required=True, type=Path)
     recognize.add_argument("--image", required=True, type=Path)
+    recognize.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="cpu",
+    )
 
     recognizer_benchmark = subparsers.add_parser(
         "benchmark-recognizer",
@@ -291,6 +301,11 @@ def _parser() -> argparse.ArgumentParser:
     recognizer_benchmark.add_argument("--output", required=True, type=Path)
     recognizer_benchmark.add_argument("--no-hash-check", action="store_true")
     recognizer_benchmark.add_argument("--calibration", type=Path)
+    recognizer_benchmark.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="cpu",
+    )
 
     calibrate = subparsers.add_parser(
         "calibrate-recognizer",
@@ -316,6 +331,7 @@ def _convert_document(args: argparse.Namespace) -> int:
         engine = OwnedRecognizerEngine(
             args.model,
             calibration_path=args.calibration,
+            device=args.device,
         )
 
     outputs = convert_document_to_outputs(
@@ -678,7 +694,11 @@ def _recognize_line(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    recognizer = ExportedLineRecognizer(args.model, calibration_path=args.calibration)
+    recognizer = ExportedLineRecognizer(
+        args.model,
+        calibration_path=args.calibration,
+        device=args.device,
+    )
     result = recognizer.recognize(args.image)
     print(result.text)
     print(f"uncalibrated_confidence={result.confidence:.4f}", file=sys.stderr)
@@ -705,6 +725,7 @@ def _benchmark_recognizer(args: argparse.Namespace) -> int:
     recognizer = ExportedLineRecognizer(
         args.model,
         calibration_path=args.calibration,
+        device=args.device,
     )
     report = benchmark_recognizer(samples, recognizer)
     output = write_recognizer_report(report, args.output)

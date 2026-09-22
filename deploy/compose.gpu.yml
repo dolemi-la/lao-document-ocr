@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.owned-api
+      args:
+        TORCH_INDEX_URL: "${TORCH_INDEX_URL:-}"
+        INSTALL_S3: "${INSTALL_S3:-false}"
+    environment:
+      OCR_ENGINE: owned
+      OCR_DEVICE: "${OCR_DEVICE:-cuda}"
+      OCR_MODEL_PATH: /models/recognizer.pt2
+      OCR_CALIBRATION_PATH: "${OCR_CALIBRATION_PATH:-}"
+      JOB_MAX_WORKERS: "${GPU_JOB_MAX_WORKERS:-1}"
+      JOB_MAX_ACTIVE: "${GPU_JOB_MAX_ACTIVE:-4}"
+    volumes:
+      - "${OCR_MODEL_DIR:-./models}:/models:ro"
+    gpus: all

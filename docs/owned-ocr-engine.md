@@ -114,3 +114,7 @@ The current calibration target is observed character accuracy (`1 - CER`) using 
 The current line detector uses thresholding plus horizontal morphology.
 
 It exists so the project-owned recognizer can run through the complete document pipeline today. It should eventually be replaced or complemented by learned text/layout detection for difficult page structures.
+
+## Accelerator runtime
+
+Owned recognizer inference supports explicit CPU/CUDA/MPS/auto device selection. The API caches one model instance per model/calibration/device key. See [gpu-worker.md](gpu-worker.md).

@@ -29,6 +29,34 @@ def _sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def resolve_torch_device(requested: str = "cpu"):
+    torch = _require_torch()
+    device = requested.strip().lower()
+    if device == "auto":
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif (
+            hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        ):
+            device = "mps"
+        else:
+            device = "cpu"
+
+    if device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested but is not available.")
+    if device == "mps":
+        available = (
+            hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        )
+        if not available:
+            raise RuntimeError("MPS was requested but is not available.")
+    if device not in {"cpu", "cuda", "mps"}:
+        raise ValueError("device must be one of: cpu, cuda, mps, auto")
+    return torch.device(device)
+
+
 def _require_torch():
     try:
         import torch
@@ -46,6 +74,7 @@ class ExportedLineRecognizer:
         artifact_path: str | Path,
         *,
         calibration_path: str | Path | None = None,
+        device: str = "cpu",
     ) -> None:
         torch = _require_torch()
         self.artifact_path = Path(artifact_path)
@@ -59,7 +88,11 @@ class ExportedLineRecognizer:
         expected_sha256 = metadata.get("artifact_sha256")
         if expected_sha256 and _sha256_file(self.artifact_path) != expected_sha256:
             raise ValueError("Recognizer artifact SHA-256 does not match metadata")
-        self.metadata = metadata
+        self.device = resolve_torch_device(device)
+        self.metadata = {
+            **metadata,
+            "runtime_device": str(self.device),
+        }
 
         model_config = metadata["model_config"]
         self.image_height = int(model_config["image_height"])
@@ -72,20 +105,20 @@ class ExportedLineRecognizer:
         )
 
         exported = torch.export.load(str(self.artifact_path))
-        self.model = exported.module()
+        self.model = exported.module().to(self.device)
 
     def _recognize_array(self, array: np.ndarray, valid_width: int) -> RecognitionResult:
         torch = _require_torch()
         padded = np.zeros((1, self.image_height, self.max_width), dtype=np.float32)
         padded[:, :, :valid_width] = array
 
-        tensor = torch.from_numpy(padded).unsqueeze(0)
+        tensor = torch.from_numpy(padded).unsqueeze(0).to(self.device)
         with torch.no_grad():
             log_probs = self.model(tensor)
 
         valid_timesteps = max(1, valid_width // self.width_downsample_factor)
         valid_timesteps = min(valid_timesteps, int(log_probs.shape[0]))
-        valid = log_probs[:valid_timesteps, 0, :]
+        valid = log_probs[:valid_timesteps, 0, :].detach().cpu()
 
         probabilities = valid.exp()
         max_probabilities, token_ids = probabilities.max(dim=-1)

@@ -784,3 +784,39 @@ def test_build_result_storage_requires_s3_bucket(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="RESULT_STORAGE_S3_BUCKET"):
         api_main._build_result_storage()
+
+
+def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
+    import services.api.app.main as api_main
+
+    calls = []
+
+    class FakeOwnedEngine:
+        def __init__(self, model_path, *, calibration_path, device):
+            calls.append(
+                {
+                    "model_path": model_path,
+                    "calibration_path": calibration_path,
+                    "device": device,
+                }
+            )
+
+    api_main._cached_owned_engine.cache_clear()
+    monkeypatch.setattr(api_main, "OCR_ENGINE", "owned")
+    monkeypatch.setattr(api_main, "OCR_MODEL_PATH", "/models/recognizer.pt2")
+    monkeypatch.setattr(api_main, "OCR_CALIBRATION_PATH", "/models/calibration.json")
+    monkeypatch.setattr(api_main, "OCR_DEVICE", "cuda")
+    monkeypatch.setattr(api_main, "OwnedRecognizerEngine", FakeOwnedEngine)
+    try:
+        first = api_main._engine()
+        second = api_main._engine()
+        assert first is second
+        assert calls == [
+            {
+                "model_path": "/models/recognizer.pt2",
+                "calibration_path": "/models/calibration.json",
+                "device": "cuda",
+            }
+        ]
+    finally:
+        api_main._cached_owned_engine.cache_clear()

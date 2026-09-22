@@ -172,3 +172,18 @@ Do not horizontally scale the API behind a load balancer without replacing:
 with shared equivalents.
 
 S3 result storage alone does not make the job queue distributed.
+
+## GPU owned-recognizer preset
+
+For NVIDIA inference with the project-owned recognizer:
+
+```bash
+docker compose \
+  --env-file deploy/presets/gpu.env.example \
+  -f docker-compose.yml \
+  -f deploy/compose.public.yml \
+  -f deploy/compose.gpu.yml \
+  up --build -d
+```
+
+The preset uses `Dockerfile.owned-api`, mounts `./models` read-only, requests Docker GPU access, and defaults to one OCR worker. See [gpu-worker.md](gpu-worker.md).

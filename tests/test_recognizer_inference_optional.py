@@ -15,7 +15,10 @@ from lao_document_ocr.confidence_calibration import (  # noqa: E402
     CalibrationBin,
     ConfidenceCalibration,
 )
-from lao_document_ocr.recognizer_inference import ExportedLineRecognizer  # noqa: E402
+from lao_document_ocr.recognizer_inference import (  # noqa: E402
+    ExportedLineRecognizer,
+    resolve_torch_device,
+)
 from lao_document_ocr.recognizer_model import LaoCrnnRecognizer, RecognizerConfig  # noqa: E402
 from lao_document_ocr.vocabulary import CharacterVocabulary  # noqa: E402
 
@@ -65,6 +68,8 @@ def test_exported_recognizer_runs_fixed_width_artifact(tmp_path) -> None:
     recognizer = ExportedLineRecognizer(artifact)
     result = recognizer.recognize(image_path)
 
+    assert recognizer.device.type == "cpu"
+    assert recognizer.metadata["runtime_device"] == "cpu"
     assert isinstance(result.text, str)
     assert 0 <= result.confidence <= 1
     assert result.valid_timesteps > 0
@@ -137,3 +142,33 @@ def test_exported_recognizer_applies_calibration(tmp_path) -> None:
     recognizer = ExportedLineRecognizer(artifact, calibration_path=calibration_path)
     result = recognizer.recognize(image_path)
     assert result.calibrated_confidence == pytest.approx(0.42)
+
+
+def test_resolve_torch_device_cpu_and_invalid() -> None:
+    assert resolve_torch_device("cpu").type == "cpu"
+    with pytest.raises(ValueError, match="device must be one of"):
+        resolve_torch_device("tpu")
+
+
+def test_auto_device_resolves_to_available_backend() -> None:
+    device = resolve_torch_device("auto")
+    if torch.cuda.is_available():
+        assert device.type == "cuda"
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        assert device.type == "mps"
+    else:
+        assert device.type == "cpu"
+
+
+def test_unavailable_explicit_accelerator_has_clear_error() -> None:
+    if not torch.cuda.is_available():
+        with pytest.raises(RuntimeError, match="CUDA was requested"):
+            resolve_torch_device("cuda")
+
+    mps_available = (
+        hasattr(torch.backends, "mps")
+        and torch.backends.mps.is_available()
+    )
+    if not mps_available:
+        with pytest.raises(RuntimeError, match="MPS was requested"):
+            resolve_torch_device("mps")

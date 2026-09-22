@@ -188,6 +188,7 @@ Override them with:
 - `OCR_PSM`
 - `OCR_MODEL_PATH` (required for `OCR_ENGINE=owned`)
 - `OCR_CALIBRATION_PATH` (optional for the owned recognizer)
+- `OCR_DEVICE` (`cpu`, `cuda`, `mps`, or `auto`; default `cpu`)
 - `CORS_ORIGINS`
 - `JOB_MAX_WORKERS`
 - `JOB_MAX_ACTIVE`
