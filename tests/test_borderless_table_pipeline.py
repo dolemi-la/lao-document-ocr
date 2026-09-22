@@ -166,3 +166,58 @@ def test_borderless_vertical_merge_exports_as_word_vmerge(tmp_path) -> None:
 
     assert "vMerge" in xml
     assert "Team A" in xml
+
+
+class SparseBorderlessTableEngine(OcrEngine):
+    def is_available(self) -> bool:
+        return True
+
+    def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+        values = [
+            ("Name", 40, 80),
+            ("Role", 220, 80),
+            ("City", 400, 80),
+            ("Ana", 40, 125),
+            ("Dev", 220, 125),
+            ("VTE", 400, 125),
+            ("Kai", 40, 170),
+            ("PKZ", 400, 170),
+            ("Mia", 40, 215),
+            ("Ops", 220, 215),
+            ("SVK", 400, 215),
+        ]
+        return [
+            RecognizedLine(
+                text=text,
+                bbox=BoundingBox(x=x, y=y, width=70, height=24),
+                confidence=0.94,
+                block_id=index,
+                paragraph_id=index,
+                line_id=index,
+            )
+            for index, (text, x, y) in enumerate(values, start=1)
+        ]
+
+
+def test_sparse_borderless_table_exports_explicit_blank_word_cell(tmp_path) -> None:
+    from docx import Document as WordDocument
+
+    source = tmp_path / "borderless-sparse.png"
+    Image.new("RGB", (600, 300), "white").save(source)
+
+    document = process_document(source, engine=SparseBorderlessTableEngine())
+
+    assert len(document.pages[0].blocks) == 1
+    block = document.pages[0].blocks[0]
+    assert block.type == BlockType.TABLE
+    assert block.metadata["blank_cells"] == 1
+
+    path = export_docx(document, tmp_path / "borderless-sparse.docx")
+    word = WordDocument(path)
+    table = word.tables[0]
+
+    assert len(table.rows) == 4
+    assert len(table.columns) == 3
+    assert table.cell(2, 0).text == "Kai"
+    assert table.cell(2, 1).text == ""
+    assert table.cell(2, 2).text == "PKZ"

@@ -76,7 +76,8 @@ Status: started
 - [x] simple ruled-table detection baseline
 - [x] row/column/cell structure for clear ruled grids
 - [x] aligned-text borderless-table v2 baseline with stable anchors
-- [ ] general/complex borderless table detection
+- [x] complex aligned borderless-table baseline (spans + sparse blank cells)
+- [ ] learned/unstructured borderless table detection
 - [x] merged-cell baseline for clear ruled rectangular spans
 - [x] horizontal merged-cell baseline for aligned borderless tables
 - [x] vertical + rectangular merged-cell baseline for strongly aligned borderless tables

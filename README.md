@@ -31,6 +31,7 @@ Current OCR baseline:
 - conservative simple ruled-table reconstruction into editable Word tables
 - merged cells when interior ruled borders are clearly absent
 - vertical/rectangular merged cells in borderless tables when tall cell geometry clearly spans later row bands
+- sparse blank cells in strongly anchored 3+ column borderless tables
 - borderless aligned-text table reconstruction with stable column anchors and horizontal merged headers
 - region-first text detection that isolates columns/sections before line OCR
 - conservative 2–4 column reading order when clear gutters exist

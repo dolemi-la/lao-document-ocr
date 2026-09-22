@@ -43,6 +43,7 @@ class BorderlessSchema:
     column_count: int
     anchors: tuple[float, ...]
     rows: tuple[tuple[RowCellAssignment, ...], ...]
+    blank_cells: tuple[tuple[int, int], ...] = ()
 
 
 def _cluster_rows(lines: list[RecognizedLine]) -> list[TextRow]:
@@ -210,11 +211,16 @@ def _assign_rows(
     anchors: tuple[float, ...],
     *,
     page_width: int,
-) -> tuple[tuple[RowCellAssignment, ...], ...] | None:
+    allow_blank_cells: bool = False,
+) -> tuple[
+    tuple[tuple[RowCellAssignment, ...], ...],
+    tuple[tuple[int, int], ...],
+] | None:
     column_count = len(anchors)
     tolerance = max(14, int(page_width * 0.025))
     assigned_rows: list[tuple[RowCellAssignment, ...]] = []
     spanning_columns: dict[int, set[int]] = {}
+    blank_cells: list[tuple[int, int]] = []
 
     for row_index, row in enumerate(rows):
         assignments: list[RowCellAssignment] = []
@@ -241,7 +247,6 @@ def _assign_rows(
 
         assignments.sort(key=lambda item: item.column)
         covered_columns = set(spanning_columns.get(row_index, set()))
-        has_span = bool(covered_columns)
 
         for assignment in assignments:
             columns = set(
@@ -253,11 +258,6 @@ def _assign_rows(
             if covered_columns & columns:
                 return None
             covered_columns.update(columns)
-            has_span = (
-                has_span
-                or assignment.column_span > 1
-                or assignment.row_span > 1
-            )
 
             for future_row in range(
                 row_index + 1,
@@ -274,15 +274,24 @@ def _assign_rows(
                     return None
                 future_columns.update(columns)
 
-        if covered_columns != set(range(column_count)):
-            return None
+        missing_columns = set(range(column_count)) - covered_columns
+        if missing_columns:
+            if (
+                not allow_blank_cells
+                or len(missing_columns) != 1
+                or len(assignments) < 2
+            ):
+                return None
+            blank_column = next(iter(missing_columns))
+            blank_cells.append((row_index, blank_column))
+            covered_columns.add(blank_column)
 
-        if len(assignments) < column_count and not has_span:
+        if covered_columns != set(range(column_count)):
             return None
 
         assigned_rows.append(tuple(assignments))
 
-    return tuple(assigned_rows)
+    return tuple(assigned_rows), tuple(blank_cells)
 
 
 def _valid_two_column_value_pattern(
@@ -353,18 +362,30 @@ def _infer_schema(
     ):
         return None
 
-    assignments = _assign_rows(
+    full_row_count = sum(
+        len(row.lines) == column_count
+        for row in rows
+    )
+    allow_blank_cells = (
+        column_count >= 3
+        and len(rows) >= 4
+        and full_row_count >= 3
+    )
+    assignment_result = _assign_rows(
         rows,
         anchors,
         page_width=page_width,
+        allow_blank_cells=allow_blank_cells,
     )
-    if assignments is None:
+    if assignment_result is None:
         return None
+    assignments, blank_cells = assignment_result
 
     return BorderlessSchema(
         column_count=column_count,
         anchors=anchors,
         rows=assignments,
+        blank_cells=blank_cells,
     )
 
 
@@ -398,6 +419,15 @@ def _block_from_schema(
             if assignment.column_span > 1 or assignment.row_span > 1:
                 merged_cells += 1
 
+    for row_index, column_index in schema.blank_cells:
+        cells.append(
+            TableCell(
+                row=row_index,
+                column=column_index,
+                text="",
+            )
+        )
+
     confidence = (
         sum(line.confidence for line in all_lines)
         / len(all_lines)
@@ -419,6 +449,7 @@ def _block_from_schema(
             "rows": len(rows),
             "columns": schema.column_count,
             "merged_cells": merged_cells,
+            "blank_cells": len(schema.blank_cells),
             "merge_support": (
                 "horizontal+vertical"
                 if any(

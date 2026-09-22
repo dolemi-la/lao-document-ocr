@@ -222,3 +222,53 @@ def test_detects_rectangular_borderless_row_and_column_span() -> None:
     assert merged.column_span == 2
     assert block.metadata["merged_cells"] == 1
     assert block.metadata["merge_support"] == "horizontal+vertical"
+
+
+def test_detects_single_blank_cell_in_strong_three_column_schema() -> None:
+    lines = [
+        _line("Name", 40, 80, width=70, line_id=1),
+        _line("Role", 220, 80, width=70, line_id=2),
+        _line("City", 400, 80, width=70, line_id=3),
+        _line("Ana", 40, 125, width=70, line_id=4),
+        _line("Dev", 220, 125, width=70, line_id=5),
+        _line("VTE", 400, 125, width=70, line_id=6),
+        _line("Kai", 40, 170, width=70, line_id=7),
+        _line("PKZ", 400, 170, width=70, line_id=8),
+        _line("Mia", 40, 215, width=70, line_id=9),
+        _line("Ops", 220, 215, width=70, line_id=10),
+        _line("SVK", 400, 215, width=70, line_id=11),
+    ]
+
+    remaining, blocks = detect_borderless_tables(lines, page_width=600)
+
+    assert remaining == []
+    assert len(blocks) == 1
+    block = blocks[0]
+    assert block.metadata["blank_cells"] == 1
+    blank = next(
+        cell
+        for cell in block.cells
+        if cell.row == 2 and cell.column == 1
+    )
+    assert blank.text == ""
+    assert blank.row_span == 1
+    assert blank.column_span == 1
+
+
+def test_two_column_missing_cell_remains_ambiguous_even_with_many_full_rows() -> None:
+    lines = [
+        _line("Item", 70, 80, line_id=1),
+        _line("Amount", 330, 80, line_id=2),
+        _line("Coffee", 70, 125, line_id=3),
+        _line("20,000 ₭", 330, 125, line_id=4),
+        _line("Tea", 70, 170, line_id=5),
+        _line("Water", 70, 215, line_id=6),
+        _line("5,000 ₭", 330, 215, line_id=7),
+        _line("Juice", 70, 260, line_id=8),
+        _line("8,000 ₭", 330, 260, line_id=9),
+    ]
+
+    remaining, blocks = detect_borderless_tables(lines, page_width=600)
+
+    assert blocks == []
+    assert remaining == lines
