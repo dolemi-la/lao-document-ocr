@@ -114,3 +114,45 @@ The next learned-layout stage can consume this JSONL manifest and derive model t
 - table-cell graphs
 
 The reviewed AST should remain unchanged when experimenting with different model architectures.
+
+## Generate model targets
+
+Convert the reviewed AST labels into model-ready categorical masks and box/class targets:
+
+```bash
+lao-ocr prepare-layout-targets \
+  --training-manifest training/layout/layout-training.jsonl \
+  --dataset-root benchmarks/public \
+  --output training/layout/targets
+```
+
+Output:
+
+```text
+targets/
+├── classes.json
+├── targets.jsonl
+├── masks/
+│   └── <sample-id>.png
+└── boxes/
+    └── <sample-id>.json
+```
+
+The fixed class map is:
+
+```json
+{
+  "background": 0,
+  "heading": 1,
+  "paragraph": 2,
+  "list": 3,
+  "table": 4,
+  "image": 5
+}
+```
+
+Masks use the original page dimensions and fill each reviewed block bbox with its semantic class ID. The box JSON preserves class, bbox, and AST reading-order index.
+
+If two different semantic classes overlap, target generation fails rather than silently choosing one label. This is an annotation-quality signal that should be resolved in the reviewed AST.
+
+The target step also reopens the source image and checks its dimensions against the layout annotation, protecting against stale/moved manifests.

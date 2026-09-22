@@ -81,6 +81,14 @@ def _parser() -> argparse.ArgumentParser:
         help="Repeat to select splits. Omit to include all labeled splits.",
     )
 
+    layout_targets = subparsers.add_parser(
+        "prepare-layout-targets",
+        help="Generate categorical masks and box targets from a layout-training manifest.",
+    )
+    layout_targets.add_argument("--training-manifest", required=True, type=Path)
+    layout_targets.add_argument("--dataset-root", required=True, type=Path)
+    layout_targets.add_argument("--output", required=True, type=Path)
+
     intake = subparsers.add_parser(
         "add-dataset-sample",
         help="Copy a rights-cleared benchmark page into the public dataset.",
@@ -425,6 +433,37 @@ def _prepare_layout_training_manifest(args: argparse.Namespace) -> int:
     summary = summarize_layout_training_entries(entries)
     print(f"Layout training manifest: {output}")
     print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
+
+
+def _prepare_layout_targets(args: argparse.Namespace) -> int:
+    from lao_document_ocr.layout_targets import (
+        LAYOUT_CLASS_IDS,
+        write_layout_target_artifacts,
+        write_layout_target_manifest,
+    )
+    from lao_document_ocr.layout_training_manifest import (
+        load_layout_training_manifest,
+    )
+
+    entries = load_layout_training_manifest(args.training_manifest)
+    artifacts = [
+        write_layout_target_artifacts(
+            sample_id=entry.id,
+            image_path=entry.image,
+            layout_ground_truth_path=entry.layout_ground_truth,
+            split=entry.split,
+            subset=entry.subset,
+            tags=entry.tags,
+            dataset_root=args.dataset_root,
+            output_dir=args.output,
+        )
+        for entry in entries
+    ]
+    manifest = write_layout_target_manifest(artifacts, args.output)
+    print(f"Layout targets: {manifest}")
+    print(f"Samples: {len(artifacts)}")
+    print(json.dumps(LAYOUT_CLASS_IDS, indent=2, sort_keys=True))
     return 0
 
 
@@ -803,6 +842,8 @@ def main() -> int:
             return _dataset_report(args)
         if args.command == "prepare-layout-training-manifest":
             return _prepare_layout_training_manifest(args)
+        if args.command == "prepare-layout-targets":
+            return _prepare_layout_targets(args)
         if args.command == "add-dataset-sample":
             return _add_dataset_sample(args)
         if args.command == "benchmark-layout":

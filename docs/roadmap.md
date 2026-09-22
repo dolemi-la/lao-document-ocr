@@ -28,6 +28,7 @@ Status: in progress
 - [x] benchmark source review registry/policy
 - [x] optional reviewed layout AST labels in dataset manifests + coverage reporting
 - [x] reproducible layout-training manifest from reviewed AST labels
+- [x] categorical mask + ordered box targets from reviewed layout ASTs
 - [x] dataset coverage/integrity report + duplicate-image detection
 - [x] multi-axis benchmark tags and per-tag CER/WER
 - [x] structured printable capture templates for multi-column/table/receipt/form collection

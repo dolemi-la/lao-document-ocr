@@ -732,3 +732,90 @@ def test_prepare_layout_training_manifest_cli(
     captured = capsys.readouterr().out
     assert "Layout training manifest:" in captured
     assert '"samples": 1' in captured
+
+
+def test_prepare_layout_targets_cli(tmp_path, monkeypatch, capsys) -> None:
+    from lao_document_ocr.layout_ground_truth import write_layout_ground_truth
+    from lao_document_ocr.models import Block, BlockType, BoundingBox, Document, Page
+
+    image = tmp_path / "data" / "clean-print" / "target-cli.png"
+    layout = tmp_path / "layout-ground-truth" / "clean-print" / "target-cli.json"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    layout.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (120, 80), "white").save(image)
+    write_layout_ground_truth(
+        Document(
+            pages=[
+                Page(
+                    number=1,
+                    width=120,
+                    height=80,
+                    blocks=[
+                        Block(
+                            type=BlockType.PARAGRAPH,
+                            text="Body",
+                            bbox=BoundingBox(
+                                x=10,
+                                y=10,
+                                width=90,
+                                height=30,
+                            ),
+                        )
+                    ],
+                )
+            ]
+        ),
+        layout,
+    )
+    training_manifest = tmp_path / "layout-training.jsonl"
+    training_manifest.write_text(
+        json.dumps(
+            {
+                "id": "target-cli",
+                "document_id": "target-cli-doc",
+                "image": "data/clean-print/target-cli.png",
+                "layout_ground_truth": (
+                    "layout-ground-truth/clean-print/target-cli.json"
+                ),
+                "split": "train",
+                "subset": "clean-print",
+                "tags": ["layout:plain"],
+                "sha256": None,
+                "width": 120,
+                "height": 80,
+                "block_counts": {"paragraph": 1},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "targets"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "prepare-layout-targets",
+            "--training-manifest",
+            str(training_manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(
+        (output / "targets.jsonl").read_text(encoding="utf-8")
+    )
+    assert payload["id"] == "target-cli"
+    assert payload["mask"] == "masks/target-cli.png"
+    assert payload["boxes"] == "boxes/target-cli.json"
+    assert (output / payload["mask"]).is_file()
+    assert (output / payload["boxes"]).is_file()
+    assert (output / "classes.json").is_file()
+    captured = capsys.readouterr().out
+    assert "Layout targets:" in captured
+    assert "Samples: 1" in captured

@@ -130,3 +130,106 @@ def summarize_layout_training_entries(
         "by_tag": dict(sorted(by_tag.items())),
         "by_block_type": dict(sorted(by_block_type.items())),
     }
+
+
+def _safe_relative_manifest_path(value: str, field: str) -> str:
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError(
+            f"layout training {field} must be a safe relative path"
+        )
+    return path.as_posix()
+
+
+def load_layout_training_manifest(
+    path: str | Path,
+) -> list[LayoutTrainingEntry]:
+    source = Path(path)
+    try:
+        lines = source.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ValueError(
+            f"Could not read layout training manifest: {exc}"
+        ) from exc
+
+    entries: list[LayoutTrainingEntry] = []
+    seen_ids: set[str] = set()
+    for line_number, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Invalid layout training manifest JSON at line {line_number}: {exc}"
+            ) from exc
+
+        try:
+            sample_id = str(payload["id"])
+            document_id = str(payload["document_id"])
+            image = _safe_relative_manifest_path(
+                str(payload["image"]),
+                "image",
+            )
+            layout_ground_truth = _safe_relative_manifest_path(
+                str(payload["layout_ground_truth"]),
+                "layout_ground_truth",
+            )
+            split = str(payload["split"])
+            subset = str(payload["subset"])
+            width = int(payload["width"])
+            height = int(payload["height"])
+            tags = tuple(str(tag) for tag in payload.get("tags", []))
+            block_counts = {
+                str(name): int(count)
+                for name, count in dict(payload.get("block_counts", {})).items()
+            }
+            sha256 = payload.get("sha256")
+            if sha256 is not None:
+                sha256 = str(sha256)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Invalid layout training manifest entry at line {line_number}: {exc}"
+            ) from exc
+
+        if not sample_id or not document_id:
+            raise ValueError(
+                f"Invalid layout training manifest entry at line {line_number}: "
+                "id/document_id must not be empty"
+            )
+        if width < 1 or height < 1:
+            raise ValueError(
+                f"Invalid layout training manifest entry at line {line_number}: "
+                "width/height must be positive"
+            )
+        if any(count < 0 for count in block_counts.values()):
+            raise ValueError(
+                f"Invalid layout training manifest entry at line {line_number}: "
+                "block counts must be non-negative"
+            )
+        if sample_id in seen_ids:
+            raise ValueError(
+                f"Duplicate layout training sample id: {sample_id}"
+            )
+        seen_ids.add(sample_id)
+
+        entries.append(
+            LayoutTrainingEntry(
+                id=sample_id,
+                document_id=document_id,
+                image=image,
+                layout_ground_truth=layout_ground_truth,
+                split=split,
+                subset=subset,
+                tags=tags,
+                sha256=sha256,
+                width=width,
+                height=height,
+                block_counts=block_counts,
+            )
+        )
+
+    if not entries:
+        raise ValueError("Layout training manifest contains no samples")
+    return entries

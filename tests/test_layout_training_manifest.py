@@ -7,6 +7,7 @@ from lao_document_ocr.dataset import load_manifest
 from lao_document_ocr.layout_ground_truth import write_layout_ground_truth
 from lao_document_ocr.layout_training_manifest import (
     build_layout_training_entries,
+    load_layout_training_manifest,
     summarize_layout_training_entries,
     write_layout_training_manifest,
 )
@@ -153,3 +154,46 @@ def test_layout_training_manifest_writes_jsonl_and_summary(tmp_path) -> None:
     assert summary["by_split"] == {"dev": 1, "train": 1}
     assert summary["by_block_type"] == {"heading": 1, "paragraph": 1}
     assert summary["by_tag"] == {"layout:plain": 2}
+
+
+def test_layout_training_manifest_loader_round_trip(tmp_path) -> None:
+    samples = load_manifest(_manifest(tmp_path))
+    entries = build_layout_training_entries(samples, tmp_path)
+    output = write_layout_training_manifest(
+        entries,
+        tmp_path / "loader.jsonl",
+    )
+
+    loaded = load_layout_training_manifest(output)
+
+    assert loaded == entries
+
+
+def test_layout_training_manifest_loader_rejects_unsafe_paths(tmp_path) -> None:
+    path = tmp_path / "unsafe.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "id": "unsafe",
+                "document_id": "unsafe-doc",
+                "image": "../escape.png",
+                "layout_ground_truth": "layout.json",
+                "split": "train",
+                "subset": "clean-print",
+                "tags": [],
+                "sha256": None,
+                "width": 100,
+                "height": 50,
+                "block_counts": {},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        load_layout_training_manifest(path)
+    except ValueError as exc:
+        assert "safe relative path" in str(exc)
+    else:
+        raise AssertionError("Expected unsafe layout training path to fail")
