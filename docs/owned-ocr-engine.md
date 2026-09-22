@@ -148,3 +148,9 @@ OCR_LAYOUT_CONFIDENCE=0.55
 ```
 
 The learned detector is experimental and should remain opt-in until it beats the deterministic baseline on the fixed layout benchmark. See [layout-model-training.md](layout-model-training.md).
+
+## Semantic region hints
+
+When `OCR_LAYOUT_DETECTOR=learned`, layout regions retain their semantic class (`heading`, `paragraph`, `list`, `table`) through line detection and OCR. Lines from one detected region share a stable block/paragraph ID, so multi-line learned paragraphs/lists remain grouped in the AST.
+
+The hints are applied conservatively and do not fabricate missing table cells or list markers.

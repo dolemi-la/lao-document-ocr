@@ -7,13 +7,14 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from lao_document_ocr.models import BoundingBox
+from lao_document_ocr.models import BlockType, BoundingBox
 
 
 @dataclass(frozen=True)
 class TextRegion:
     bbox: BoundingBox
     detector: str = "morphology-region-v1"
+    semantic_type: BlockType | None = None
 
 
 class TextRegionDetector(Protocol):

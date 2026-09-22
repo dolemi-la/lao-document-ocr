@@ -6,7 +6,7 @@ from typing import Any
 
 from PIL import Image
 
-from lao_document_ocr.models import BoundingBox
+from lao_document_ocr.models import BlockType, BoundingBox
 
 
 class OcrEngineError(RuntimeError):
@@ -21,6 +21,7 @@ class RecognizedLine:
     block_id: int
     paragraph_id: int
     line_id: int
+    semantic_type: BlockType | None = None
 
 
 class OcrEngine(ABC):

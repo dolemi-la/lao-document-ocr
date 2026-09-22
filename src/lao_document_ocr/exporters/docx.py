@@ -57,16 +57,24 @@ def _add_block(word: WordDocument, block: Block, font_name: str) -> None:
         return
 
     if block.type == BlockType.LIST:
-        style = (
-            "List Number"
-            if block.metadata.get("list_style") == "ordered"
-            else "List Bullet"
-        )
+        list_style = block.metadata.get("list_style")
         items = block.metadata.get("items")
         if not isinstance(items, list) or not items:
             items = block.text.splitlines()
+
+        if list_style == "ordered":
+            style = "List Number"
+        elif list_style == "bullet":
+            style = "List Bullet"
+        else:
+            style = None
+
         for item in items:
-            paragraph = word.add_paragraph(style=style)
+            paragraph = (
+                word.add_paragraph(style=style)
+                if style is not None
+                else word.add_paragraph()
+            )
             _add_text(paragraph, str(item), font_name)
         return
 

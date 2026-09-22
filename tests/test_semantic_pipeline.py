@@ -172,3 +172,104 @@ def test_markdown_list_style_uses_clean_items() -> None:
     assert "- Alpha" in markdown
     assert "- Beta" in markdown
     assert "- 1. First" not in markdown
+
+
+def test_learned_heading_hint_promotes_normal_height_text() -> None:
+    lines = [
+        RecognizedLine(
+            text="Learned heading",
+            bbox=BoundingBox(x=50, y=50, width=320, height=20),
+            confidence=0.95,
+            block_id=1,
+            paragraph_id=1,
+            line_id=1,
+            semantic_type=BlockType.HEADING,
+        ),
+        RecognizedLine(
+            text="Normal body",
+            bbox=BoundingBox(x=50, y=120, width=320, height=20),
+            confidence=0.95,
+            block_id=2,
+            paragraph_id=2,
+            line_id=1,
+            semantic_type=BlockType.PARAGRAPH,
+        ),
+    ]
+
+    blocks = build_blocks(lines)
+
+    assert blocks[0].type == BlockType.HEADING
+    assert blocks[0].metadata["semantic_hint"] == "heading"
+    assert blocks[0].metadata["semantic_hint_source"] == "learned-layout"
+    assert blocks[1].type == BlockType.PARAGRAPH
+
+
+def test_learned_unresolved_list_and_table_preserve_semantics_without_structure() -> None:
+    lines = [
+        RecognizedLine(
+            text="First item",
+            bbox=BoundingBox(x=50, y=50, width=220, height=20),
+            confidence=0.95,
+            block_id=1,
+            paragraph_id=1,
+            line_id=1,
+            semantic_type=BlockType.LIST,
+        ),
+        RecognizedLine(
+            text="Second item",
+            bbox=BoundingBox(x=50, y=80, width=220, height=20),
+            confidence=0.95,
+            block_id=1,
+            paragraph_id=1,
+            line_id=2,
+            semantic_type=BlockType.LIST,
+        ),
+        RecognizedLine(
+            text="Unresolved table text",
+            bbox=BoundingBox(x=50, y=160, width=320, height=20),
+            confidence=0.95,
+            block_id=2,
+            paragraph_id=2,
+            line_id=1,
+            semantic_type=BlockType.TABLE,
+        ),
+    ]
+
+    blocks = build_blocks(lines)
+
+    assert blocks[0].type == BlockType.LIST
+    assert blocks[0].metadata["list_style"] == "unresolved"
+    assert blocks[0].metadata["items"] == ["First item", "Second item"]
+    assert blocks[1].type == BlockType.TABLE
+    assert blocks[1].cells == []
+    assert blocks[1].metadata["structure_status"] == "unresolved"
+
+
+def test_unresolved_learned_list_export_does_not_invent_markers(tmp_path) -> None:
+    block = Block(
+        type=BlockType.LIST,
+        text="First item\nSecond item",
+        metadata={
+            "list_style": "unresolved",
+            "items": ["First item", "Second item"],
+            "semantic_hint": "list",
+        },
+    )
+    document = Document(
+        pages=[Page(number=1, width=600, height=800, blocks=[block])]
+    )
+
+    path = export_docx(document, tmp_path / "unresolved-list.docx")
+    word = WordDocument(path)
+    paragraphs = [paragraph for paragraph in word.paragraphs if paragraph.text]
+    assert [paragraph.text for paragraph in paragraphs] == [
+        "First item",
+        "Second item",
+    ]
+    assert all(paragraph.style.name == "Normal" for paragraph in paragraphs)
+
+    markdown = document_to_markdown(document)
+    assert "First item" in markdown
+    assert "Second item" in markdown
+    assert "- First item" not in markdown
+    assert "1. First item" not in markdown

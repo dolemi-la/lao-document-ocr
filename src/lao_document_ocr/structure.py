@@ -10,7 +10,7 @@ from lao_document_ocr.models import Block, BoundingBox
 from lao_document_ocr.normalization import normalize_lao_text
 from lao_document_ocr.ocr.base import RecognizedLine
 from lao_document_ocr.reading_order import order_blocks
-from lao_document_ocr.semantic import classify_paragraph
+from lao_document_ocr.semantic import apply_semantic_hint, classify_paragraph
 from lao_document_ocr.table_detection import (
     build_table_block,
     detect_ruled_tables,
@@ -44,6 +44,11 @@ def build_blocks(lines: list[RecognizedLine]) -> list[Block]:
 
         confidence = sum(line.confidence for line in paragraph_lines) / len(paragraph_lines)
         classification = classify_paragraph(
+            paragraph_lines,
+            typical_height=typical_height,
+        )
+        classification = apply_semantic_hint(
+            classification,
             paragraph_lines,
             typical_height=typical_height,
         )

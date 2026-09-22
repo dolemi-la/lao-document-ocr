@@ -33,9 +33,16 @@ Classes:
 }
 ```
 
-The first runtime use is text-region detection: heading/paragraph/list/table classes are combined into a text-region mask and converted into page regions for downstream line detection + OCR.
+At runtime, heading/paragraph/list/table classes are converted into **separate class-aware regions** rather than one generic text mask. Region-aware line detection preserves the region ID, local line order, and semantic hint into `RecognizedLine`.
 
-The semantic class map remains available in the exported model metadata for future direct semantic-block inference.
+Document structure then uses those hints conservatively:
+
+- learned heading hints can promote otherwise-normal text to a heading while heuristic height still selects heading level;
+- learned paragraph hints are recorded without demoting strong heuristic headings;
+- learned list hints create an unresolved list only when explicit OCR list markers are absent; exporters do not invent bullets/numbers for unresolved lists;
+- learned table hints create an unresolved table region only when ruled/borderless geometry has not already reconstructed real cells.
+
+Strong explicit list markers and geometric table reconstruction remain authoritative.
 
 ## Prerequisites
 

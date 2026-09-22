@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
 from PIL import Image
 
-from lao_document_ocr.models import BoundingBox
+from lao_document_ocr.models import BlockType, BoundingBox
+
+
+@dataclass(frozen=True)
+class DetectedTextLine:
+    bbox: BoundingBox
+    region_id: int
+    line_id: int
+    semantic_type: BlockType | None = None
+    detector: str | None = None
 
 
 def _merge_line_boxes(
@@ -136,17 +147,12 @@ def _offset_box(box: BoundingBox, *, offset_x: int, offset_y: int) -> BoundingBo
     )
 
 
-def detect_region_aware_lines(
+def detect_region_aware_line_records(
     image: Image.Image,
     *,
     region_detector=None,
-) -> list[BoundingBox]:
-    """Detect text lines inside independent text regions.
-
-    Region-first detection keeps neighboring columns/sections from influencing
-    the line morphology kernel. If no regions are found, the legacy whole-page
-    line detector remains the fallback.
-    """
+) -> list[DetectedTextLine]:
+    """Detect text lines inside regions while preserving semantic hints."""
     if region_detector is None:
         from lao_document_ocr.text_regions import MorphologyTextRegionDetector
 
@@ -154,10 +160,20 @@ def detect_region_aware_lines(
 
     regions = region_detector.detect(image)
     if not regions:
-        return detect_text_lines(image)
+        return [
+            DetectedTextLine(
+                bbox=box,
+                region_id=index,
+                line_id=1,
+            )
+            for index, box in enumerate(
+                detect_text_lines(image),
+                start=1,
+            )
+        ]
 
-    lines: list[BoundingBox] = []
-    for region in regions:
+    lines: list[DetectedTextLine] = []
+    for region_index, region in enumerate(regions, start=1):
         box = region.bbox
         crop = image.crop(
             (
@@ -173,12 +189,36 @@ def detect_region_aware_lines(
             merge_gap_multiplier=3.5,
         )
         lines.extend(
-            _offset_box(
-                local,
-                offset_x=box.x,
-                offset_y=box.y,
+            DetectedTextLine(
+                bbox=_offset_box(
+                    local,
+                    offset_x=box.x,
+                    offset_y=box.y,
+                ),
+                region_id=region_index,
+                line_id=line_index,
+                semantic_type=region.semantic_type,
+                detector=region.detector,
             )
-            for local in local_lines
+            for line_index, local in enumerate(local_lines, start=1)
         )
 
-    return sorted(lines, key=lambda box: (box.y, box.x))
+    return sorted(
+        lines,
+        key=lambda line: (line.bbox.y, line.bbox.x),
+    )
+
+
+def detect_region_aware_lines(
+    image: Image.Image,
+    *,
+    region_detector=None,
+) -> list[BoundingBox]:
+    """Backward-compatible region-aware line boxes without semantic metadata."""
+    return [
+        line.bbox
+        for line in detect_region_aware_line_records(
+            image,
+            region_detector=region_detector,
+        )
+    ]

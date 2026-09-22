@@ -95,3 +95,38 @@ def test_fallback_detector_uses_secondary_only_when_primary_empty() -> None:
     ]
     assert primary.calls == 2
     assert fallback.calls == 1
+
+
+def test_region_aware_line_records_keep_region_group_and_semantic_type() -> None:
+    from lao_document_ocr.line_detection import detect_region_aware_line_records
+    from lao_document_ocr.models import BlockType, BoundingBox
+    from lao_document_ocr.text_regions import TextRegion
+
+    class FakeDetector:
+        def metadata(self):
+            return {"name": "fake"}
+
+        def detect(self, image):
+            return [
+                TextRegion(
+                    bbox=BoundingBox(x=20, y=20, width=360, height=130),
+                    detector="fake-learned",
+                    semantic_type=BlockType.PARAGRAPH,
+                )
+            ]
+
+    image = Image.new("L", (420, 200), 255)
+    draw = ImageDraw.Draw(image)
+    _draw_words(draw, (40, 100, 165), 50)
+    _draw_words(draw, (40, 100, 165), 105)
+
+    records = detect_region_aware_line_records(
+        image.convert("RGB"),
+        region_detector=FakeDetector(),
+    )
+
+    assert len(records) == 2
+    assert [record.region_id for record in records] == [1, 1]
+    assert [record.line_id for record in records] == [1, 2]
+    assert all(record.semantic_type == BlockType.PARAGRAPH for record in records)
+    assert all(record.detector == "fake-learned" for record in records)

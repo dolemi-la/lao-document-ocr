@@ -69,6 +69,7 @@ Status: started
 - [x] deterministic clean-scan text-line detection baseline
 - [x] general deterministic text-region detector interface/baseline
 - [x] learned text-region detector training/export/inference pipeline (quality not yet benchmark-ready)
+- [x] learned semantic-region hints propagated into owned OCR/AST blocks
 - [x] heuristic heading hierarchy + body/list classification baseline
 - [x] conservative 2–4 column reading-order baseline
 - [ ] learned/general reading-order model

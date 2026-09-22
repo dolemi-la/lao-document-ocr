@@ -16,10 +16,14 @@ def document_to_markdown(document: Document) -> str:
                 items = block.metadata.get("items")
                 if not isinstance(items, list) or not items:
                     items = block.text.splitlines()
-                ordered = block.metadata.get("list_style") == "ordered"
+                list_style = block.metadata.get("list_style")
                 for index, item in enumerate(items, start=1):
-                    marker = f"{index}." if ordered else "-"
-                    output.append(f"{marker} {item}")
+                    if list_style == "ordered":
+                        output.append(f"{index}. {item}")
+                    elif list_style == "bullet":
+                        output.append(f"- {item}")
+                    else:
+                        output.append(str(item))
             elif block.type == BlockType.TABLE and block.cells:
                 # Full table reconstruction is a later milestone. Keep cell text lossless for now.
                 output.append(block.text)

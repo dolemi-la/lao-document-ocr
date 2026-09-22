@@ -90,3 +90,40 @@ def test_learned_region_detector_requires_model_path() -> None:
         assert "requires a layout model path" in str(exc)
     else:
         raise AssertionError("Expected learned layout detector without model to fail")
+
+
+def test_owned_engine_preserves_region_grouping_and_semantic_hint() -> None:
+    from lao_document_ocr.models import BlockType, BoundingBox
+    from lao_document_ocr.text_regions import TextRegion
+
+    class FakeSemanticDetector:
+        def metadata(self):
+            return {"name": "fake-semantic"}
+
+        def detect(self, image):
+            return [
+                TextRegion(
+                    bbox=BoundingBox(x=20, y=20, width=360, height=130),
+                    detector="fake-semantic",
+                    semantic_type=BlockType.PARAGRAPH,
+                )
+            ]
+
+    image = Image.new("L", (420, 200), 255)
+    draw = ImageDraw.Draw(image)
+    for x in (40, 100, 165):
+        draw.rectangle((x, 50, x + 34, 66), fill=0)
+        draw.rectangle((x, 105, x + 34, 121), fill=0)
+
+    recognizer = FakeLineRecognizer()
+    engine = OwnedRecognizerEngine(
+        recognizer=recognizer,
+        region_detector=FakeSemanticDetector(),
+    )
+    lines = engine.recognize(image.convert("RGB"))
+
+    assert len(lines) == 2
+    assert [line.block_id for line in lines] == [1, 1]
+    assert [line.paragraph_id for line in lines] == [1, 1]
+    assert [line.line_id for line in lines] == [1, 2]
+    assert all(line.semantic_type == BlockType.PARAGRAPH for line in lines)

@@ -123,3 +123,92 @@ def classify_paragraph(
         BlockType.PARAGRAPH,
         metadata={"classifier": "heuristic-v2"},
     )
+
+
+def apply_semantic_hint(
+    classification: SemanticClassification,
+    paragraph_lines: list[RecognizedLine],
+    *,
+    typical_height: float,
+) -> SemanticClassification:
+    hints = {
+        line.semantic_type
+        for line in paragraph_lines
+        if line.semantic_type is not None
+    }
+    if len(hints) != 1:
+        return classification
+
+    hint = next(iter(hints))
+    metadata = dict(classification.metadata or {})
+    metadata.update(
+        {
+            "semantic_hint": hint.value,
+            "semantic_hint_source": "learned-layout",
+        }
+    )
+
+    # Strong explicit evidence remains authoritative.
+    if classification.block_type in {BlockType.LIST, BlockType.TABLE}:
+        return SemanticClassification(
+            classification.block_type,
+            level=classification.level,
+            metadata=metadata,
+        )
+
+    if hint == BlockType.HEADING:
+        paragraph_height = median(line.bbox.height for line in paragraph_lines)
+        height_ratio = paragraph_height / max(1.0, typical_height)
+        metadata.update(
+            {
+                "classifier": "learned-layout+heuristic-level",
+                "height_ratio": height_ratio,
+            }
+        )
+        return SemanticClassification(
+            BlockType.HEADING,
+            level=(
+                classification.level
+                if classification.block_type == BlockType.HEADING
+                else _heading_level(height_ratio)
+            ),
+            metadata=metadata,
+        )
+
+    if hint == BlockType.LIST:
+        items = [
+            normalize_lao_text(line.text)
+            for line in paragraph_lines
+            if normalize_lao_text(line.text)
+        ]
+        metadata.update(
+            {
+                "classifier": "learned-layout",
+                "list_style": "unresolved",
+                "items": items,
+            }
+        )
+        return SemanticClassification(
+            BlockType.LIST,
+            metadata=metadata,
+        )
+
+    if hint == BlockType.TABLE:
+        metadata.update(
+            {
+                "classifier": "learned-layout",
+                "structure_status": "unresolved",
+            }
+        )
+        return SemanticClassification(
+            BlockType.TABLE,
+            metadata=metadata,
+        )
+
+    # A paragraph hint does not demote a strong heuristic heading; retain the
+    # heuristic decision while still exposing the learned hint in metadata.
+    return SemanticClassification(
+        classification.block_type,
+        level=classification.level,
+        metadata=metadata,
+    )

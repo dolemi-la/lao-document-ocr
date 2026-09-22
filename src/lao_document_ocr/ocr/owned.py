@@ -5,7 +5,7 @@ from typing import Protocol
 
 from PIL import Image
 
-from lao_document_ocr.line_detection import detect_region_aware_lines
+from lao_document_ocr.line_detection import detect_region_aware_line_records
 from lao_document_ocr.text_regions import (
     MorphologyTextRegionDetector,
     TextRegionDetector,
@@ -96,13 +96,14 @@ class OwnedRecognizerEngine(OcrEngine):
         }
 
     def recognize(self, image: Image.Image) -> list[RecognizedLine]:
-        boxes = detect_region_aware_lines(
+        detected_lines = detect_region_aware_line_records(
             image,
             region_detector=self.region_detector,
         )
         lines: list[RecognizedLine] = []
 
-        for line_index, box in enumerate(boxes, start=1):
+        for detected in detected_lines:
+            box = detected.bbox
             crop = image.crop(
                 (
                     box.x,
@@ -126,9 +127,10 @@ class OwnedRecognizerEngine(OcrEngine):
                     text=text,
                     bbox=box,
                     confidence=max(0.0, min(1.0, float(confidence))),
-                    block_id=line_index,
-                    paragraph_id=line_index,
-                    line_id=line_index,
+                    block_id=detected.region_id,
+                    paragraph_id=detected.region_id,
+                    line_id=detected.line_id,
+                    semantic_type=detected.semantic_type,
                 )
             )
 

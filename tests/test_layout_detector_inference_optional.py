@@ -95,3 +95,38 @@ def test_layout_detector_rejects_tampered_artifact(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="SHA-256"):
         ExportedLayoutRegionDetector(artifact)
+
+
+def test_layout_detector_preserves_semantic_region_classes(tmp_path) -> None:
+    from types import MethodType
+
+    from lao_document_ocr.models import BlockType
+
+    image = Image.new("RGB", (64, 64), "white")
+    _, transform = prepare_layout_inference_image(
+        image,
+        image_height=64,
+        image_width=64,
+    )
+    mask = np.zeros((64, 64), dtype=np.uint8)
+    mask[4:14, 4:28] = LAYOUT_CLASS_IDS["heading"]
+    mask[18:30, 4:40] = LAYOUT_CLASS_IDS["paragraph"]
+    mask[34:44, 4:36] = LAYOUT_CLASS_IDS["list"]
+    mask[48:60, 4:52] = LAYOUT_CLASS_IDS["table"]
+
+    detector = object.__new__(ExportedLayoutRegionDetector)
+    detector.min_region_area_ratio = 0.0001
+
+    def fake_predict(self, source):
+        return mask, transform
+
+    detector._predict_mask = MethodType(fake_predict, detector)
+    regions = detector.detect(image)
+
+    assert [region.semantic_type for region in regions] == [
+        BlockType.HEADING,
+        BlockType.PARAGRAPH,
+        BlockType.LIST,
+        BlockType.TABLE,
+    ]
+    assert all(region.detector == "tiny-layout-unet-v1" for region in regions)

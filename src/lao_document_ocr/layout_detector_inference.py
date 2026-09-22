@@ -10,9 +10,16 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from lao_document_ocr.layout_targets import LAYOUT_CLASS_IDS
-from lao_document_ocr.models import BoundingBox
+from lao_document_ocr.models import BlockType, BoundingBox
 from lao_document_ocr.recognizer_inference import resolve_torch_device
 from lao_document_ocr.text_regions import TextRegion
+
+_SEMANTIC_CLASS_TYPES = {
+    LAYOUT_CLASS_IDS["heading"]: BlockType.HEADING,
+    LAYOUT_CLASS_IDS["paragraph"]: BlockType.PARAGRAPH,
+    LAYOUT_CLASS_IDS["list"]: BlockType.LIST,
+    LAYOUT_CLASS_IDS["table"]: BlockType.TABLE,
+}
 
 
 @dataclass(frozen=True)
@@ -217,35 +224,17 @@ class ExportedLayoutRegionDetector:
             transform,
         )
 
-        text_class_ids = {
-            LAYOUT_CLASS_IDS["heading"],
-            LAYOUT_CLASS_IDS["paragraph"],
-            LAYOUT_CLASS_IDS["list"],
-            LAYOUT_CLASS_IDS["table"],
-        }
-        binary = np.isin(
-            restored,
-            list(text_class_ids),
-        ).astype(np.uint8) * 255
-
         kernel_size = max(
             1,
             min(7, min(image.width, image.height) // 250),
         )
-        if kernel_size > 1:
-            binary = cv2.morphologyEx(
-                binary,
-                cv2.MORPH_CLOSE,
-                cv2.getStructuringElement(
-                    cv2.MORPH_RECT,
-                    (kernel_size, kernel_size),
-                ),
+        kernel = (
+            cv2.getStructuringElement(
+                cv2.MORPH_RECT,
+                (kernel_size, kernel_size),
             )
-
-        contours, _ = cv2.findContours(
-            binary,
-            cv2.RETR_EXTERNAL,
-            cv2.CHAIN_APPROX_SIMPLE,
+            if kernel_size > 1
+            else None
         )
         page_area = max(1, image.width * image.height)
         min_area = max(
@@ -254,29 +243,46 @@ class ExportedLayoutRegionDetector:
         )
 
         regions: list[TextRegion] = []
-        for contour in contours:
-            x, y, width, height = cv2.boundingRect(contour)
-            if width * height < min_area:
+        for class_id, semantic_type in _SEMANTIC_CLASS_TYPES.items():
+            binary = (restored == class_id).astype(np.uint8) * 255
+            if not np.any(binary):
                 continue
-            margin = max(
-                2,
-                round(min(width, height) * 0.03),
-            )
-            left = max(0, x - margin)
-            top = max(0, y - margin)
-            right = min(image.width, x + width + margin)
-            bottom = min(image.height, y + height + margin)
-            regions.append(
-                TextRegion(
-                    bbox=BoundingBox(
-                        x=left,
-                        y=top,
-                        width=right - left,
-                        height=bottom - top,
-                    ),
-                    detector="tiny-layout-unet-v1",
+            if kernel is not None:
+                binary = cv2.morphologyEx(
+                    binary,
+                    cv2.MORPH_CLOSE,
+                    kernel,
                 )
+
+            contours, _ = cv2.findContours(
+                binary,
+                cv2.RETR_EXTERNAL,
+                cv2.CHAIN_APPROX_SIMPLE,
             )
+            for contour in contours:
+                x, y, width, height = cv2.boundingRect(contour)
+                if width * height < min_area:
+                    continue
+                margin = max(
+                    2,
+                    round(min(width, height) * 0.03),
+                )
+                left = max(0, x - margin)
+                top = max(0, y - margin)
+                right = min(image.width, x + width + margin)
+                bottom = min(image.height, y + height + margin)
+                regions.append(
+                    TextRegion(
+                        bbox=BoundingBox(
+                            x=left,
+                            y=top,
+                            width=right - left,
+                            height=bottom - top,
+                        ),
+                        detector="tiny-layout-unet-v1",
+                        semantic_type=semantic_type,
+                    )
+                )
 
         return sorted(
             regions,
