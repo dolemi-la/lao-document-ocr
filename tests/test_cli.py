@@ -2201,3 +2201,92 @@ def test_capture_submission_cli_pack_verify_extract(
     assert main() == 0
     assert (extracted / "suite-v1-p0001.jpg").is_file()
     assert (extracted / "capture-submission.json").is_file()
+
+
+def test_register_capture_submission_cli_uses_submission_metadata(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import lao_document_ocr.capture_submission_import as submission_import
+    from lao_document_ocr.capture_batch import CaptureBatchReport
+    from lao_document_ocr.capture_submission_import import (
+        CaptureSubmissionImportReport,
+    )
+
+    captured = {}
+
+    def fake_register_capture_submission(**kwargs):
+        captured.update(kwargs)
+        return CaptureSubmissionImportReport(
+            suite_id="campaign-v1",
+            source_revision="abc123",
+            kit_sha256="a" * 64,
+            capture_id="phone-a",
+            capture_mode="phone-photo",
+            captured_pages=60,
+            expected_pages=60,
+            submission_complete=True,
+            batch=CaptureBatchReport(
+                suite_id="campaign-v1",
+                capture_id="phone-a",
+                capture_mode="phone-photo",
+                expected_pages=60,
+                discovered_captures=60,
+                planned_captures=60,
+                registered_captures=0,
+                missing_page_ids=(),
+                ignored_files=("capture-submission.json",),
+                registered_sample_ids=(),
+                dry_run=True,
+            ),
+        )
+
+    monkeypatch.setattr(
+        submission_import,
+        "register_capture_submission",
+        fake_register_capture_submission,
+    )
+    report = tmp_path / "submission-import-report.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "register-capture-submission",
+            "--submission",
+            str(tmp_path / "phone-a.submission.zip"),
+            "--suite-manifest",
+            str(tmp_path / "capture-suite.json"),
+            "--contributor",
+            "CLI Contributor",
+            "--release-license",
+            "CC0-1.0",
+            "--dataset-root",
+            str(tmp_path / "dataset"),
+            "--dataset-manifest",
+            str(tmp_path / "dataset" / "manifest.jsonl"),
+            "--require-complete",
+            "--dry-run",
+            "--expected-kit-sha256",
+            "a" * 64,
+            "--expected-source-revision",
+            "abc123",
+            "--report",
+            str(report),
+        ],
+    )
+
+    assert main() == 0
+    assert captured["require_complete"] is True
+    assert captured["dry_run"] is True
+    assert captured["confirm_release"] is False
+    assert captured["expected_kit_sha256"] == "a" * 64
+    assert captured["expected_source_revision"] == "abc123"
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["capture_id"] == "phone-a"
+    assert payload["batch"]["planned_captures"] == 60
+    rendered = capsys.readouterr().out
+    assert "Capture ID: phone-a" in rendered
+    assert "Planned captures: 60" in rendered
+    assert "Dry run: yes" in rendered

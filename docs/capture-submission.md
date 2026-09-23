@@ -81,12 +81,36 @@ Extraction verifies first, refuses a non-empty destination directory, writes the
 
 The resulting directory is compatible with the existing `register-capture-directory` workflow.
 
-## Maintainer workflow
+## Preferred maintainer import
+
+Use the one-step importer to verify the archive, bind it to the intended suite/kit revision, extract it into a temporary private directory, run the existing optical-evidence checks, and atomically register the captures:
+
+```bash
+lao-ocr register-capture-submission \
+  --submission phone-a.submission.zip \
+  --suite-manifest benchmarks/capture-packs/project-authored-lao-v1/capture-suite.json \
+  --contributor "Contributor Alias" \
+  --release-license CC0-1.0 \
+  --dataset-root benchmarks/public \
+  --dataset-manifest benchmarks/public/manifest.jsonl \
+  --expected-kit-sha256 <collector-kit-sha256> \
+  --expected-source-revision <git-revision> \
+  --require-complete \
+  --dry-run
+```
+
+The importer derives `capture_id` and capture mode from the verified submission instead of accepting retyped values. It also requires the submission suite ID and expected page count to match the supplied suite manifest. `--expected-kit-sha256` and `--expected-source-revision` are optional but recommended for maintainer handoffs.
+
+After reviewing the dry-run report, rerun without `--dry-run` and add `--confirm-release`. Temporary extracted files are removed automatically after the import attempt.
+
+## Manual maintainer workflow
+
+The lower-level commands remain available when manual staging is useful:
 
 1. receive the submission ZIP
-2. verify it
+2. run `verify-capture-submission`
 3. inspect the manifest/session provenance
-4. extract to a private staging directory
+4. run `extract-capture-submission` into a private staging directory
 5. run `register-capture-directory --dry-run`
 6. review optical-evidence/authenticity results
 7. register with `--confirm-release`

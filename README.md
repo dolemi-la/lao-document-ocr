@@ -305,6 +305,7 @@ lao-ocr serve-capture-kit --kit <collector.zip> --output-dir <captures/session> 
 lao-ocr pack-capture-submission --capture-dir <captures/session> --output capture.submission.zip --require-complete
 lao-ocr verify-capture-submission --submission capture.submission.zip
 lao-ocr extract-capture-submission --submission capture.submission.zip --output-dir <incoming/session>
+lao-ocr register-capture-submission --submission capture.submission.zip --suite-manifest <capture-suite.json> --contributor <alias> --release-license CC0-1.0 --dataset-root benchmarks/public --dataset-manifest benchmarks/public/manifest.jsonl --require-complete --dry-run
 lao-ocr benchmark-capture-suite --suite-manifest <capture-suite.json> --engine tesseract --output digital-qa.json
 lao-ocr capture-campaign-report --suite-manifest <capture-suite.json> --dataset-manifest <manifest.jsonl> --output campaign-report.json
 lao-ocr register-capture --help

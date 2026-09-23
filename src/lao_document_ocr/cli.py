@@ -593,6 +593,32 @@ def _parser() -> argparse.ArgumentParser:
     extract_submission.add_argument("--output-dir", required=True, type=Path)
     extract_submission.add_argument("--max-page-pixels", type=int, default=80_000_000)
 
+    register_submission = subparsers.add_parser(
+        "register-capture-submission",
+        help=(
+            "Verify a blind capture submission and atomically register its captures "
+            "using the submission's capture ID and mode."
+        ),
+    )
+    register_submission.add_argument("--submission", required=True, type=Path)
+    register_submission.add_argument("--suite-manifest", required=True, type=Path)
+    register_submission.add_argument("--contributor", required=True)
+    register_submission.add_argument("--release-license", required=True)
+    register_submission.add_argument("--dataset-root", required=True, type=Path)
+    register_submission.add_argument("--dataset-manifest", required=True, type=Path)
+    register_submission.add_argument("--notes")
+    register_submission.add_argument("--confirm-release", action="store_true")
+    register_submission.add_argument("--require-complete", action="store_true")
+    register_submission.add_argument("--dry-run", action="store_true")
+    register_submission.add_argument("--report", type=Path)
+    register_submission.add_argument("--expected-kit-sha256")
+    register_submission.add_argument("--expected-source-revision")
+    register_submission.add_argument(
+        "--max-page-pixels",
+        type=int,
+        default=80_000_000,
+    )
+
     serve_capture_kit = subparsers.add_parser(
         "serve-capture-kit",
         help="Serve a collector-safe capture kit with a mobile camera upload UI.",
@@ -1521,6 +1547,44 @@ def _extract_capture_submission(args: argparse.Namespace) -> int:
     return 0
 
 
+def _register_capture_submission(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_submission_import import (
+        register_capture_submission,
+    )
+
+    report = register_capture_submission(
+        submission_path=args.submission,
+        suite_manifest=args.suite_manifest,
+        contributor=args.contributor,
+        release_license=args.release_license,
+        dataset_root=args.dataset_root,
+        dataset_manifest=args.dataset_manifest,
+        confirm_release=args.confirm_release,
+        require_complete=args.require_complete,
+        dry_run=args.dry_run,
+        notes=args.notes,
+        expected_kit_sha256=args.expected_kit_sha256,
+        expected_source_revision=args.expected_source_revision,
+        max_page_pixels=args.max_page_pixels,
+    )
+    if args.report is not None:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"Report: {args.report}")
+    print(f"Suite: {report.suite_id}")
+    print(f"Capture ID: {report.capture_id}")
+    print(f"Mode: {report.capture_mode}")
+    print(f"Submission captured: {report.captured_pages}/{report.expected_pages}")
+    print(f"Planned captures: {report.batch.planned_captures}")
+    print(f"Registered captures: {report.batch.registered_captures}")
+    print(f"Missing pages: {len(report.batch.missing_page_ids)}")
+    print(f"Dry run: {'yes' if report.batch.dry_run else 'no'}")
+    return 0
+
+
 def _serve_capture_kit(args: argparse.Namespace) -> int:
     import secrets
 
@@ -1943,6 +2007,8 @@ def main() -> int:
             return _verify_capture_submission(args)
         if args.command == "extract-capture-submission":
             return _extract_capture_submission(args)
+        if args.command == "register-capture-submission":
+            return _register_capture_submission(args)
         if args.command == "serve-capture-kit":
             return _serve_capture_kit(args)
         if args.command == "capture-campaign-report":
