@@ -97,3 +97,7 @@ project-authored-lao-v1.collector.zip.sha256
 The workflow installs the Noto Lao font, regenerates all 60 pages from the project-authored corpus, verifies the suite/collector contents and checksums, binds the kit to `github.sha`, and uploads it with 30-day artifact retention. Repository permissions are read-only.
 
 Workflow source: `.github/workflows/capture-kit.yml`.
+
+## Mobile/browser collection
+
+Instead of manually copying camera files, maintainers can serve a verified collector kit on a trusted local network and capture directly from a phone browser with `lao-ocr serve-capture-kit`. The CLI protects the session with a random access token by default. See [mobile-capture-collector.md](mobile-capture-collector.md).

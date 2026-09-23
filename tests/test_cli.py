@@ -1984,3 +1984,143 @@ def test_benchmark_report_embeds_verified_freeze_identity(
         frozen.read_bytes()
     ).hexdigest()
     assert payload["freeze"]["source_revision"] == "freeze-rev"
+
+
+def test_serve_capture_kit_cli_builds_app_and_runs_uvicorn(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import uvicorn
+
+    import lao_document_ocr.capture_collector as collector
+
+    calls = {}
+    sentinel_app = object()
+
+    def fake_create(*args, **kwargs):
+        calls["create_args"] = args
+        calls["create_kwargs"] = kwargs
+        return sentinel_app
+
+    def fake_run(app, **kwargs):
+        calls["app"] = app
+        calls["run_kwargs"] = kwargs
+
+    monkeypatch.setattr(collector, "create_collector_app", fake_create)
+    monkeypatch.setattr(uvicorn, "run", fake_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "serve-capture-kit",
+            "--kit",
+            str(tmp_path / "collector.zip"),
+            "--output-dir",
+            str(tmp_path / "captures"),
+            "--capture-id",
+            "phone-a",
+            "--mode",
+            "phone-photo",
+            "--port",
+            "8099",
+        ],
+    )
+
+    assert main() == 0
+    assert calls["app"] is sentinel_app
+    assert calls["run_kwargs"] == {
+        "host": "127.0.0.1",
+        "port": 8099,
+        "log_level": "info",
+    }
+    assert calls["create_kwargs"]["capture_id"] == "phone-a"
+    assert calls["create_kwargs"]["mode"].value == "phone-photo"
+    assert calls["create_kwargs"]["require_qr"] is True
+    assert len(calls["create_kwargs"]["access_token"]) >= 16
+    output = capsys.readouterr().out
+    assert "Collector access token:" in output
+    assert "Local collector: http://127.0.0.1:8099/?token=" in output
+
+
+def test_serve_capture_kit_cli_warns_when_exposed_on_network(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import uvicorn
+
+    import lao_document_ocr.capture_collector as collector
+
+    calls = {}
+
+    def fake_create(*args, **kwargs):
+        calls["kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(collector, "create_collector_app", fake_create)
+    monkeypatch.setattr(uvicorn, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "serve-capture-kit",
+            "--kit",
+            str(tmp_path / "collector.zip"),
+            "--output-dir",
+            str(tmp_path / "captures"),
+            "--capture-id",
+            "phone-a",
+            "--mode",
+            "phone-photo",
+            "--host",
+            "0.0.0.0",
+            "--allow-unreadable-qr",
+        ],
+    )
+
+    assert main() == 0
+    assert calls["kwargs"]["require_qr"] is False
+    assert len(calls["kwargs"]["access_token"]) >= 16
+    assert "trusted network" in capsys.readouterr().err
+
+
+def test_serve_capture_kit_cli_uses_explicit_access_token(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import uvicorn
+
+    import lao_document_ocr.capture_collector as collector
+
+    calls = {}
+
+    def fake_create(*args, **kwargs):
+        calls["kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(collector, "create_collector_app", fake_create)
+    monkeypatch.setattr(uvicorn, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "serve-capture-kit",
+            "--kit",
+            str(tmp_path / "collector.zip"),
+            "--output-dir",
+            str(tmp_path / "captures"),
+            "--capture-id",
+            "phone-a",
+            "--mode",
+            "phone-photo",
+            "--access-token",
+            "collector-token-explicit-1234",
+        ],
+    )
+
+    assert main() == 0
+    assert calls["kwargs"]["access_token"] == "collector-token-explicit-1234"

@@ -569,6 +569,46 @@ def _parser() -> argparse.ArgumentParser:
     capture_kit.add_argument("--output", required=True, type=Path)
     capture_kit.add_argument("--revision")
 
+    serve_capture_kit = subparsers.add_parser(
+        "serve-capture-kit",
+        help="Serve a collector-safe capture kit with a mobile camera upload UI.",
+    )
+    serve_capture_kit.add_argument("--kit", required=True, type=Path)
+    serve_capture_kit.add_argument("--output-dir", required=True, type=Path)
+    serve_capture_kit.add_argument("--capture-id", required=True)
+    serve_capture_kit.add_argument(
+        "--mode",
+        required=True,
+        choices=["flatbed-scan", "degraded-scan", "phone-photo"],
+    )
+    serve_capture_kit.add_argument("--host", default="127.0.0.1")
+    serve_capture_kit.add_argument("--port", type=int, default=8090)
+    serve_capture_kit.add_argument(
+        "--access-token",
+        help=(
+            "Optional 16-256 character collector token. "
+            "A random token is generated when omitted."
+        ),
+    )
+    serve_capture_kit.add_argument(
+        "--max-upload-bytes",
+        type=int,
+        default=25 * 1024 * 1024,
+    )
+    serve_capture_kit.add_argument(
+        "--max-page-pixels",
+        type=int,
+        default=80_000_000,
+    )
+    serve_capture_kit.add_argument(
+        "--allow-unreadable-qr",
+        action="store_true",
+        help=(
+            "Allow captures with no readable page-ID QR marker (legacy kits only). "
+            "A readable mismatched QR is always rejected."
+        ),
+    )
+
     campaign_report = subparsers.add_parser(
         "capture-campaign-report",
         help="Report missing/complete capture modes for a capture suite.",
@@ -1417,6 +1457,50 @@ def _build_capture_kit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _serve_capture_kit(args: argparse.Namespace) -> int:
+    import secrets
+
+    import uvicorn
+
+    from lao_document_ocr.capture_collector import create_collector_app
+    from lao_document_ocr.capture_registration import CaptureMode
+
+    if not 1 <= args.port <= 65535:
+        raise ValueError("--port must be between 1 and 65535")
+
+    access_token = args.access_token or secrets.token_urlsafe(24)
+    app = create_collector_app(
+        args.kit,
+        args.output_dir,
+        capture_id=args.capture_id,
+        mode=CaptureMode(args.mode),
+        max_upload_bytes=args.max_upload_bytes,
+        max_page_pixels=args.max_page_pixels,
+        require_qr=not args.allow_unreadable_qr,
+        access_token=access_token,
+    )
+    print(f"Collector output: {args.output_dir}")
+    print(f"Capture mode: {args.mode}")
+    print(f"Collector access token: {access_token}")
+    print(
+        f"Local collector: http://{args.host}:{args.port}/?token={access_token}"
+    )
+    if args.host not in {"127.0.0.1", "localhost", "::1"}:
+        print(
+            "WARNING: collector is reachable beyond localhost. "
+            "The session token blocks casual LAN access, but there is no TLS; "
+            "use only on a trusted network.",
+            file=sys.stderr,
+        )
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        log_level="info",
+    )
+    return 0
+
+
 def _capture_campaign_report(args: argparse.Namespace) -> int:
     from lao_document_ocr.capture_campaign import (
         build_capture_campaign_report,
@@ -1789,6 +1873,8 @@ def main() -> int:
             return _generate_capture_suite(args)
         if args.command == "build-capture-kit":
             return _build_capture_kit(args)
+        if args.command == "serve-capture-kit":
+            return _serve_capture_kit(args)
         if args.command == "capture-campaign-report":
             return _capture_campaign_report(args)
         if args.command == "register-capture":
