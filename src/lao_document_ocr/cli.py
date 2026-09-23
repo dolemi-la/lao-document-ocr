@@ -326,6 +326,22 @@ def _parser() -> argparse.ArgumentParser:
         help="Verify this benchmark lock before running OCR.",
     )
 
+    hplt = subparsers.add_parser(
+        "sample-hplt-lao",
+        help="Stream a bounded Lao text sample from the official HPLT v3 sorted shards.",
+    )
+    hplt.add_argument("--output", required=True, type=Path)
+    hplt.add_argument("--metadata", required=True, type=Path)
+    hplt.add_argument("--limit", type=int, default=10_000)
+    hplt.add_argument("--map-url")
+    hplt.add_argument("--timeout", type=float, default=60.0)
+    hplt.add_argument("--max-lines-per-document", type=int, default=4)
+    hplt.add_argument("--max-documents", type=int, default=10_000)
+    hplt.add_argument("--min-chars", type=int, default=8)
+    hplt.add_argument("--max-chars", type=int, default=180)
+    hplt.add_argument("--min-lao-ratio", type=float, default=0.5)
+    hplt.add_argument("--keep-duplicates", action="store_true")
+
     corpus = subparsers.add_parser(
         "prepare-corpus",
         help="Normalize/filter Lao text for synthetic OCR training.",
@@ -1017,6 +1033,34 @@ def _benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sample_hplt_lao(args: argparse.Namespace) -> int:
+    from lao_document_ocr.hplt_sampler import (
+        HPLT_V3_LAO_SORTED_MAP_URL,
+        sample_hplt_lao,
+    )
+
+    config = CorpusFilter(
+        min_chars=args.min_chars,
+        max_chars=args.max_chars,
+        min_lao_ratio=args.min_lao_ratio,
+        deduplicate=not args.keep_duplicates,
+    )
+    corpus_path, metadata_path, metadata = sample_hplt_lao(
+        output_path=args.output,
+        metadata_path=args.metadata,
+        limit=args.limit,
+        config=config,
+        map_url=args.map_url or HPLT_V3_LAO_SORTED_MAP_URL,
+        timeout=args.timeout,
+        max_lines_per_document=args.max_lines_per_document,
+        max_documents=args.max_documents,
+    )
+    print(f"Corpus: {corpus_path}")
+    print(f"Metadata: {metadata_path}")
+    print(f"Accepted lines: {metadata['sampling']['accepted_lines']}")
+    return 0
+
+
 def _prepare_corpus(args: argparse.Namespace) -> int:
     if args.format == "jsonl":
         source = iter_jsonl(args.input, field=args.field)
@@ -1439,6 +1483,8 @@ def main() -> int:
             return _compare_benchmarks(args)
         if args.command == "benchmark":
             return _benchmark(args)
+        if args.command == "sample-hplt-lao":
+            return _sample_hplt_lao(args)
         if args.command == "prepare-corpus":
             return _prepare_corpus(args)
         if args.command == "train-char-lm":

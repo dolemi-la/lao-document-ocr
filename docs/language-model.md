@@ -133,7 +133,7 @@ The GPU deployment preset exposes the same variables. Beam search and n-gram sco
 
 ## Data policy
 
-Use only text whose training/reuse rights are documented. The current benchmark-source policy approves HPLT v2 Lao as CC0 **text input**; see `benchmark-source-review.md`.
+Use only text whose training/reuse rights are documented. The project permits provenance-recorded HPLT v3 Lao for model-development workflows under its source-policy caveats; HPLT CC0 applies to dataset packaging, while underlying extracted-text rights remain source-dependent. See `benchmark-source-review.md` and `hplt-sampling.md`.
 
 Do not train the LM on the frozen test-set ground truth. That would leak benchmark answers into decoding.
 

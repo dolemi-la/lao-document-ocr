@@ -2,31 +2,33 @@
 
 This workflow creates real optical benchmark images without scraping copyrighted documents.
 
-## 1. Prepare reviewed Lao text
+## 1. Prepare independently redistributable Lao text
 
-For HPLT or another approved source, first normalize/filter the corpus:
+Public capture-pack ground truth must come from text whose **underlying content rights** permit redistribution. Preferred sources include project-authored text explicitly released for the benchmark, source-specific CC0/public-domain material, or contributor text under a compatible license.
+
+For a reviewed local source, normalize/filter it with `prepare-corpus`:
 
 ```bash
 lao-ocr prepare-corpus \
-  --input lao-source.jsonl \
-  --format jsonl \
-  --field text \
-  --output training/data/lao-lines.txt \
+  --input benchmark-source.txt \
+  --output training/data/capture-lines.txt \
   --min-lao-ratio 0.5
 ```
 
-The source must already be approved in `benchmarks/source-registry.json`.
+The source must already be reviewed in `benchmarks/source-registry.json` or have equivalent provenance attached to the campaign.
+
+HPLT's bounded sampler is useful for model-development/training text, but HPLT's packaging CC0 does not establish redistribution rights for every underlying extracted line. Do not use sampled HPLT lines in a **public** capture pack unless those underlying source rights are separately cleared. See [hplt-sampling.md](hplt-sampling.md).
 
 ## 2. Generate printable capture pages
 
 ```bash
 lao-ocr generate-capture-pack \
-  --corpus training/data/lao-lines.txt \
+  --corpus training/data/capture-lines.txt \
   --output benchmarks/capture-packs/baseline-v1 \
   --font /path/to/NotoSansLao-Regular.ttf \
   --pack-id baseline-v1 \
   --text-license CC0-1.0 \
-  --text-provenance "HPLT v2 Lao lao-Laoo cleaned corpus" \
+  --text-provenance "Project-authored Lao benchmark text released CC0" \
   --dpi 150 \
   --lines-per-page 10 \
   --max-pages 100
@@ -47,12 +49,12 @@ Example:
 
 ```bash
 lao-ocr generate-capture-pack \
-  --corpus training/data/lao-lines.txt \
+  --corpus training/data/capture-lines.txt \
   --output benchmarks/capture-packs/multi-column-v1 \
   --font /path/to/NotoSansLao-Regular.ttf \
   --pack-id multi-column-v1 \
   --text-license CC0-1.0 \
-  --text-provenance "HPLT v2 Lao lao-Laoo cleaned corpus" \
+  --text-provenance "Project-authored Lao benchmark text released CC0" \
   --template two-column
 ```
 

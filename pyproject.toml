@@ -39,6 +39,9 @@ train = [
 s3 = [
   "boto3>=1.35,<2",
 ]
+data = [
+  "zstandard>=0.23,<1",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lao_document_ocr"]

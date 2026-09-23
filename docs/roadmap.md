@@ -26,6 +26,7 @@ Status: in progress
 - [x] document licensing/provenance metadata
 - [x] rights-clear printable capture-pack + real-capture registration workflow
 - [x] benchmark source review registry/policy
+- [x] bounded official HPLT Lao streaming sampler + provenance metadata
 - [x] optional reviewed layout AST labels in dataset manifests + coverage reporting
 - [x] reproducible layout-training manifest from reviewed AST labels
 - [x] categorical mask + ordered box targets from reviewed layout ASTs
@@ -57,6 +58,7 @@ Exit condition: every model change can be measured on a fixed, legal, documented
 Status: started
 
 - [x] synthetic Lao text generator
+- [x] bounded HPLT v3 Lao text sampler with provenance metadata
 - [x] font inventory and licensing review (initial Noto Lao path)
 - [x] deterministic augmentation pipeline
 - [x] clean/noisy/phone synthetic augmentation profiles

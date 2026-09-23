@@ -30,6 +30,20 @@ The training Dockerfile installs PyTorch from the official CPU wheel index so a 
 
 ## 2. Prepare text
 
+For a bounded HPLT v3 Lao source sample (optional `data` dependency):
+
+```bash
+pip install -e '.[data]'
+lao-ocr sample-hplt-lao \
+  --output training/data/hplt-lao-10k.txt \
+  --metadata training/data/hplt-lao-10k.meta.json \
+  --limit 10000 \
+  --max-lines-per-document 4 \
+  --max-documents 10000
+```
+
+HPLT's CC0 statement applies to dataset packaging, not automatic ownership of the underlying extracted text. Preserve the sampler metadata, accept downstream responsibility for applicable source rights, and do not automatically republish sampled lines as public benchmark ground truth. See [hplt-sampling.md](hplt-sampling.md).
+
 ```bash
 lao-ocr prepare-corpus   --input source.jsonl   --format jsonl   --field text   --output training/data/lao-lines.txt   --min-lao-ratio 0.5
 ```

@@ -22,7 +22,7 @@ lao-ocr generate-capture-suite \
   --font /path/to/NotoSansLao-Regular.ttf \
   --suite-id baseline-suite-v1 \
   --text-license CC0-1.0 \
-  --text-provenance "HPLT v2 Lao lao-Laoo cleaned corpus" \
+  --text-provenance "independently cleared Lao corpus" \
   --dpi 150 \
   --lines-per-page 8 \
   --max-pages-per-template 20

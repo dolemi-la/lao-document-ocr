@@ -289,6 +289,7 @@ lao-ocr benchmark-layout --reference reference.json --prediction prediction.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
 lao-ocr bundle-benchmarks --ocr ocr.json --layout layout.json --docx docx.json --revision <git-sha> --output bundle.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
+lao-ocr sample-hplt-lao --output training/data/hplt-lao-10k.txt --metadata training/data/hplt-lao-10k.meta.json --limit 10000
 lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf> --augmentation-profile balanced
 lao-ocr train-char-lm --corpus training/data/lao-lines.txt --vocabulary training/runs/crnn-v2/vocab.json --output training/runs/crnn-v2/char-lm.json
 lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-v1 --font <font.ttf> --pack-id baseline-v1 --text-license CC0-1.0 --text-provenance <source> --template plain
@@ -315,6 +316,7 @@ See:
 - [docs/benchmark-freeze.md](docs/benchmark-freeze.md)
 - [docs/benchmark-readiness.md](docs/benchmark-readiness.md)
 - [docs/benchmark-source-review.md](docs/benchmark-source-review.md)
+- [docs/hplt-sampling.md](docs/hplt-sampling.md)
 - [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
 - [docs/capture-suite.md](docs/capture-suite.md)
 - [docs/capture-campaign-report.md](docs/capture-campaign-report.md)
@@ -322,6 +324,15 @@ See:
 - [docs/language-model.md](docs/language-model.md)
 
 Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
+
+HPLT bounded streaming is optional and requires:
+
+```bash
+pip install -e '.[data]'
+```
+
+See [docs/hplt-sampling.md](docs/hplt-sampling.md) for provenance/licensing caveats.
+
 
 ## Architecture
 

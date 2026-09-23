@@ -10,26 +10,26 @@ The machine-readable review registry is:
 
 ## Current decisions
 
-### HPLT v2 Lao — approved for text only
+### HPLT v3 Lao — approved for text only
 
 Source:
 
-https://hplt-project.org/datasets/v2.0
+https://hplt-project.org/datasets/v3.0
 
-HPLT publishes the Lao `lao-Laoo` corpus under CC0.
+HPLT includes Lao `lao_Laoo` in v2. HPLT states that its dataset packaging is licensed under CC0, while it does not own the underlying extracted text; downstream users remain responsible for applicable source rights and legal obligations.
 
-Approved uses:
+Project-policy allowed uses:
 
-- Lao training text
-- synthetic OCR rendering
-- printable capture-pack source text
+- provenance-recorded training/model-development text, subject to downstream source-rights responsibility
 
-Not treated as:
+Not approved by HPLT packaging terms alone for:
 
+- republishing sampled lines as public capture-pack source text
+- public benchmark ground truth
 - a real scanned-document benchmark
 - evidence for camera/scan robustness by itself
 
-For real optical evaluation, render/print project-created pages from reviewed CC0 text and capture those pages with real scanners/phones.
+For real optical evaluation, render project-created pages from independently redistributable/self-authored text and capture those pages with real scanners/phones. For the bounded HPLT training-text workflow and provenance rules, see [hplt-sampling.md](hplt-sampling.md).
 
 ### KhamLao MOE textbook-derived corpus — not approved
 

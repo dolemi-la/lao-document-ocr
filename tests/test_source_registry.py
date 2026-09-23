@@ -26,11 +26,19 @@ def test_source_registry_has_reviewed_entries() -> None:
 
 def test_hplt_is_only_approved_as_text_input() -> None:
     payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    hplt = next(source for source in payload["sources"] if source["id"] == "hplt-v2-lao")
+    hplt = next(source for source in payload["sources"] if source["id"] == "hplt-v3-lao")
 
-    assert hplt["license"] == "CC0-1.0"
+    assert hplt["license"].startswith("CC0-1.0-packaging")
     assert hplt["status"] == "approved-text-only"
-    assert "capture-pack-source-text" in hplt["allowed_uses"]
+    assert hplt["map_url"] == (
+        "https://data.hplt-project.org/three/sorted/lao_Laoo.map"
+    )
+    assert "underlying extracted text" in hplt["notes"]
+    assert "provenance-recorded-training-text" in hplt["allowed_uses"]
+    assert (
+        "public-capture-pack-source-text-without-source-clearance"
+        in hplt["disallowed_uses"]
+    )
     assert "claiming-as-real-scan-benchmark" in hplt["disallowed_uses"]
 
 

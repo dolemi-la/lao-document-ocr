@@ -1,22 +1,24 @@
 {
   "schema_version": "1",
-  "reviewed_at": "2026-09-21",
+  "reviewed_at": "2026-09-23",
   "sources": [
     {
-      "id": "hplt-v2-lao",
-      "name": "HPLT v2 Lao (lao-Laoo)",
-      "url": "https://hplt-project.org/datasets/v2.0",
-      "license": "CC0-1.0",
+      "id": "hplt-v3-lao",
+      "name": "HPLT v3 Lao (lao_Laoo)",
+      "url": "https://hplt-project.org/datasets/v3.0",
+      "license": "CC0-1.0-packaging; underlying-source-rights-source-dependent",
       "status": "approved-text-only",
       "allowed_uses": [
-        "training-text",
-        "synthetic-rendering",
-        "capture-pack-source-text"
+        "provenance-recorded-training-text",
+        "private-model-development"
       ],
       "disallowed_uses": [
+        "public-capture-pack-source-text-without-source-clearance",
+        "public-benchmark-ground-truth-without-source-clearance",
         "claiming-as-real-scan-benchmark"
       ],
-      "notes": "Approved as Lao text input. Real optical benchmark pages should be created by printing/capturing project-generated pages rather than treating the corpus itself as scanned-document evidence."
+      "notes": "Approved as bounded, provenance-recorded Lao training/model-development text input under the project policy. HPLT states that it licenses the dataset packaging under CC0 but does not own the underlying extracted text; downstream users remain responsible for applicable rights. Do not use sampled lines as public capture-pack source text or benchmark ground truth unless the underlying source is independently cleared.",
+      "map_url": "https://data.hplt-project.org/three/sorted/lao_Laoo.map"
     },
     {
       "id": "khamlao-moe-derived-corpus",

@@ -33,13 +33,13 @@ A repository being public is not enough. We only ingest material when redistribu
 
 ## Approved source for synthetic training text
 
-### HPLT v2 Lao (lao-Laoo)
+### HPLT v3 Lao (lao_Laoo)
 
-- Source: https://hplt-project.org/datasets/v2.0
-- License: CC0
+- Source: https://hplt-project.org/datasets/v3.0
+- License: CC0 for HPLT packaging; underlying extracted-text rights remain source-dependent
 - Status: approved for text-only corpus preparation
 - Use: diverse Lao text lines for synthetic OCR rendering and language coverage
-- Notes: use the cleaned/deduplicated Lao corpus as text input only. It is not a real scanned-document OCR benchmark and must not be reported as document accuracy. Keep the downloaded corpus outside Git and generate a normalized local corpus with `lao-ocr prepare-corpus`.
+- Notes: use bounded, provenance-recorded Lao text as model-development input only. It is not a real scanned-document OCR benchmark and must not be reported as document accuracy. Prefer `lao-ocr sample-hplt-lao` rather than downloading the full language dataset.
 
 Example after downloading/exporting a text or JSONL slice locally:
 
