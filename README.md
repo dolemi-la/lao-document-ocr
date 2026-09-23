@@ -285,7 +285,7 @@ lao-ocr benchmark-layout --reference reference.json --prediction prediction.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
 lao-ocr bundle-benchmarks --ocr ocr.json --layout layout.json --docx docx.json --revision <git-sha> --output bundle.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
-lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf>
+lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf> --augmentation-profile balanced
 lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-v1 --font <font.ttf> --pack-id baseline-v1 --text-license CC0-1.0 --text-provenance <source> --template plain
 lao-ocr generate-capture-suite --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-suite-v1 --font <font.ttf> --suite-id baseline-suite-v1 --text-license CC0-1.0 --text-provenance <source>
 lao-ocr capture-campaign-report --suite-manifest <capture-suite.json> --dataset-manifest <manifest.jsonl> --output campaign-report.json
@@ -312,6 +312,7 @@ See:
 - [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
 - [docs/capture-suite.md](docs/capture-suite.md)
 - [docs/capture-campaign-report.md](docs/capture-campaign-report.md)
+- [docs/synthetic-augmentation.md](docs/synthetic-augmentation.md)
 
 Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
 

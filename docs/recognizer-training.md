@@ -37,10 +37,10 @@ lao-ocr prepare-corpus   --input source.jsonl   --format jsonl   --field text   
 ## 3. Render labeled lines
 
 ```bash
-lao-ocr generate-synthetic   --corpus training/data/lao-lines.txt   --output training/generated/v1   --font /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf   --variants-per-line 3
+lao-ocr generate-synthetic   --corpus training/data/lao-lines.txt   --output training/generated/v1   --font /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf   --variants-per-line 3   --augmentation-profile balanced
 ```
 
-The generated manifest is `training/generated/v1/manifest.jsonl`.
+The generated manifest is `training/generated/v1/manifest.jsonl`. For augmentation profiles and their reproducibility metadata, see [synthetic-augmentation.md](synthetic-augmentation.md).
 
 ## 4. Train
 

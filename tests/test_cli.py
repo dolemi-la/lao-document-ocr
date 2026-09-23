@@ -1159,3 +1159,46 @@ def test_benchmark_refuses_tampered_frozen_dataset_before_engine(
 
     assert main() == 1
     assert "Frozen benchmark verification failed" in capsys.readouterr().err
+
+
+def test_generate_synthetic_cli_balanced_profiles(tmp_path, monkeypatch) -> None:
+    corpus = tmp_path / "synthetic-corpus.txt"
+    output = tmp_path / "synthetic-balanced"
+    corpus.write_text("OCR one\nOCR two\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "generate-synthetic",
+            "--corpus",
+            str(corpus),
+            "--output",
+            str(output),
+            "--font",
+            str(_cli_font_path()),
+            "--variants-per-line",
+            "3",
+            "--min-font-size",
+            "24",
+            "--max-font-size",
+            "24",
+            "--augmentation-profile",
+            "balanced",
+        ],
+    )
+
+    assert main() == 0
+    entries = [
+        json.loads(line)
+        for line in (output / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [entry["augmentation_profile"] for entry in entries] == [
+        "clean-scan",
+        "noisy-scan",
+        "phone-photo",
+        "clean-scan",
+        "noisy-scan",
+        "phone-photo",
+    ]

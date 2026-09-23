@@ -56,6 +56,7 @@ Status: started
 - [x] synthetic Lao text generator
 - [x] font inventory and licensing review (initial Noto Lao path)
 - [x] deterministic augmentation pipeline
+- [x] clean/noisy/phone synthetic augmentation profiles
 - [x] line recognizer training pipeline (CRNN + CTC)
 - [x] model export for CPU inference (`torch.export`)
 - [x] confidence calibration pipeline (held-out dev report -> calibration artifact)

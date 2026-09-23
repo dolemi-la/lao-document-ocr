@@ -311,6 +311,17 @@ def _parser() -> argparse.ArgumentParser:
     synthetic.add_argument("--min-font-size", type=int, default=40)
     synthetic.add_argument("--max-font-size", type=int, default=56)
     synthetic.add_argument("--max-samples", type=int)
+    synthetic.add_argument(
+        "--augmentation-profile",
+        choices=[
+            "default",
+            "clean-scan",
+            "noisy-scan",
+            "phone-photo",
+            "balanced",
+        ],
+        default="default",
+    )
 
     capture_pack = subparsers.add_parser(
         "generate-capture-pack",
@@ -948,6 +959,7 @@ def _generate_synthetic(args: argparse.Namespace) -> int:
         min_font_size=args.min_font_size,
         max_font_size=args.max_font_size,
         max_samples=args.max_samples,
+        augmentation_profile=args.augmentation_profile,
     )
     count = sum(1 for line in manifest.read_text(encoding="utf-8").splitlines() if line)
     print(f"Manifest: {manifest}")
