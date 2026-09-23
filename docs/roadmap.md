@@ -41,6 +41,7 @@ Status: in progress
 - [x] digital capture-suite OCR QA benchmark (explicitly non-real)
 - [x] real-data benchmark readiness coverage gate
 - [x] machine-readable manual review approval gate before public freeze
+- [x] local visual review queue for benchmark capture approval
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos

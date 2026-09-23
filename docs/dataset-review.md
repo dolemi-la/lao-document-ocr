@@ -4,6 +4,10 @@ Real optical evidence and valid hashes are necessary, but they do not replace hu
 
 Before a sample can enter a frozen public benchmark, a reviewer should verify the actual capture, its identity, metadata, and ground truth, then record an explicit approval in the dataset manifest.
 
+## Build a visual review queue
+
+Before recording decisions, generate a local thumbnail/ground-truth queue with `lao-ocr build-review-queue`. It defaults to unreviewed/rejected test samples and does not mutate the manifest. See [review-queue.md](review-queue.md).
+
 ## Approve a sample
 
 ```bash

@@ -245,6 +245,26 @@ def _parser() -> argparse.ArgumentParser:
     review.add_argument("--reviewer", required=True)
     review.add_argument("--notes")
 
+    review_queue = subparsers.add_parser(
+        "build-review-queue",
+        help="Build a local HTML/JSON review queue with thumbnails and ground truth.",
+    )
+    review_queue.add_argument("--manifest", required=True, type=Path)
+    review_queue.add_argument("--dataset-root", required=True, type=Path)
+    review_queue.add_argument("--output-dir", required=True, type=Path)
+    review_queue.add_argument(
+        "--split",
+        choices=[split.value for split in DatasetSplit],
+        default=DatasetSplit.TEST.value,
+    )
+    review_queue.add_argument(
+        "--status",
+        choices=["all", "needs-review", "unreviewed", "approved", "rejected"],
+        default="needs-review",
+    )
+    review_queue.add_argument("--thumbnail-width", type=int, default=900)
+    review_queue.add_argument("--thumbnail-height", type=int, default=1200)
+
     layout_benchmark = subparsers.add_parser(
         "benchmark-layout",
         help="Compare two document AST JSON files for layout/structure quality.",
@@ -1011,6 +1031,30 @@ def _review_dataset_sample(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_review_queue(args: argparse.Namespace) -> int:
+    from lao_document_ocr.review_queue import (
+        build_review_queue,
+        review_queue_summary,
+    )
+
+    samples = load_manifest(args.manifest)
+    html_path, json_path = build_review_queue(
+        samples,
+        args.dataset_root,
+        args.output_dir,
+        split=DatasetSplit(args.split),
+        status=args.status,
+        max_thumbnail_width=args.thumbnail_width,
+        max_thumbnail_height=args.thumbnail_height,
+    )
+    summary = review_queue_summary(json_path)
+    print(f"Review HTML: {html_path}")
+    print(f"Review JSON: {json_path}")
+    print(f"Samples: {summary['sample_count']}")
+    print(f"With problems: {summary['with_problems']}")
+    return 0
+
+
 def _benchmark_layout(args: argparse.Namespace) -> int:
     from lao_document_ocr.layout_benchmark import (
         benchmark_layout,
@@ -1654,6 +1698,8 @@ def main() -> int:
             return _add_dataset_sample(args)
         if args.command == "review-dataset-sample":
             return _review_dataset_sample(args)
+        if args.command == "build-review-queue":
+            return _build_review_queue(args)
         if args.command == "benchmark-layout":
             return _benchmark_layout(args)
         if args.command == "benchmark-docx":

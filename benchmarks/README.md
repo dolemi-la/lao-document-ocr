@@ -273,3 +273,7 @@ These numbers are regression/sanity data only. They are **not** the Phase 1 real
 ## Manual review gate
 
 Registered real captures are not publication-ready until a reviewer records `review.status=approved`. Use `lao-ocr review-dataset-sample`; readiness and public freeze enforce approval by default. See [../docs/dataset-review.md](../docs/dataset-review.md).
+
+## Local review queue
+
+Generate a local HTML/JSON queue for unreviewed/rejected benchmark captures with `lao-ocr build-review-queue`. It renders safe thumbnails and ground truth without mutating the manifest. See [../docs/review-queue.md](../docs/review-queue.md).

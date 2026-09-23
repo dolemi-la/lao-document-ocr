@@ -1690,3 +1690,64 @@ def test_review_dataset_sample_cli_enables_strict_public_freeze(
     assert lock.is_file()
     lock_payload = json.loads(lock.read_text(encoding="utf-8"))
     assert lock_payload["samples"][0]["review"]["status"] == "approved"
+
+
+def test_build_review_queue_cli_generates_local_bundle(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import hashlib
+
+    image = tmp_path / "review.png"
+    truth = tmp_path / "review.txt"
+    Image.new("RGB", (240, 140), (220, 245, 255)).save(image)
+    truth.write_text("ສະບາຍດີ review", encoding="utf-8")
+    manifest = tmp_path / "review-manifest.jsonl"
+    manifest.write_text(
+        json.dumps(
+            {
+                "id": "review-001",
+                "document_id": "review-doc-001",
+                "split": "test",
+                "subset": "phone-photo",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI review queue test",
+                "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
+                "tags": ["capture:phone-photo", "source:real-capture"],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "review-queue"
+    original_manifest = manifest.read_bytes()
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "build-review-queue",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output-dir",
+            str(output),
+        ],
+    )
+
+    assert main() == 0
+    assert manifest.read_bytes() == original_manifest
+    assert (output / "index.html").is_file()
+    payload = json.loads((output / "review-queue.json").read_text(encoding="utf-8"))
+    assert payload["sample_count"] == 1
+    assert payload["entries"][0]["id"] == "review-001"
+    assert (output / payload["entries"][0]["thumbnail"]).is_file()
+    captured = capsys.readouterr()
+    assert "Samples: 1" in captured.out
+    assert "With problems: 0" in captured.out
