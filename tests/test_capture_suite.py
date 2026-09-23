@@ -127,3 +127,34 @@ def test_capture_suite_rejects_duplicate_templates(tmp_path) -> None:
             templates=[CaptureTemplate.PLAIN, CaptureTemplate.PLAIN],
             dpi=96,
         )
+
+
+def test_combined_capture_pdf_is_byte_reproducible(tmp_path) -> None:
+    kwargs = dict(
+        corpus_lines=["ສະບາຍດີ", "ຂອບໃຈ", "OCR", "20,000 ₭"],
+        font_path=_font_path(),
+        suite_id="repro",
+        text_license="Apache-2.0",
+        text_provenance="Reproducibility unit test",
+        templates=[CaptureTemplate.PLAIN, CaptureTemplate.RECEIPT],
+        dpi=96,
+        lines_per_page=4,
+        max_pages_per_template=1,
+    )
+
+    first_manifest = generate_capture_suite(
+        output_dir=tmp_path / "first",
+        **kwargs,
+    )
+    second_manifest = generate_capture_suite(
+        output_dir=tmp_path / "second",
+        **kwargs,
+    )
+
+    first = load_capture_suite(first_manifest)
+    second = load_capture_suite(second_manifest)
+    first_pdf = first_manifest.parent / first.combined_pdf
+    second_pdf = second_manifest.parent / second.combined_pdf
+
+    assert first_pdf.read_bytes() == second_pdf.read_bytes()
+    assert b"/ID[" not in first_pdf.read_bytes()

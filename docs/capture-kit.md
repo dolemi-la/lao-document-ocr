@@ -63,7 +63,7 @@ Collectors can fill `capture_file` and `notes` while working through the printed
 
 `SHA256SUMS` covers every other member in the ZIP.
 
-ZIP entry timestamps are fixed, so rebuilding a kit from the same suite/revision produces identical bytes.
+ZIP entry timestamps are fixed, and the combined printable PDF is serialized without a random PDF document ID. Rebuilding the campaign and kit from the same source revision therefore produces identical combined-PDF/manifest/worksheet/ZIP bytes.
 
 ## Collection guidance
 

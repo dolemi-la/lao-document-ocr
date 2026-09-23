@@ -61,7 +61,7 @@ def _merge_pdfs(pdf_paths: list[Path], destination: Path) -> None:
                 output.insert_pdf(source)
             finally:
                 source.close()
-        output.save(destination)
+        output.save(destination, no_new_id=True)
     finally:
         output.close()
 

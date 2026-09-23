@@ -34,16 +34,21 @@ or directly:
 The generated files are intentionally ignored by Git:
 
 ```text
-benchmarks/capture-packs/project-authored-lao-v1/
-├── project-authored-lao-v1.pdf
-├── capture-suite.json
-├── plain/
-├── two-column/
-├── ruled-table/
-├── borderless-table/
-├── receipt/
-└── form/
+benchmarks/capture-packs/
+├── project-authored-lao-v1/
+│   ├── project-authored-lao-v1.pdf
+│   ├── capture-suite.json
+│   ├── capture-worksheet.csv
+│   ├── plain/
+│   ├── two-column/
+│   ├── ruled-table/
+│   ├── borderless-table/
+│   ├── receipt/
+│   └── form/
+└── project-authored-lao-v1.collector.zip
 ```
+
+The generator verifies all 60 suite pages and builds the collector-safe ZIP automatically. It prints the collector ZIP SHA-256 for handoff/integrity checks. The combined PDF and collector ZIP are byte-reproducible when regenerated from the same source revision.
 
 The v1 campaign contains:
 
@@ -56,6 +61,14 @@ The v1 campaign contains:
 - 60 pages total in the combined PDF
 
 The digital PDF/PNGs are source material only. They are **not real OCR benchmark evidence**.
+
+Share this ZIP with collectors instead of the internal suite directory:
+
+```text
+benchmarks/capture-packs/project-authored-lao-v1.collector.zip
+```
+
+It excludes ground truth, digital page PNGs, and internal suite paths.
 
 ## Print
 
