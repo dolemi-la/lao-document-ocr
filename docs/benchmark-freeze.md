@@ -68,3 +68,19 @@ A verification failure exits nonzero.
 9. publish reports + lock file + revision
 
 Do not regenerate a lock merely because a candidate model performs poorly on the frozen set. Any benchmark-content change should create a new benchmark version with reviewed reasons.
+
+## Enforce the lock during OCR benchmarking
+
+After freezing, pass the lock directly to every baseline/candidate run:
+
+```bash
+lao-ocr benchmark \
+  --manifest benchmarks/frozen/test-v1.jsonl \
+  --dataset-root benchmarks/public \
+  --split test \
+  --freeze-lock benchmarks/frozen/test-v1.lock.json \
+  --engine tesseract \
+  --output benchmarks/results/tesseract-v1.json
+```
+
+The command verifies the frozen manifest and every locked source/ground-truth/layout hash before initializing the OCR engine. A tampered benchmark therefore fails before producing a report.

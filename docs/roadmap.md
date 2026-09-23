@@ -44,6 +44,7 @@ Status: in progress
 - [x] CER/WER reporting by subset
 - [x] benchmark release bundle with report SHA-256/source revision
 - [x] frozen test-set manifest/lock with file hashes
+- [x] benchmark command enforces frozen test-set lock
 - [ ] Tesseract baseline report
 
 Exit condition: every model change can be measured on a fixed, legal, documented dataset.

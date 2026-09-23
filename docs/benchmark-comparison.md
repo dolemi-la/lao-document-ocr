@@ -10,6 +10,7 @@ lao-ocr benchmark \
   --dataset-root benchmarks/public \
   --split test \
   --engine tesseract \
+  --freeze-lock benchmarks/frozen/test-v1.lock.json \
   --languages lao+eng \
   --psm 3 \
   --output benchmarks/results/tesseract-v1.json
@@ -25,6 +26,7 @@ lao-ocr benchmark \
   --dataset-root benchmarks/public \
   --split test \
   --engine owned \
+  --freeze-lock benchmarks/frozen/test-v1.lock.json \
   --model models/recognizer.pt2 \
   --calibration models/calibration.json \
   --device cpu \

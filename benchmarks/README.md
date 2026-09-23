@@ -224,3 +224,5 @@ lao-ocr freeze-benchmark \
 ```
 
 Verify the lock before every published benchmark run with `verify-benchmark-freeze`. See [../docs/benchmark-freeze.md](../docs/benchmark-freeze.md).
+
+When publishing baseline/candidate results, use `--freeze-lock <lock.json>` with `lao-ocr benchmark` so the command refuses to run if the frozen test set has changed.

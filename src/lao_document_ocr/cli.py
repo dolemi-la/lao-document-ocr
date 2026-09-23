@@ -267,6 +267,11 @@ def _parser() -> argparse.ArgumentParser:
         default=256,
     )
     benchmark.add_argument("--no-hash-check", action="store_true")
+    benchmark.add_argument(
+        "--freeze-lock",
+        type=Path,
+        help="Verify this benchmark lock before running OCR.",
+    )
 
     corpus = subparsers.add_parser(
         "prepare-corpus",
@@ -812,6 +817,20 @@ def _compare_benchmarks(args: argparse.Namespace) -> int:
 
 
 def _benchmark(args: argparse.Namespace) -> int:
+    if args.freeze_lock is not None:
+        from lao_document_ocr.benchmark_freeze import verify_benchmark_freeze
+
+        freeze_errors = verify_benchmark_freeze(
+            args.freeze_lock,
+            args.dataset_root,
+            manifest_path=args.manifest,
+        )
+        if freeze_errors:
+            raise ValueError(
+                "Frozen benchmark verification failed:\n"
+                + "\n".join(f"- {error}" for error in freeze_errors)
+            )
+
     samples = load_manifest(args.manifest)
 
     if args.engine == "tesseract":

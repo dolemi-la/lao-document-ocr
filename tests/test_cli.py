@@ -1085,3 +1085,77 @@ def test_verify_benchmark_freeze_cli_detects_tamper(
         ],
     )
     assert main() == 1
+
+
+def test_benchmark_refuses_tampered_frozen_dataset_before_engine(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import hashlib
+
+    image = tmp_path / "page.png"
+    truth = tmp_path / "page.txt"
+    Image.new("RGB", (100, 60), (160, 255, 255)).save(image)
+    truth.write_text("truth", encoding="utf-8")
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    source_manifest = tmp_path / "source.jsonl"
+    source_manifest.write_text(
+        json.dumps(
+            {
+                "id": "sample-001",
+                "document_id": "doc-001",
+                "split": "test",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI frozen benchmark guard test",
+                "sha256": digest,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    frozen = tmp_path / "frozen.jsonl"
+    lock = tmp_path / "lock.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "freeze-benchmark",
+            "--manifest",
+            str(source_manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output-manifest",
+            str(frozen),
+            "--output-lock",
+            str(lock),
+        ],
+    )
+    assert main() == 0
+    capsys.readouterr()
+
+    truth.write_text("tampered", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "benchmark",
+            "--manifest",
+            str(frozen),
+            "--dataset-root",
+            str(tmp_path),
+            "--output",
+            str(tmp_path / "report.json"),
+            "--freeze-lock",
+            str(lock),
+        ],
+    )
+
+    assert main() == 1
+    assert "Frozen benchmark verification failed" in capsys.readouterr().err
