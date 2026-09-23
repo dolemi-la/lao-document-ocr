@@ -56,6 +56,9 @@ Status: in progress
 - [ ] multi-column documents
 - [ ] simple/complex tables
 - [ ] receipts/forms as separate subsets
+
+Tracking: real optical collection + registration is tracked in [#14](https://github.com/dolemi-la/lao-document-ocr/issues/14).
+
 - [x] CER/WER reporting by subset
 - [x] configurable Tesseract traineddata with model hashes
 - [x] benchmark release bundle with report SHA-256/source revision
@@ -64,7 +67,7 @@ Status: in progress
 - [x] capture optical-evidence integrity check against digital re-encodes
 - [x] benchmark command enforces frozen test-set lock
 - [x] OCR reports cryptographically bound to verified frozen test-set lock
-- [ ] Tesseract baseline report
+- [ ] Tesseract baseline report — tracked in [#15](https://github.com/dolemi-la/lao-document-ocr/issues/15)
 
 Exit condition: every model change can be measured on a fixed, legal, documented dataset.
 
@@ -131,7 +134,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] S3-compatible/object-storage result adapter
 - [x] baseline security hardening/review (uploads, parser caps, headers, permissions, non-root API)
 - [x] automated Python/web dependency vulnerability scanning + Dependabot
-- [ ] external deployment penetration/security review
+- [ ] external deployment penetration/security review — tracked in [#16](https://github.com/dolemi-la/lao-document-ocr/issues/16)
 - [x] Lao/English web accessibility baseline
 - [x] Lao/English web localization baseline
 - [x] local/public/S3 deployment presets
