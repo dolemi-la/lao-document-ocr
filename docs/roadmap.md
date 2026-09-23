@@ -61,6 +61,7 @@ Status: started
 - [x] bounded HPLT v3 Lao text sampler with provenance metadata
 - [x] font inventory and licensing review (initial Noto Lao path)
 - [x] deterministic augmentation pipeline
+- [x] leakage-safe normalized-text-group train/dev splitting
 - [x] clean/noisy/phone synthetic augmentation profiles
 - [x] line recognizer training pipeline (CRNN + CTC)
 - [x] model export for CPU inference (`torch.export`)

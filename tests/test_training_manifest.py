@@ -59,3 +59,49 @@ def test_split_rejects_invalid_ratio(tmp_path) -> None:
     samples = load_training_manifest(manifest)
     with pytest.raises(ValueError, match="dev_ratio"):
         deterministic_split(samples, dev_ratio=1.0)
+
+
+def test_split_keeps_augmented_variants_of_same_text_together(tmp_path) -> None:
+    entries = [
+        _write_sample(tmp_path, "hello-a", "  ສະບາຍດີ   ໂລກ  "),
+        _write_sample(tmp_path, "hello-b", "ສະບາຍດີ ໂລກ"),
+        _write_sample(tmp_path, "thanks-a", "ຂອບໃຈ ຫຼາຍ"),
+        _write_sample(tmp_path, "thanks-b", "ຂອບໃຈ ຫຼາຍ"),
+        _write_sample(tmp_path, "ocr-a", "Lao OCR"),
+        _write_sample(tmp_path, "ocr-b", "Lao OCR"),
+    ]
+    manifest = tmp_path / "manifest.jsonl"
+    manifest.write_text(
+        "\n".join(json.dumps(entry, ensure_ascii=False) for entry in entries) + "\n",
+        encoding="utf-8",
+    )
+    samples = load_training_manifest(manifest)
+
+    train, dev = deterministic_split(samples, dev_ratio=0.34)
+
+    train_texts = {" ".join(sample.text.split()) for sample in train}
+    dev_texts = {" ".join(sample.text.split()) for sample in dev}
+    assert train_texts.isdisjoint(dev_texts)
+
+    placement = {}
+    for split_name, split_samples in (("train", train), ("dev", dev)):
+        for sample in split_samples:
+            normalized = " ".join(sample.text.split())
+            placement.setdefault(normalized, set()).add(split_name)
+    assert all(len(sides) == 1 for sides in placement.values())
+
+
+def test_split_rejects_single_unique_text_group(tmp_path) -> None:
+    entries = [
+        _write_sample(tmp_path, "variant-a", "same text"),
+        _write_sample(tmp_path, "variant-b", "same   text"),
+    ]
+    manifest = tmp_path / "manifest.jsonl"
+    manifest.write_text(
+        "\n".join(json.dumps(entry) for entry in entries) + "\n",
+        encoding="utf-8",
+    )
+    samples = load_training_manifest(manifest)
+
+    with pytest.raises(ValueError, match="unique normalized text groups"):
+        deterministic_split(samples, dev_ratio=0.2)

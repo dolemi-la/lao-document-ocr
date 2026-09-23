@@ -5,6 +5,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from lao_document_ocr.normalization import normalize_lao_text
+
+SPLIT_STRATEGY = "normalized-text-group-sha256-v1"
+
 
 @dataclass(frozen=True)
 class TrainingSample:
@@ -75,6 +79,13 @@ def load_training_manifest(
     return samples
 
 
+def _split_group_key(sample: TrainingSample) -> str:
+    normalized = normalize_lao_text(sample.text)
+    if not normalized:
+        raise ValueError(f"Training sample {sample.id} has empty normalized text")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def deterministic_split(
     samples: list[TrainingSample],
     *,
@@ -85,22 +96,46 @@ def deterministic_split(
     if len(samples) < 2:
         raise ValueError("At least two samples are required for a train/dev split")
 
-    train: list[TrainingSample] = []
-    dev: list[TrainingSample] = []
-    threshold = int(dev_ratio * 10_000)
-
+    groups: dict[str, list[TrainingSample]] = {}
     for sample in samples:
-        digest = hashlib.sha256(sample.id.encode("utf-8")).digest()
+        groups.setdefault(_split_group_key(sample), []).append(sample)
+
+    if len(groups) < 2:
+        raise ValueError(
+            "At least two unique normalized text groups are required for a "
+            "leakage-safe train/dev split"
+        )
+
+    threshold = int(dev_ratio * 10_000)
+    dev_groups: set[str] = set()
+    train_groups: set[str] = set()
+
+    for group_key in sorted(groups):
+        digest = bytes.fromhex(group_key)
         bucket = int.from_bytes(digest[:4], "big") % 10_000
         if bucket < threshold:
+            dev_groups.add(group_key)
+        else:
+            train_groups.add(group_key)
+
+    # Tiny datasets can hash entirely into one side. Move a whole text group,
+    # never an individual augmented sample, so identical labels cannot leak.
+    if not dev_groups:
+        moved = sorted(train_groups)[-1]
+        train_groups.remove(moved)
+        dev_groups.add(moved)
+    if not train_groups:
+        moved = sorted(dev_groups)[0]
+        dev_groups.remove(moved)
+        train_groups.add(moved)
+
+    train: list[TrainingSample] = []
+    dev: list[TrainingSample] = []
+    for sample in samples:
+        group_key = _split_group_key(sample)
+        if group_key in dev_groups:
             dev.append(sample)
         else:
             train.append(sample)
-
-    # Tiny smoke datasets can hash entirely into one side. Move one sample deterministically.
-    if not dev:
-        dev.append(train.pop(-1))
-    if not train:
-        train.append(dev.pop(0))
 
     return train, dev

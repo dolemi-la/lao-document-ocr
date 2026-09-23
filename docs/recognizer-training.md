@@ -193,3 +193,26 @@ lao-ocr train-char-lm \
 ```
 
 Use it only with beam decoding and tune fusion parameters on held-out dev data. Confidence calibration must be refit for the exact LM checksum/weight/token bonus. See [language-model.md](language-model.md).
+
+## Leakage-safe train/dev split
+
+Recognizer training splits by **normalized ground-truth text group**, not by generated sample ID. All augmented/rendered variants of the same normalized text therefore stay together in either train or dev.
+
+The current strategy is recorded as:
+
+```text
+normalized-text-group-sha256-v1
+```
+
+in checkpoint metadata and exported recognizer metadata.
+
+This prevents augmentation leakage such as:
+
+```text
+train: line-0001 variant A -> "ສະບາຍດີ"
+dev:   line-0001 variant B -> "ສະບາຍດີ"
+```
+
+which would make dev CER look better without testing generalization to unseen text.
+
+At least two unique normalized text groups are required. Tiny datasets containing multiple images of only one text string are rejected instead of manufacturing a leaked dev split.

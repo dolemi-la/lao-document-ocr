@@ -13,7 +13,11 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from lao_document_ocr.normalization import normalize_lao_text
-from lao_document_ocr.training_manifest import TrainingSample, deterministic_split
+from lao_document_ocr.training_manifest import (
+    SPLIT_STRATEGY,
+    TrainingSample,
+    deterministic_split,
+)
 from lao_document_ocr.vocabulary import CharacterVocabulary
 
 MODEL_VERSION = "crnn-ctc-v2"
@@ -351,6 +355,7 @@ def train_recognizer(
         "model_version": MODEL_VERSION,
         "model_config": model_config.to_dict(),
         "training_config": training_config.to_dict(),
+        "split_strategy": SPLIT_STRATEGY,
         "vocabulary": vocabulary.to_dict(),
         "vocabulary_checksum": vocabulary.checksum(),
         "state_dict": model.state_dict(),
@@ -370,6 +375,7 @@ def train_recognizer(
         "vocabulary_checksum": vocabulary.checksum(),
         "model_config": model_config.to_dict(),
         "training_config": training_config.to_dict(),
+        "split_strategy": SPLIT_STRATEGY,
         "train_samples": len(train_samples),
         "dev_samples": len(dev_samples),
         "best_dev_cer": best_cer,
@@ -432,6 +438,7 @@ def export_recognizer(
         "vocabulary": checkpoint["vocabulary"],
         "vocabulary_checksum": checkpoint["vocabulary_checksum"],
         "model_config": checkpoint["model_config"],
+        "split_strategy": checkpoint.get("split_strategy", "legacy-sample-id-sha256"),
         "width_downsample_factor": model.width_downsample_factor,
     }
     destination.with_suffix(destination.suffix + ".json").write_text(
