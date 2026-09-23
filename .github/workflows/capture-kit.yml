@@ -1,0 +1,140 @@
+name: Build Collector Capture Kit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collector-kit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Lao font
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-core
+          test -f /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Build canonical suite and collector kit
+        env:
+          OUTPUT_DIR: ${{ runner.temp }}/project-authored-lao-v1
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUTPUT_DIR"
+
+          lao-ocr generate-capture-suite \
+            --corpus resources/corpora/project-authored-lao-v1.txt \
+            --output "$OUTPUT_DIR/suite" \
+            --font /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf \
+            --suite-id project-authored-lao-v1 \
+            --text-license Apache-2.0 \
+            --text-provenance "Project-authored Lao capture corpus v1; resources/corpora/project-authored-lao-v1.meta.json" \
+            --dpi 150 \
+            --lines-per-page 8 \
+            --max-pages-per-template 10
+
+          lao-ocr build-capture-kit \
+            --suite-manifest "$OUTPUT_DIR/suite/capture-suite.json" \
+            --output "$OUTPUT_DIR/project-authored-lao-v1.collector.zip" \
+            --revision "$REVISION"
+
+      - name: Verify collector artifact
+        env:
+          OUTPUT_DIR: ${{ runner.temp }}/project-authored-lao-v1
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          import os
+          import zipfile
+          from pathlib import Path
+
+          import pymupdf
+
+          root = Path(os.environ["OUTPUT_DIR"])
+          suite_path = root / "suite" / "capture-suite.json"
+          suite = json.loads(suite_path.read_text(encoding="utf-8"))
+          worksheet_path = root / "suite" / suite["worksheet"]
+          rows = list(
+              csv.DictReader(
+                  worksheet_path.open(encoding="utf-8", newline="")
+              )
+          )
+          pdf_path = root / "suite" / suite["combined_pdf"]
+          pdf = pymupdf.open(pdf_path)
+          try:
+              page_count = pdf.page_count
+          finally:
+              pdf.close()
+
+          expected_pages = sum(
+              int(pack["page_count"])
+              for pack in suite["packs"]
+          )
+          assert page_count == expected_pages == len(rows) == 60
+
+          kit_path = root / "project-authored-lao-v1.collector.zip"
+          with zipfile.ZipFile(kit_path) as archive:
+              expected_members = {
+                  "CAPTURE-INSTRUCTIONS.md",
+                  "SHA256SUMS",
+                  "capture-kit.json",
+                  "capture-worksheet.csv",
+                  "project-authored-lao-v1.pdf",
+              }
+              assert set(archive.namelist()) == expected_members
+
+              collector_sheet = archive.read(
+                  "capture-worksheet.csv"
+              ).decode("utf-8")
+              assert "ground_truth" not in collector_sheet
+              assert "digital_page" not in collector_sheet
+              assert "pack_manifest" not in collector_sheet
+
+              manifest = json.loads(
+                  archive.read("capture-kit.json")
+              )
+              assert manifest["page_count"] == 60
+              assert manifest["excludes_ground_truth"] is True
+              assert manifest["excludes_digital_page_images"] is True
+              assert manifest["excludes_internal_suite_paths"] is True
+
+              for line in archive.read("SHA256SUMS").decode("utf-8").splitlines():
+                  digest, name = line.split("  ", 1)
+                  assert digest == hashlib.sha256(
+                      archive.read(name)
+                  ).hexdigest()
+
+          digest = hashlib.sha256(kit_path.read_bytes()).hexdigest()
+          checksum_path = root / "project-authored-lao-v1.collector.zip.sha256"
+          checksum_path.write_text(
+              f"{digest}  {kit_path.name}\n",
+              encoding="utf-8",
+          )
+          print(f"Collector kit SHA-256: {digest}")
+          PY
+
+      - name: Upload collector kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-authored-lao-v1-collector-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/project-authored-lao-v1/project-authored-lao-v1.collector.zip
+            ${{ runner.temp }}/project-authored-lao-v1/project-authored-lao-v1.collector.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

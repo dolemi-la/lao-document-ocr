@@ -331,6 +331,8 @@ See:
 - [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
 - [docs/capture-suite.md](docs/capture-suite.md)
 - [docs/capture-kit.md](docs/capture-kit.md)
+
+Maintainers can also run the manual GitHub Actions workflow **Build Collector Capture Kit** to generate a revision-bound collector ZIP + SHA-256 artifact without committing generated benchmark files.
 - [docs/capture-suite-qa.md](docs/capture-suite-qa.md)
 - [docs/project-authored-capture-campaign.md](docs/project-authored-capture-campaign.md)
 - [docs/bulk-capture-registration.md](docs/bulk-capture-registration.md)

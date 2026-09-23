@@ -77,3 +77,23 @@ The included instructions ask contributors to:
 - keep original capture files
 
 After collection, maintainers run optical-evidence checks, registration, manual review, readiness checks, and benchmark freeze before publishing accuracy results.
+
+## GitHub Actions artifact
+
+Maintainers can build the canonical project-authored collector kit without committing generated files:
+
+1. open **Actions** in the repository
+2. select **Build Collector Capture Kit**
+3. choose **Run workflow** on the desired commit/branch
+4. download the generated artifact when the workflow succeeds
+
+The artifact contains only:
+
+```text
+project-authored-lao-v1.collector.zip
+project-authored-lao-v1.collector.zip.sha256
+```
+
+The workflow installs the Noto Lao font, regenerates all 60 pages from the project-authored corpus, verifies the suite/collector contents and checksums, binds the kit to `github.sha`, and uploads it with 30-day artifact retention. Repository permissions are read-only.
+
+Workflow source: `.github/workflows/capture-kit.yml`.

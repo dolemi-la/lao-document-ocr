@@ -70,6 +70,10 @@ benchmarks/capture-packs/project-authored-lao-v1.collector.zip
 
 It excludes ground truth, digital page PNGs, and internal suite paths.
 
+### GitHub Actions handoff
+
+For a revision-bound downloadable artifact, run the repository workflow **Build Collector Capture Kit**. It regenerates the canonical 60-page suite, builds/verifies the collector ZIP, writes a `.sha256` sidecar, and uploads only those two collector-facing files. See [capture-kit.md](capture-kit.md).
+
 ## Print
 
 Print:

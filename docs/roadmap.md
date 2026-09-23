@@ -36,6 +36,7 @@ Status: in progress
 - [x] combined multi-template capture suite generator
 - [x] collector-safe reproducible capture-kit packaging
 - [x] byte-reproducible combined capture PDF + collector ZIP generation
+- [x] manual CI workflow for revision-bound collector ZIP + SHA-256 artifact
 - [x] project-authored rights-clear Lao capture corpus + printable 60-page campaign
 - [x] capture campaign completion report by template/device mode
 - [x] atomic bulk capture-directory registration workflow
