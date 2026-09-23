@@ -115,6 +115,8 @@ def test_dry_run_plans_batch_without_mutating_dataset(tmp_path) -> None:
     assert report.planned_captures == 2
     assert report.registered_captures == 0
     assert report.missing_page_ids == ()
+    assert len(report.file_mappings) == 2
+    assert all(mapping.page_id_method == "qr" for mapping in report.file_mappings)
     assert not (tmp_path / "dataset" / "manifest.jsonl").exists()
 
 
@@ -187,15 +189,46 @@ def test_require_complete_rejects_partial_directory_before_write(tmp_path) -> No
     assert not manifest.exists()
 
 
-def test_unknown_page_filename_is_rejected(tmp_path) -> None:
+def test_raw_camera_filenames_are_identified_by_qr(tmp_path) -> None:
     suite = _suite(tmp_path)
-    captures = _captures(tmp_path, suite, count=1)
-    _make_optical_capture(
-        _page_sources(suite)[0][1],
-        captures / "not-a-suite-page.jpg",
+    captures = tmp_path / "raw-phone"
+    captures.mkdir()
+    for index, (_, source) in enumerate(_page_sources(suite), start=1):
+        _make_optical_capture(source, captures / f"IMG_{index:04d}.jpg")
+
+    report = register_capture_directory(
+        suite_manifest=suite,
+        capture_dir=captures,
+        capture_id="phone-a",
+        capture_mode=CaptureMode.PHONE_PHOTO,
+        contributor="Test Contributor",
+        release_license="CC0-1.0",
+        dataset_root=tmp_path / "dataset",
+        dataset_manifest=tmp_path / "dataset" / "manifest.jsonl",
+        require_complete=True,
+        dry_run=True,
     )
 
-    with pytest.raises(ValueError, match="do not match suite page ids"):
+    assert report.planned_captures == 2
+    assert [mapping.filename for mapping in report.file_mappings] == [
+        "IMG_0001.jpg",
+        "IMG_0002.jpg",
+    ]
+    assert all(mapping.page_id_method == "qr" for mapping in report.file_mappings)
+    assert {mapping.page_id for mapping in report.file_mappings} == {
+        "batch-plain-p0001",
+        "batch-plain-p0002",
+    }
+
+
+def test_unknown_image_without_qr_is_rejected(tmp_path) -> None:
+    suite = _suite(tmp_path)
+    captures = tmp_path / "unknown"
+    captures.mkdir()
+    image = Image.new("RGB", (900, 1200), (220, 215, 205))
+    image.save(captures / "not-a-suite-page.jpg", quality=82)
+
+    with pytest.raises(ValueError, match="could not identify"):
         register_capture_directory(
             suite_manifest=suite,
             capture_dir=captures,
@@ -205,7 +238,54 @@ def test_unknown_page_filename_is_rejected(tmp_path) -> None:
             release_license="CC0-1.0",
             dataset_root=tmp_path / "dataset",
             dataset_manifest=tmp_path / "dataset" / "manifest.jsonl",
-            confirm_release=True,
+            dry_run=True,
+        )
+
+
+def test_filename_and_qr_page_id_mismatch_is_rejected(tmp_path) -> None:
+    suite = _suite(tmp_path)
+    captures = tmp_path / "mismatch"
+    captures.mkdir()
+    pages = _page_sources(suite)
+    first_id = pages[0][0]
+    _make_optical_capture(pages[1][1], captures / f"{first_id}.jpg")
+
+    with pytest.raises(ValueError, match="does not match QR page id"):
+        register_capture_directory(
+            suite_manifest=suite,
+            capture_dir=captures,
+            capture_id="phone-a",
+            capture_mode=CaptureMode.PHONE_PHOTO,
+            contributor="Test Contributor",
+            release_license="CC0-1.0",
+            dataset_root=tmp_path / "dataset",
+            dataset_manifest=tmp_path / "dataset" / "manifest.jsonl",
+            dry_run=True,
+        )
+
+
+def test_qr_enabled_suite_rejects_unreadable_qr(tmp_path) -> None:
+    suite = _suite(tmp_path)
+    captures = tmp_path / "unreadable"
+    captures.mkdir()
+    page_id, source = _page_sources(suite)[0]
+    with Image.open(source) as image:
+        page = image.convert("RGB")
+    # Remove the header/QR while keeping plenty of visible body content.
+    cropped = page.crop((0, round(page.height * 0.18), page.width, page.height))
+    cropped.save(captures / f"{page_id}.jpg", quality=85)
+
+    with pytest.raises(ValueError, match="QR page id could not be decoded"):
+        register_capture_directory(
+            suite_manifest=suite,
+            capture_dir=captures,
+            capture_id="phone-a",
+            capture_mode=CaptureMode.PHONE_PHOTO,
+            contributor="Test Contributor",
+            release_license="CC0-1.0",
+            dataset_root=tmp_path / "dataset",
+            dataset_manifest=tmp_path / "dataset" / "manifest.jsonl",
+            dry_run=True,
         )
 
 

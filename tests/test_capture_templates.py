@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from PIL import ImageFont
 
+from lao_document_ocr.capture_page_id import decode_page_id_image
 from lao_document_ocr.capture_templates import (
     CaptureTemplate,
     render_capture_page,
@@ -59,7 +60,9 @@ def test_templates_render_with_expected_tags(template, required_tag) -> None:
     assert f"Page ID: test-{template.value}" in truth
     assert required_tag in tags
     assert "source:capture-pack" in tags
+    assert "page-id:qr-v1" in tags
     assert "language:mixed" in tags
+    assert decode_page_id_image(image) == f"test-{template.value}"
 
 
 def test_two_column_truth_is_left_then_right() -> None:

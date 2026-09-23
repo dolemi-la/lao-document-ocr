@@ -4,20 +4,21 @@ Use this workflow after scanning or photographing multiple pages from a capture 
 
 It avoids running `register-capture` once per page.
 
-## Filename convention
+## Page identification
 
-Put one capture mode/device run in one directory.
-
-Each image filename stem must exactly match the capture-suite page ID:
+Current capture suites print a `page-id:qr-v1` QR marker in the top-right header. Bulk registration reads that marker directly, so raw camera/scanner filenames are fine:
 
 ```text
 captures/phone-a/
-├── project-authored-lao-v1-plain-p0001.jpg
-├── project-authored-lao-v1-plain-p0002.jpg
+├── IMG_1842.jpg
+├── IMG_1843.jpg
 ├── ...
-├── project-authored-lao-v1-form-p0009.jpg
-└── project-authored-lao-v1-form-p0010.jpg
+└── IMG_1901.jpg
 ```
+
+If you rename files to exact page IDs, that is also supported. When both a page-ID filename and QR are present, they must agree; a mismatch is rejected.
+
+Legacy capture suites without QR markers still require exact page-ID filenames.
 
 Supported image extensions:
 
@@ -30,7 +31,7 @@ Supported image extensions:
 
 Non-image files such as `.DS_Store` are ignored and reported.
 
-Unknown image stems are rejected instead of being silently skipped.
+Images whose QR cannot be decoded and whose filename is not a known legacy page ID are rejected instead of being silently skipped. QR-enabled suites require a readable QR marker during bulk import. Hard/degraded captures whose marker is unreadable should be reviewed and registered individually rather than guessed.
 
 ## Dry-run first
 
@@ -55,8 +56,9 @@ The dry-run performs preflight checks but does not modify the dataset.
 
 It checks:
 
-- suite page IDs
-- duplicate filenames
+- suite page IDs decoded from QR/legacy filenames
+- duplicate page mappings
+- filename ↔ QR agreement when both identify a page
 - missing pages when `--require-complete` is used
 - existing sample-ID collisions
 - destination collisions

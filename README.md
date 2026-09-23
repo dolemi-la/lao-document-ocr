@@ -266,7 +266,7 @@ The project does not bundle Phetsarath OT. If the font is legally installed on t
 
 ## Benchmarks
 
-The repository has a strict JSONL dataset format, dataset validator, CER/WER benchmark runner, per-subset and multi-axis benchmark-tag reporting, split-leakage checks, structured capture templates, and a deterministic synthetic Lao smoke benchmark.
+The repository has a strict JSONL dataset format, dataset validator, CER/WER benchmark runner, per-subset and multi-axis benchmark-tag reporting, split-leakage checks, structured capture templates with page-ID QR markers, and a deterministic synthetic Lao smoke benchmark.
 
 Useful commands:
 

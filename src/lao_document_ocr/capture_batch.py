@@ -10,6 +10,7 @@ from lao_document_ocr.capture_authenticity import (
     compare_capture_to_digital_source,
 )
 from lao_document_ocr.capture_pack import load_capture_pack
+from lao_document_ocr.capture_page_id import decode_page_id
 from lao_document_ocr.capture_registration import (
     CaptureMode,
     register_capture,
@@ -36,6 +37,7 @@ class CaptureBatchItem:
     pack_manifest: Path
     digital_page: Path
     capture_path: Path
+    page_id_method: str
     authenticity: CaptureAuthenticity
 
     def to_dict(self) -> dict:
@@ -45,8 +47,20 @@ class CaptureBatchItem:
             "pack_manifest": str(self.pack_manifest),
             "digital_page": str(self.digital_page),
             "capture_path": str(self.capture_path),
+            "page_id_method": self.page_id_method,
             "authenticity": self.authenticity.to_dict(),
         }
+
+
+@dataclass(frozen=True)
+class CaptureFileMapping:
+    filename: str
+    page_id: str
+    template: str
+    page_id_method: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -62,12 +76,16 @@ class CaptureBatchReport:
     ignored_files: tuple[str, ...]
     registered_sample_ids: tuple[str, ...]
     dry_run: bool
+    file_mappings: tuple[CaptureFileMapping, ...] = ()
 
     def to_dict(self) -> dict:
         payload = asdict(self)
         payload["missing_page_ids"] = list(self.missing_page_ids)
         payload["ignored_files"] = list(self.ignored_files)
         payload["registered_sample_ids"] = list(self.registered_sample_ids)
+        payload["file_mappings"] = [
+            mapping.to_dict() for mapping in self.file_mappings
+        ]
         return payload
 
 
@@ -77,6 +95,7 @@ class _SuitePage:
     template: str
     pack_manifest: Path
     digital_page: Path
+    requires_qr: bool
 
 
 def _suite_pages(suite_manifest: Path) -> tuple[str, dict[str, _SuitePage]]:
@@ -97,6 +116,7 @@ def _suite_pages(suite_manifest: Path) -> tuple[str, dict[str, _SuitePage]]:
                 template=pack.template,
                 pack_manifest=pack_manifest,
                 digital_page=(pack_root / page.image).resolve(),
+                requires_qr="page-id:qr-v1" in page.tags,
             )
 
     if not pages:
@@ -106,11 +126,12 @@ def _suite_pages(suite_manifest: Path) -> tuple[str, dict[str, _SuitePage]]:
 
 def _discover_capture_files(
     capture_dir: Path,
-) -> tuple[dict[str, Path], list[str]]:
+    suite_pages: dict[str, _SuitePage],
+) -> tuple[dict[str, tuple[Path, str]], list[str]]:
     if not capture_dir.is_dir():
         raise FileNotFoundError(f"Capture directory not found: {capture_dir}")
 
-    captures: dict[str, Path] = {}
+    captures: dict[str, tuple[Path, str]] = {}
     ignored: list[str] = []
     for path in sorted(capture_dir.iterdir(), key=lambda item: item.name):
         if not path.is_file():
@@ -119,11 +140,44 @@ def _discover_capture_files(
         if path.suffix.lower() not in _CAPTURE_EXTENSIONS:
             ignored.append(path.name)
             continue
-        if path.stem in captures:
+
+        resolved = path.resolve()
+        decoded = decode_page_id(resolved)
+        filename_page_id = path.stem if path.stem in suite_pages else None
+
+        if decoded is not None:
+            if decoded not in suite_pages:
+                raise ValueError(
+                    f"{path.name}: QR page id is not part of the capture suite: "
+                    f"{decoded}"
+                )
+            if filename_page_id is not None and filename_page_id != decoded:
+                raise ValueError(
+                    f"{path.name}: filename page id ({filename_page_id}) does not "
+                    f"match QR page id ({decoded})"
+                )
+            page_id = decoded
+            method = "qr"
+        elif filename_page_id is not None:
+            page = suite_pages[filename_page_id]
+            if page.requires_qr:
+                raise ValueError(
+                    f"{path.name}: QR page id could not be decoded for a "
+                    "page-id:qr-v1 capture suite"
+                )
+            page_id = filename_page_id
+            method = "filename"
+        else:
             raise ValueError(
-                f"Multiple capture files use page id '{path.stem}'"
+                f"{path.name}: could not identify a capture-suite page from "
+                "the QR marker or filename"
             )
-        captures[path.stem] = path.resolve()
+
+        if page_id in captures:
+            raise ValueError(
+                f"Multiple capture files resolve to page id '{page_id}'"
+            )
+        captures[page_id] = (resolved, method)
     return captures, ignored
 
 
@@ -188,14 +242,10 @@ def plan_capture_directory(
 
     suite_path = Path(suite_manifest).resolve()
     suite_id, suite_pages = _suite_pages(suite_path)
-    captures, ignored = _discover_capture_files(Path(capture_dir).resolve())
-
-    unknown = sorted(set(captures) - set(suite_pages))
-    if unknown:
-        raise ValueError(
-            "Capture filenames do not match suite page ids: "
-            + ", ".join(unknown)
-        )
+    captures, ignored = _discover_capture_files(
+        Path(capture_dir).resolve(),
+        suite_pages,
+    )
 
     missing = sorted(set(suite_pages) - set(captures))
     if require_complete and missing:
@@ -208,9 +258,10 @@ def plan_capture_directory(
     items: list[CaptureBatchItem] = []
     for page_id in sorted(captures):
         page = suite_pages[page_id]
+        capture_path, page_id_method = captures[page_id]
         authenticity = compare_capture_to_digital_source(
             page.digital_page,
-            captures[page_id],
+            capture_path,
         )
         if not authenticity.has_visible_content:
             raise ValueError(
@@ -227,7 +278,8 @@ def plan_capture_directory(
                 template=page.template,
                 pack_manifest=page.pack_manifest,
                 digital_page=page.digital_page,
-                capture_path=captures[page_id],
+                capture_path=capture_path,
+                page_id_method=page_id_method,
                 authenticity=authenticity,
             )
         )
@@ -307,6 +359,15 @@ def register_capture_directory(
             ignored_files=tuple(ignored),
             registered_sample_ids=(),
             dry_run=True,
+            file_mappings=tuple(
+                CaptureFileMapping(
+                    filename=item.capture_path.name,
+                    page_id=item.page_id,
+                    template=item.template,
+                    page_id_method=item.page_id_method,
+                )
+                for item in items
+            ),
         )
 
     manifest_existed = manifest_path.is_file()
@@ -361,6 +422,15 @@ def register_capture_directory(
         ignored_files=tuple(ignored),
         registered_sample_ids=tuple(registered_ids),
         dry_run=False,
+        file_mappings=tuple(
+            CaptureFileMapping(
+                filename=item.capture_path.name,
+                page_id=item.page_id,
+                template=item.template,
+                page_id_method=item.page_id_method,
+            )
+            for item in items
+        ),
     )
 
 

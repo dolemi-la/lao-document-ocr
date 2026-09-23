@@ -89,6 +89,10 @@ The printable PDF and digital page PNGs are reproducible source pages.
 
 For multi-layout campaigns, generate one combined suite instead of separate packs. See [capture-suite.md](capture-suite.md).
 
+## Page-ID QR markers
+
+New capture packs include a `page-id:qr-v1` marker in the top-right header. Keep it visible when printing/capturing. `register-capture-directory` uses it to map raw scanner/phone filenames back to the correct ground truth and rejects filename/QR disagreements.
+
 ## 3. Capture real optical versions
 
 Print at approximately 100% scale.

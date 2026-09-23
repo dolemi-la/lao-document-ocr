@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from lao_document_ocr.capture_page_id import render_page_id_qr
 from lao_document_ocr.normalization import normalize_lao_text
 
 
@@ -127,6 +128,7 @@ def template_tags(
 ) -> tuple[str, ...]:
     tags = {
         "source:capture-pack",
+        "page-id:qr-v1",
         f"template:{template.value}",
         *_language_tags(source_lines),
     }
@@ -187,7 +189,18 @@ def _base(
         font=meta_font,
         fill="black",
     )
-    y += round(dpi * 0.35)
+
+    qr = render_page_id_qr(
+        page_id,
+        size_px=max(64, round(dpi * 0.82)),
+    )
+    qr_x = width - margin - qr.width
+    qr_y = margin
+    image.paste(qr, (qr_x, qr_y))
+
+    text_body_top = y + round(dpi * 0.35)
+    qr_body_top = qr_y + qr.height + round(dpi * 0.10)
+    y = max(text_body_top, qr_body_top)
     return image, draw, body_font, meta_font, width, height, margin, y
 
 

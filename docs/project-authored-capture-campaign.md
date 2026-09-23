@@ -75,6 +75,12 @@ Recommended baseline:
 
 If the printer driver automatically scales slightly for hardware margins, that is acceptable; real optical variation is the point.
 
+### Page-ID QR marker
+
+Every v1 page includes a `page-id:qr-v1` marker in the top-right header. It encodes the exact capture-suite page ID and is outside the textual ground-truth content.
+
+Bulk import uses the marker to prevent page/ground-truth mismatches. Keep the top-right page header visible in scans/photos.
+
 ## Capture each page
 
 The initial target is two optical captures per printed page:
@@ -159,7 +165,7 @@ template:<template>
 
 ## Bulk-register a full device run
 
-For a 60-page scan/photo session, name each file exactly after its printed page ID and use `register-capture-directory` instead of 60 individual commands.
+For a 60-page scan/photo session, use `register-capture-directory` instead of 60 individual commands. The current pages carry a top-right page-ID QR marker, so normal camera filenames such as `IMG_1842.jpg` can be used without renaming.
 
 Dry-run first:
 
