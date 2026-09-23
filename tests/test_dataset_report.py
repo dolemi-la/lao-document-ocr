@@ -174,3 +174,63 @@ def test_dataset_report_counts_layout_labeled_samples(tmp_path) -> None:
     assert layout["coverage_ratio"] == 0.5
     assert layout["by_split"] == {"train": 1}
     assert layout["by_subset"] == {"clean-print": 1}
+
+
+def test_dataset_report_counts_manual_review_status(tmp_path) -> None:
+    from datetime import UTC, datetime
+
+    entries = []
+    for sample_id, review in (
+        (
+            "approved",
+            {
+                "status": "approved",
+                "reviewer": "Reviewer A",
+                "reviewed_at": datetime(2026, 9, 23, 8, 0, tzinfo=UTC).isoformat(),
+            },
+        ),
+        (
+            "rejected",
+            {
+                "status": "rejected",
+                "reviewer": "Reviewer B",
+                "reviewed_at": datetime(2026, 9, 23, 8, 5, tzinfo=UTC).isoformat(),
+                "notes": "Needs recapture",
+            },
+        ),
+        ("unreviewed", None),
+    ):
+        image = tmp_path / f"{sample_id}.png"
+        truth = tmp_path / f"{sample_id}.txt"
+        image.write_bytes(f"image-{sample_id}".encode())
+        truth.write_text(sample_id, encoding="utf-8")
+        digest = hashlib.sha256(image.read_bytes()).hexdigest()
+        entry = _sample_entry(
+            sample_id,
+            f"doc-{sample_id}",
+            "test",
+            "clean-print",
+            image.name,
+            truth.name,
+            digest,
+        )
+        if review is not None:
+            entry["review"] = review
+        entries.append(entry)
+
+    manifest = tmp_path / "review-report-manifest.jsonl"
+    manifest.write_text(
+        "\n".join(json.dumps(entry) for entry in entries) + "\n",
+        encoding="utf-8",
+    )
+
+    report = build_dataset_report(load_manifest(manifest), tmp_path)
+    review = report["review"]
+
+    assert review["approved"] == 1
+    assert review["rejected"] == 1
+    assert review["unreviewed"] == 1
+    assert review["approved_coverage_ratio"] == 1 / 3
+    assert review["approved_sample_ids"] == ["approved"]
+    assert review["rejected_sample_ids"] == ["rejected"]
+    assert review["unreviewed_sample_ids"] == ["unreviewed"]

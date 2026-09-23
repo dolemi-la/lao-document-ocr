@@ -269,3 +269,7 @@ WER 0.9169
 ```
 
 These numbers are regression/sanity data only. They are **not** the Phase 1 real scan/photo Tesseract baseline.
+
+## Manual review gate
+
+Registered real captures are not publication-ready until a reviewer records `review.status=approved`. Use `lao-ocr review-dataset-sample`; readiness and public freeze enforce approval by default. See [../docs/dataset-review.md](../docs/dataset-review.md).

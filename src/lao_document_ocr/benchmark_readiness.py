@@ -11,6 +11,7 @@ from lao_document_ocr.dataset import (
     DatasetSubset,
     validate_dataset,
 )
+from lao_document_ocr.dataset_review import is_review_approved
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,7 @@ def build_benchmark_readiness_report(
     min_layout_labeled_documents: int = 0,
     verify_hashes: bool = True,
     require_real_sources: bool = True,
+    require_manual_review: bool = True,
 ) -> dict:
     if min_documents_per_dimension < 1:
         raise ValueError("min_documents_per_dimension must be at least 1")
@@ -115,11 +117,24 @@ def build_benchmark_readiness_report(
         verify_hashes=verify_hashes,
     )
     selected = [sample for sample in samples if sample.split == split]
-    eligible = (
+    source_eligible = (
         [sample for sample in selected if _is_real_source(sample)]
         if require_real_sources
         else selected
     )
+    approved_samples = [
+        sample for sample in source_eligible if is_review_approved(sample)
+    ]
+    review_pending_samples = [
+        sample.id for sample in source_eligible if sample.review is None
+    ]
+    review_rejected_samples = [
+        sample.id
+        for sample in source_eligible
+        if sample.review is not None
+        and sample.review.status.value == "rejected"
+    ]
+    eligible = approved_samples if require_manual_review else source_eligible
     document_ids = {sample.document_id for sample in eligible}
     layout_document_ids = {
         sample.document_id
@@ -151,6 +166,10 @@ def build_benchmark_readiness_report(
     total_documents_passed = len(document_ids) >= min_total_documents
     layout_passed = len(layout_document_ids) >= min_layout_labeled_documents
     validation_passed = not validation_errors
+    review_passed = (
+        not require_manual_review
+        or (not review_pending_samples and not review_rejected_samples)
+    )
 
     return {
         "schema_version": "1",
@@ -161,6 +180,7 @@ def build_benchmark_readiness_report(
             and not missing
             and total_documents_passed
             and layout_passed
+            and review_passed
         ),
         "validation": {
             "ok": validation_passed,
@@ -171,6 +191,11 @@ def build_benchmark_readiness_report(
         "document_count": len(document_ids),
         "require_real_sources": require_real_sources,
         "accepted_real_source_tags": sorted(REAL_SOURCE_TAGS),
+        "require_manual_review": require_manual_review,
+        "review_passed": review_passed,
+        "approved_sample_count": len(approved_samples),
+        "unreviewed_samples": sorted(review_pending_samples),
+        "rejected_samples": sorted(review_rejected_samples),
         "unverified_source_samples": sorted(unverified_source_samples),
         "minimum_total_documents": min_total_documents,
         "total_documents_passed": total_documents_passed,

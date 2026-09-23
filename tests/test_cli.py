@@ -1002,6 +1002,8 @@ def test_freeze_and_verify_benchmark_cli(tmp_path, monkeypatch, capsys) -> None:
             str(frozen),
             "--output-lock",
             str(lock),
+            "--allow-unverified-sources",
+            "--allow-unreviewed",
             "--revision",
             "abc123",
         ],
@@ -1073,6 +1075,8 @@ def test_verify_benchmark_freeze_cli_detects_tamper(
             str(frozen),
             "--output-lock",
             str(lock),
+            "--allow-unverified-sources",
+            "--allow-unreviewed",
         ],
     )
     assert main() == 0
@@ -1140,6 +1144,8 @@ def test_benchmark_refuses_tampered_frozen_dataset_before_engine(
             str(frozen),
             "--output-lock",
             str(lock),
+            "--allow-unverified-sources",
+            "--allow-unreviewed",
         ],
     )
     assert main() == 0
@@ -1347,6 +1353,11 @@ def test_benchmark_readiness_cli_reports_ready_for_complete_dimensions(
                     "capture:optical-evidence",
                     "source:real-capture",
                 ],
+                "review": {
+                    "status": "approved",
+                    "reviewer": "CLI Reviewer",
+                    "reviewed_at": "2026-09-23T08:00:00+00:00",
+                },
             }
         )
 
@@ -1574,3 +1585,108 @@ def test_benchmark_capture_suite_cli_marks_report_as_digital_qa(
     assert set(payload["qa"]["templates"]) == {"plain", "receipt"}
     captured = capsys.readouterr()
     assert "not real benchmark accuracy" in captured.out
+
+
+def test_review_dataset_sample_cli_enables_strict_public_freeze(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import hashlib
+
+    image = tmp_path / "real-page.png"
+    truth = tmp_path / "real-page.txt"
+    Image.new("RGB", (120, 80), (210, 250, 255)).save(image)
+    truth.write_text("ສະບາຍດີ", encoding="utf-8")
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    manifest = tmp_path / "manifest.jsonl"
+    manifest.write_text(
+        json.dumps(
+            {
+                "id": "real-001",
+                "document_id": "real-doc-001",
+                "split": "test",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI manual-review test",
+                "sha256": digest,
+                "tags": [
+                    "capture:flatbed-scan",
+                    "capture:optical-evidence",
+                    "source:real-capture",
+                ],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    frozen = tmp_path / "strict-frozen.jsonl"
+    lock = tmp_path / "strict.lock.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "freeze-benchmark",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output-manifest",
+            str(frozen),
+            "--output-lock",
+            str(lock),
+        ],
+    )
+    assert main() == 1
+    assert "approved manual review" in capsys.readouterr().err
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "review-dataset-sample",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--id",
+            "real-001",
+            "--status",
+            "approved",
+            "--reviewer",
+            "Reviewer A",
+            "--notes",
+            "Checked page identity, orientation, and ground truth.",
+        ],
+    )
+    assert main() == 0
+    reviewed_payload = json.loads(capsys.readouterr().out)
+    assert reviewed_payload["review"]["status"] == "approved"
+    assert reviewed_payload["review"]["reviewer"] == "Reviewer A"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "freeze-benchmark",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output-manifest",
+            str(frozen),
+            "--output-lock",
+            str(lock),
+        ],
+    )
+    assert main() == 0
+    assert lock.is_file()
+    lock_payload = json.loads(lock.read_text(encoding="utf-8"))
+    assert lock_payload["samples"][0]["review"]["status"] == "approved"

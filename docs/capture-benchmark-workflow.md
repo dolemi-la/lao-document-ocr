@@ -221,16 +221,21 @@ lao-ocr validate-dataset \
   --dataset-root benchmarks/public
 ```
 
-Then manually review:
+Then manually review each accepted sample and record the decision:
 
-- image orientation
-- correct page ID
-- exact ground truth
-- subset classification
-- contributor/release metadata
-- no unrelated personal/private material
+```bash
+lao-ocr review-dataset-sample \
+  --manifest benchmarks/public/manifest.jsonl \
+  --dataset-root benchmarks/public \
+  --id <sample-id> \
+  --status approved \
+  --reviewer <reviewer-alias> \
+  --notes "Page ID, orientation, ground truth, tags, and release metadata checked."
+```
 
-Freeze the final test document IDs before comparing OCR models.
+Review image orientation, page ID, exact ground truth, subset/tags, contributor/release metadata, and absence of unrelated private material. See [dataset-review.md](dataset-review.md).
+
+Freeze the final test document IDs only after the readiness gate reports approved review coverage.
 
 ## Multi-axis benchmark tags
 

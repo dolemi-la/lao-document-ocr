@@ -13,6 +13,22 @@ from lao_document_ocr.dataset import (
     sha256_file,
     validate_dataset,
 )
+from lao_document_ocr.dataset_review import is_review_approved
+
+REAL_SOURCE_TAGS = {
+    "source:real-capture",
+    "source:real-document",
+}
+
+
+def _is_real_source(sample: DatasetSample) -> bool:
+    tags = set(sample.tags)
+    if "source:real-document" in tags:
+        return True
+    return (
+        "source:real-capture" in tags
+        and "capture:optical-evidence" in tags
+    )
 
 
 class BenchmarkFreezeError(ValueError):
@@ -38,6 +54,11 @@ def _sample_lock_entry(sample: DatasetSample, root: Path) -> dict[str, Any]:
         "subset": sample.subset.value,
         "tags": list(sample.tags),
         "license": sample.license,
+        "review": (
+            sample.review.model_dump(mode="json")
+            if sample.review is not None
+            else None
+        ),
         "source": sample.source,
         "source_sha256": sha256_file(source),
         "ground_truth": sample.ground_truth,
@@ -58,6 +79,8 @@ def freeze_benchmark(
     split: DatasetSplit = DatasetSplit.TEST,
     source_manifest: str | Path | None = None,
     source_revision: str | None = None,
+    require_real_sources: bool = False,
+    require_manual_review: bool = False,
 ) -> tuple[Path, Path]:
     errors = validate_dataset(samples, dataset_root, verify_hashes=True)
     if errors:
@@ -74,6 +97,22 @@ def freeze_benchmark(
         raise BenchmarkFreezeError(
             f"No samples found for split '{split.value}'."
         )
+
+    if require_real_sources:
+        unverified = [sample.id for sample in selected if not _is_real_source(sample)]
+        if unverified:
+            raise BenchmarkFreezeError(
+                "Frozen public benchmark contains samples without verified real-source "
+                "evidence: " + ", ".join(unverified)
+            )
+
+    if require_manual_review:
+        unapproved = [sample.id for sample in selected if not is_review_approved(sample)]
+        if unapproved:
+            raise BenchmarkFreezeError(
+                "Frozen public benchmark contains samples without approved manual "
+                "review: " + ", ".join(unapproved)
+            )
 
     root = Path(dataset_root).resolve()
     manifest_path = Path(output_manifest)

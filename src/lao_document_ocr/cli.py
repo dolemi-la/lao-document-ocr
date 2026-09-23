@@ -16,6 +16,7 @@ from lao_document_ocr.corpus import (
 )
 from lao_document_ocr.dataset import (
     DatasetManifestError,
+    DatasetReviewStatus,
     DatasetSplit,
     DatasetSubset,
     load_manifest,
@@ -135,6 +136,11 @@ def _parser() -> argparse.ArgumentParser:
             "Intended for local smoke checks, not public benchmark releases."
         ),
     )
+    readiness.add_argument(
+        "--allow-unreviewed",
+        action="store_true",
+        help="Allow samples without approved manual review (development only).",
+    )
 
     freeze = subparsers.add_parser(
         "freeze-benchmark",
@@ -150,6 +156,16 @@ def _parser() -> argparse.ArgumentParser:
         default=DatasetSplit.TEST.value,
     )
     freeze.add_argument("--revision")
+    freeze.add_argument(
+        "--allow-unverified-sources",
+        action="store_true",
+        help="Allow freezing samples without verified real-source evidence (development only).",
+    )
+    freeze.add_argument(
+        "--allow-unreviewed",
+        action="store_true",
+        help="Allow freezing samples without approved manual review (development only).",
+    )
 
     verify_freeze = subparsers.add_parser(
         "verify-benchmark-freeze",
@@ -213,6 +229,21 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Confirm redistribution and OCR/model-evaluation rights for this sample.",
     )
+
+    review = subparsers.add_parser(
+        "review-dataset-sample",
+        help="Record an approved/rejected manual review for one dataset sample.",
+    )
+    review.add_argument("--manifest", required=True, type=Path)
+    review.add_argument("--dataset-root", required=True, type=Path)
+    review.add_argument("--id", required=True, dest="sample_id")
+    review.add_argument(
+        "--status",
+        required=True,
+        choices=[status.value for status in DatasetReviewStatus],
+    )
+    review.add_argument("--reviewer", required=True)
+    review.add_argument("--notes")
 
     layout_benchmark = subparsers.add_parser(
         "benchmark-layout",
@@ -764,7 +795,6 @@ def _validate(args: argparse.Namespace) -> int:
         samples,
         args.dataset_root,
         verify_hashes=not args.no_hash_check,
-        require_real_sources=not args.allow_unverified_sources,
     )
     if errors:
         for error in errors:
@@ -796,6 +826,8 @@ def _benchmark_readiness(args: argparse.Namespace) -> int:
         min_total_documents=args.min_total_documents,
         min_layout_labeled_documents=args.min_layout_labeled_documents,
         verify_hashes=not args.no_hash_check,
+        require_real_sources=not args.allow_unverified_sources,
+        require_manual_review=not args.allow_unreviewed,
     )
     output = write_benchmark_readiness_report(report, args.output)
     print(f"Report: {output}")
@@ -804,6 +836,12 @@ def _benchmark_readiness(args: argparse.Namespace) -> int:
     print(
         "Missing dimensions: "
         + (", ".join(report["missing_dimensions"]) or "none")
+    )
+    print(
+        "Manual review: "
+        f"approved={report['approved_sample_count']} "
+        f"unreviewed={len(report['unreviewed_samples'])} "
+        f"rejected={len(report['rejected_samples'])}"
     )
     print(f"Readiness: {'READY' if report['ready'] else 'NOT READY'}")
     return 0 if report["ready"] else 1
@@ -821,6 +859,8 @@ def _freeze_benchmark(args: argparse.Namespace) -> int:
         split=DatasetSplit(args.split),
         source_manifest=args.manifest,
         source_revision=args.revision,
+        require_real_sources=not args.allow_unverified_sources,
+        require_manual_review=not args.allow_unreviewed,
     )
     print(f"Frozen manifest: {frozen_manifest}")
     print(f"Benchmark lock: {lock}")
@@ -861,6 +901,13 @@ def _dataset_report(args: argparse.Namespace) -> int:
     print(f"Documents: {report['document_count']}")
     print(f"Validation: {'ok' if report['validation']['ok'] else 'failed'}")
     print(f"Missing subsets: {len(report['missing_subsets'])}")
+    review = report["review"]
+    print(
+        "Review: "
+        f"approved={review['approved']} "
+        f"rejected={review['rejected']} "
+        f"unreviewed={review['unreviewed']}"
+    )
     return 0 if report["validation"]["ok"] else 1
 
 
@@ -941,6 +988,26 @@ def _add_dataset_sample(args: argparse.Namespace) -> int:
         rights_confirmed=args.confirm_redistributable,
     )
     print(json.dumps(sample.model_dump(mode="json", exclude_none=True), ensure_ascii=False))
+    return 0
+
+
+def _review_dataset_sample(args: argparse.Namespace) -> int:
+    from lao_document_ocr.dataset_review import set_dataset_sample_review
+
+    sample = set_dataset_sample_review(
+        args.manifest,
+        args.dataset_root,
+        sample_id=args.sample_id,
+        status=DatasetReviewStatus(args.status),
+        reviewer=args.reviewer,
+        notes=args.notes,
+    )
+    print(
+        json.dumps(
+            sample.model_dump(mode="json", exclude_none=True),
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 
@@ -1585,6 +1652,8 @@ def main() -> int:
             return _prepare_layout_targets(args)
         if args.command == "add-dataset-sample":
             return _add_dataset_sample(args)
+        if args.command == "review-dataset-sample":
+            return _review_dataset_sample(args)
         if args.command == "benchmark-layout":
             return _benchmark_layout(args)
         if args.command == "benchmark-docx":

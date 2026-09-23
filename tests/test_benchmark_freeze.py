@@ -93,3 +93,44 @@ def test_verify_detects_frozen_manifest_change(tmp_path) -> None:
     errors = verify_benchmark_freeze(lock, tmp_path)
 
     assert any("frozen manifest sha256 mismatch" in error for error in errors)
+
+
+def test_public_freeze_requires_real_source_and_review(tmp_path) -> None:
+    import pytest
+
+    from lao_document_ocr.benchmark_freeze import BenchmarkFreezeError
+
+    sample = _sample(tmp_path, "a", DatasetSplit.TEST)
+    with pytest.raises(BenchmarkFreezeError, match="real-source"):
+        freeze_benchmark(
+            [sample],
+            tmp_path,
+            output_manifest=tmp_path / "manifest.jsonl",
+            output_lock=tmp_path / "lock.json",
+            require_real_sources=True,
+            require_manual_review=True,
+        )
+
+
+def test_public_freeze_accepts_reviewed_real_capture(tmp_path) -> None:
+    from datetime import UTC, datetime
+
+    from lao_document_ocr.dataset import DatasetReview, DatasetReviewStatus
+
+    sample = _sample(tmp_path, "a", DatasetSplit.TEST)
+    sample.tags.extend(["source:real-capture", "capture:optical-evidence"])
+    sample.review = DatasetReview(
+        status=DatasetReviewStatus.APPROVED,
+        reviewer="Reviewer",
+        reviewed_at=datetime(2026, 9, 23, 8, 0, tzinfo=UTC),
+    )
+    _, lock = freeze_benchmark(
+        [sample],
+        tmp_path,
+        output_manifest=tmp_path / "manifest.jsonl",
+        output_lock=tmp_path / "lock.json",
+        require_real_sources=True,
+        require_manual_review=True,
+    )
+    payload = json.loads(lock.read_text(encoding="utf-8"))
+    assert payload["samples"][0]["review"]["status"] == "approved"

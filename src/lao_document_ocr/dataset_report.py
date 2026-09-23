@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from lao_document_ocr.dataset import (
+    DatasetReviewStatus,
     DatasetSample,
     DatasetSplit,
     DatasetSubset,
@@ -33,6 +34,23 @@ def build_dataset_report(
     by_license = Counter(sample.license for sample in samples)
     by_language = Counter(sample.language for sample in samples)
     by_tag = Counter(tag for sample in samples for tag in sample.tags)
+    review_approved = [
+        sample.id
+        for sample in samples
+        if sample.review is not None
+        and sample.review.status == DatasetReviewStatus.APPROVED
+    ]
+    review_rejected = [
+        sample.id
+        for sample in samples
+        if sample.review is not None
+        and sample.review.status == DatasetReviewStatus.REJECTED
+    ]
+    review_unreviewed = [
+        sample.id
+        for sample in samples
+        if sample.review is None
+    ]
     layout_samples = [
         sample
         for sample in samples
@@ -75,6 +93,15 @@ def build_dataset_report(
         "by_license": dict(sorted(by_license.items())),
         "by_language": dict(sorted(by_language.items())),
         "by_tag": dict(sorted(by_tag.items())),
+        "review": {
+            "approved": len(review_approved),
+            "rejected": len(review_rejected),
+            "unreviewed": len(review_unreviewed),
+            "approved_coverage_ratio": len(review_approved) / len(samples),
+            "approved_sample_ids": sorted(review_approved),
+            "rejected_sample_ids": sorted(review_rejected),
+            "unreviewed_sample_ids": sorted(review_unreviewed),
+        },
         "layout_ground_truth": {
             "sample_count": len(layout_samples),
             "document_count": len(layout_documents),

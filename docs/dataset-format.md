@@ -20,7 +20,13 @@ The format is intentionally reviewable in Git and strict enough to keep benchmar
   "source_url": "https://example.org/source",
   "license_url": "https://creativecommons.org/licenses/by/4.0/",
   "sha256": "<64 hex characters>",
-  "notes": "Optional notes"
+  "notes": "Optional notes",
+  "review": {
+    "status": "approved",
+    "reviewer": "reviewer-alias",
+    "reviewed_at": "2026-09-23T08:00:00Z",
+    "notes": "Optional review notes"
+  }
 }
 ```
 
@@ -110,6 +116,17 @@ SHA-256 of the source page. Public benchmark releases should include hashes.
 ### `notes`
 
 Anything reviewers need to understand about the sample.
+
+### `review`
+
+Optional machine-readable manual review record. Fields:
+
+- `status`: `approved` or `rejected`
+- `reviewer`: reviewer name/alias
+- `reviewed_at`: timezone-aware timestamp
+- `notes`: optional review notes
+
+Public benchmark readiness/freezing requires approved review by default. Use `lao-ocr review-dataset-sample` rather than editing review timestamps by hand. See [dataset-review.md](dataset-review.md).
 
 ### `tags`
 

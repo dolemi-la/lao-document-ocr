@@ -1,9 +1,16 @@
 import hashlib
+from datetime import UTC, datetime
 
 from PIL import Image
 
 from lao_document_ocr.benchmark_readiness import build_benchmark_readiness_report
-from lao_document_ocr.dataset import DatasetSample, DatasetSplit, DatasetSubset
+from lao_document_ocr.dataset import (
+    DatasetReview,
+    DatasetReviewStatus,
+    DatasetSample,
+    DatasetSplit,
+    DatasetSubset,
+)
 
 
 def _sample(tmp_path, sample_id, subset, tags, *, document_id=None, layout=False):
@@ -38,6 +45,11 @@ def _sample(tmp_path, sample_id, subset, tags, *, document_id=None, layout=False
             "capture:optical-evidence",
             "source:real-capture",
         ],
+        review=DatasetReview(
+            status=DatasetReviewStatus.APPROVED,
+            reviewer="Unit Reviewer",
+            reviewed_at=datetime(2026, 9, 23, 8, 0, tzinfo=UTC),
+        ),
     )
 
 
@@ -164,5 +176,32 @@ def test_unverified_source_override_is_for_local_smoke_only(tmp_path) -> None:
     )
 
     assert report["eligible_sample_count"] == len(samples)
+    assert report["missing_dimensions"] == []
+    assert report["ready"] is True
+
+
+def test_unreviewed_real_sample_blocks_release_readiness(tmp_path) -> None:
+    samples = _complete_samples(tmp_path)
+    samples[0].review = None
+
+    report = build_benchmark_readiness_report(samples, tmp_path)
+
+    assert report["review_passed"] is False
+    assert report["unreviewed_samples"] == [samples[0].id]
+    assert report["ready"] is False
+
+
+def test_unreviewed_override_is_for_development_only(tmp_path) -> None:
+    samples = _complete_samples(tmp_path)
+    for sample in samples:
+        sample.review = None
+
+    report = build_benchmark_readiness_report(
+        samples,
+        tmp_path,
+        require_manual_review=False,
+    )
+
+    assert report["review_passed"] is True
     assert report["missing_dimensions"] == []
     assert report["ready"] is True

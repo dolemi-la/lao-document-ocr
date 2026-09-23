@@ -40,6 +40,7 @@ Status: in progress
 - [x] machine-readable page-ID QR markers for capture-suite integrity
 - [x] digital capture-suite OCR QA benchmark (explicitly non-real)
 - [x] real-data benchmark readiness coverage gate
+- [x] machine-readable manual review approval gate before public freeze
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos

@@ -14,6 +14,17 @@ lao-ocr freeze-benchmark \
   --revision "$(git rev-parse HEAD)"
 ```
 
+## Public freeze policy
+
+The CLI is strict by default. Every selected sample must have:
+
+- verified real-source evidence (`source:real-document`, or `source:real-capture` plus `capture:optical-evidence`)
+- `review.status=approved` from the manual review workflow
+
+For development-only fixtures/smoke tests, opt out explicitly with `--allow-unverified-sources` and/or `--allow-unreviewed`. Do not use these bypass flags for published results.
+
+The lock stores the review record for every frozen sample in addition to content hashes.
+
 The command validates the dataset first, then writes:
 
 - a sorted frozen JSONL manifest for the selected split
@@ -59,13 +70,14 @@ A verification failure exits nonzero.
 
 1. finish capture collection
 2. validate the dataset
-3. review test IDs and licenses
-4. freeze the test split
-5. verify the freeze
-6. run the Tesseract baseline on the frozen manifest
-7. run the owned candidate on the same frozen manifest
-8. compare with `compare-benchmarks`
-9. publish reports + lock file + revision
+3. approve every publication sample with `review-dataset-sample`
+4. run `benchmark-readiness` and resolve pending/rejected samples
+5. freeze the test split
+6. verify the freeze
+7. run the Tesseract baseline on the frozen manifest
+8. run the owned candidate on the same frozen manifest
+9. compare with `compare-benchmarks`
+10. publish reports + lock file + revision
 
 Do not regenerate a lock merely because a candidate model performs poorly on the frozen set. Any benchmark-content change should create a new benchmark version with reviewed reasons.
 

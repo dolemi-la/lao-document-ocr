@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 
@@ -23,6 +24,33 @@ class DatasetSplit(StrEnum):
     TRAIN = "train"
     DEV = "dev"
     TEST = "test"
+
+
+class DatasetReviewStatus(StrEnum):
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class DatasetReview(BaseModel):
+    status: DatasetReviewStatus
+    reviewer: str = Field(min_length=1, max_length=160)
+    reviewed_at: datetime
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("reviewer")
+    @classmethod
+    def normalize_reviewer(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("reviewer must not be empty")
+        return normalized
+
+    @field_validator("reviewed_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("reviewed_at must include a timezone")
+        return value
 
 
 class DatasetSubset(StrEnum):
@@ -54,6 +82,7 @@ class DatasetSample(BaseModel):
     sha256: str | None = None
     notes: str | None = None
     tags: list[str] = Field(default_factory=list)
+    review: DatasetReview | None = None
 
     @field_validator("tags")
     @classmethod
