@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import shlex
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
 import pytesseract
@@ -14,13 +17,57 @@ from .base import OcrEngine, OcrEngineError, RecognizedLine
 
 
 class TesseractEngine(OcrEngine):
-    def __init__(self, languages: str = "lao+eng", psm: int = 3) -> None:
+    def __init__(
+        self,
+        languages: str = "lao+eng",
+        psm: int = 3,
+        tessdata_dir: str | Path | None = None,
+    ) -> None:
         self.languages = languages
         self.psm = psm
+        self.tessdata_dir = (
+            Path(tessdata_dir).expanduser().resolve()
+            if tessdata_dir is not None
+            else None
+        )
+        if self.tessdata_dir is not None and not self.tessdata_dir.is_dir():
+            raise ValueError(
+                f"Tesseract tessdata directory not found: {self.tessdata_dir}"
+            )
+        self._traineddata_sha256 = self._compute_traineddata_hashes()
+
+    def _tessdata_config(self) -> str:
+        if self.tessdata_dir is None:
+            return ""
+        return f"--tessdata-dir {shlex.quote(str(self.tessdata_dir))}"
+
+    def _ocr_config(self) -> str:
+        parts = [f"--psm {self.psm}"]
+        tessdata = self._tessdata_config()
+        if tessdata:
+            parts.append(tessdata)
+        return " ".join(parts)
+
+    def _compute_traineddata_hashes(self) -> dict[str, str]:
+        if self.tessdata_dir is None:
+            return {}
+        hashes: dict[str, str] = {}
+        for language in self.languages.split("+"):
+            path = self.tessdata_dir / f"{language}.traineddata"
+            if not path.is_file():
+                continue
+            digest = hashlib.sha256()
+            with path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            hashes[language] = digest.hexdigest()
+        return hashes
 
     def available_languages(self) -> list[str]:
         try:
-            return sorted(pytesseract.get_languages(config=""))
+            return sorted(
+                pytesseract.get_languages(config=self._tessdata_config())
+            )
         except TesseractNotFoundError as exc:
             raise OcrEngineError(
                 "Tesseract is not installed. Install Tesseract and Lao language data."
@@ -44,6 +91,14 @@ class TesseractEngine(OcrEngine):
             "tesseract_version": version,
             "languages": self.languages,
             "psm": self.psm,
+            "tessdata": {
+                "source": (
+                    "custom"
+                    if self.tessdata_dir is not None
+                    else "system-default"
+                ),
+                "traineddata_sha256": dict(self._traineddata_sha256),
+            },
         }
 
     def _validate(self) -> None:
@@ -62,7 +117,7 @@ class TesseractEngine(OcrEngine):
             data = pytesseract.image_to_data(
                 image,
                 lang=self.languages,
-                config=f"--psm {self.psm}",
+                config=self._ocr_config(),
                 output_type=Output.DICT,
             )
         except TesseractNotFoundError as exc:

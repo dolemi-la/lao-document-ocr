@@ -889,3 +889,22 @@ def test_health_fails_early_when_learned_reading_order_model_is_missing(
     assert payload["ocr_ready"] is False
     assert payload["reading_order"] is None
     assert "OCR_READING_ORDER_MODEL_PATH" in payload["error"]
+
+
+def test_tesseract_engine_uses_configured_tessdata_dir(tmp_path, monkeypatch) -> None:
+    import services.api.app.main as api_main
+    from lao_document_ocr.ocr.tesseract import TesseractEngine
+
+    (tmp_path / "lao.traineddata").write_bytes(b"lao")
+    (tmp_path / "eng.traineddata").write_bytes(b"eng")
+    monkeypatch.setattr(api_main, "OCR_ENGINE", "tesseract")
+    monkeypatch.setattr(api_main, "OCR_TESSDATA_DIR", str(tmp_path))
+
+    engine = api_main._engine()
+
+    assert isinstance(engine, TesseractEngine)
+    assert engine.tessdata_dir == tmp_path.resolve()
+    assert set(engine.metadata()["tessdata"]["traineddata_sha256"]) == {
+        "lao",
+        "eng",
+    }

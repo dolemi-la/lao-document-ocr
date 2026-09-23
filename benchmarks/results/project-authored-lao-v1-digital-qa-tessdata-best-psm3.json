@@ -1,0 +1,1508 @@
+{
+  "schema_version": "1",
+  "generated_at": "2026-09-23T07:40:01.651892+00:00",
+  "split": "test",
+  "engine": {
+    "name": "TesseractEngine",
+    "tesseract_version": "5.5.0",
+    "languages": "lao+eng",
+    "psm": 3,
+    "tessdata": {
+      "source": "custom",
+      "traineddata_sha256": {
+        "lao": "12680f24af571909d69f0dd0151ecdf657a98f000c0ca011c11f8f9dc2bf69b7",
+        "eng": "8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba"
+      }
+    }
+  },
+  "reading_order": {
+    "name": "DeterministicReadingOrderResolver"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-7.0.12-linuxkit-aarch64-with-glibc2.41"
+  },
+  "elapsed_seconds": 278.5971615000017,
+  "overall": {
+    "character_edits": 15271,
+    "characters": 31814,
+    "word_edits": 2826,
+    "words": 3082,
+    "samples": 60,
+    "cer": 0.48000880115672345,
+    "wer": 0.9169370538611291
+  },
+  "subsets": {
+    "clean-print": {
+      "character_edits": 2036,
+      "characters": 4624,
+      "word_edits": 338,
+      "words": 382,
+      "samples": 10,
+      "cer": 0.4403114186851211,
+      "wer": 0.8848167539267016
+    },
+    "complex-table": {
+      "character_edits": 2593,
+      "characters": 5724,
+      "word_edits": 514,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.453004891684137,
+      "wer": 0.8986013986013986
+    },
+    "form": {
+      "character_edits": 2701,
+      "characters": 5384,
+      "word_edits": 540,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.5016716196136701,
+      "wer": 0.9440559440559441
+    },
+    "multi-column": {
+      "character_edits": 2993,
+      "characters": 4724,
+      "word_edits": 362,
+      "words": 382,
+      "samples": 10,
+      "cer": 0.6335732430143945,
+      "wer": 0.9476439790575916
+    },
+    "receipt": {
+      "character_edits": 2542,
+      "characters": 5734,
+      "word_edits": 556,
+      "words": 602,
+      "samples": 10,
+      "cer": 0.44332054412277644,
+      "wer": 0.9235880398671097
+    },
+    "simple-table": {
+      "character_edits": 2406,
+      "characters": 5624,
+      "word_edits": 516,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.42780938833570414,
+      "wer": 0.9020979020979021
+    }
+  },
+  "tags": {
+    "content:table": {
+      "character_edits": 4999,
+      "characters": 11348,
+      "word_edits": 1030,
+      "words": 1144,
+      "samples": 20,
+      "cer": 0.4405181529784984,
+      "wer": 0.9003496503496503
+    },
+    "document:form": {
+      "character_edits": 2701,
+      "characters": 5384,
+      "word_edits": 540,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.5016716196136701,
+      "wer": 0.9440559440559441
+    },
+    "document:receipt": {
+      "character_edits": 2542,
+      "characters": 5734,
+      "word_edits": 556,
+      "words": 602,
+      "samples": 10,
+      "cer": 0.44332054412277644,
+      "wer": 0.9235880398671097
+    },
+    "language:lao": {
+      "character_edits": 3851,
+      "characters": 9327,
+      "word_edits": 753,
+      "words": 837,
+      "samples": 18,
+      "cer": 0.41288731639326687,
+      "wer": 0.899641577060932
+    },
+    "language:mixed": {
+      "character_edits": 11420,
+      "characters": 22487,
+      "word_edits": 2073,
+      "words": 2245,
+      "samples": 42,
+      "cer": 0.5078489794103259,
+      "wer": 0.9233853006681515
+    },
+    "layout:form": {
+      "character_edits": 2701,
+      "characters": 5384,
+      "word_edits": 540,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.5016716196136701,
+      "wer": 0.9440559440559441
+    },
+    "layout:multi-column": {
+      "character_edits": 2993,
+      "characters": 4724,
+      "word_edits": 362,
+      "words": 382,
+      "samples": 10,
+      "cer": 0.6335732430143945,
+      "wer": 0.9476439790575916
+    },
+    "layout:plain": {
+      "character_edits": 2036,
+      "characters": 4624,
+      "word_edits": 338,
+      "words": 382,
+      "samples": 10,
+      "cer": 0.4403114186851211,
+      "wer": 0.8848167539267016
+    },
+    "layout:receipt": {
+      "character_edits": 2542,
+      "characters": 5734,
+      "word_edits": 556,
+      "words": 602,
+      "samples": 10,
+      "cer": 0.44332054412277644,
+      "wer": 0.9235880398671097
+    },
+    "layout:table": {
+      "character_edits": 4999,
+      "characters": 11348,
+      "word_edits": 1030,
+      "words": 1144,
+      "samples": 20,
+      "cer": 0.4405181529784984,
+      "wer": 0.9003496503496503
+    },
+    "page-id:qr-v1": {
+      "character_edits": 15271,
+      "characters": 31814,
+      "word_edits": 2826,
+      "words": 3082,
+      "samples": 60,
+      "cer": 0.48000880115672345,
+      "wer": 0.9169370538611291
+    },
+    "qa:digital-capture-suite": {
+      "character_edits": 15271,
+      "characters": 31814,
+      "word_edits": 2826,
+      "words": 3082,
+      "samples": 60,
+      "cer": 0.48000880115672345,
+      "wer": 0.9169370538611291
+    },
+    "source:capture-pack": {
+      "character_edits": 15271,
+      "characters": 31814,
+      "word_edits": 2826,
+      "words": 3082,
+      "samples": 60,
+      "cer": 0.48000880115672345,
+      "wer": 0.9169370538611291
+    },
+    "source:digital-capture-suite": {
+      "character_edits": 15271,
+      "characters": 31814,
+      "word_edits": 2826,
+      "words": 3082,
+      "samples": 60,
+      "cer": 0.48000880115672345,
+      "wer": 0.9169370538611291
+    },
+    "table:borderless": {
+      "character_edits": 2593,
+      "characters": 5724,
+      "word_edits": 514,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.453004891684137,
+      "wer": 0.8986013986013986
+    },
+    "table:ruled": {
+      "character_edits": 2406,
+      "characters": 5624,
+      "word_edits": 516,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.42780938833570414,
+      "wer": 0.9020979020979021
+    },
+    "template:borderless-table": {
+      "character_edits": 2593,
+      "characters": 5724,
+      "word_edits": 514,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.453004891684137,
+      "wer": 0.8986013986013986
+    },
+    "template:form": {
+      "character_edits": 2701,
+      "characters": 5384,
+      "word_edits": 540,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.5016716196136701,
+      "wer": 0.9440559440559441
+    },
+    "template:plain": {
+      "character_edits": 2036,
+      "characters": 4624,
+      "word_edits": 338,
+      "words": 382,
+      "samples": 10,
+      "cer": 0.4403114186851211,
+      "wer": 0.8848167539267016
+    },
+    "template:receipt": {
+      "character_edits": 2542,
+      "characters": 5734,
+      "word_edits": 556,
+      "words": 602,
+      "samples": 10,
+      "cer": 0.44332054412277644,
+      "wer": 0.9235880398671097
+    },
+    "template:ruled-table": {
+      "character_edits": 2406,
+      "characters": 5624,
+      "word_edits": 516,
+      "words": 572,
+      "samples": 10,
+      "cer": 0.42780938833570414,
+      "wer": 0.9020979020979021
+    },
+    "template:two-column": {
+      "character_edits": 2993,
+      "characters": 4724,
+      "word_edits": 362,
+      "words": 382,
+      "samples": 10,
+      "cer": 0.6335732430143945,
+      "wer": 0.9476439790575916
+    }
+  },
+  "samples": [
+    {
+      "id": "project-authored-lao-v1-plain-p0001",
+      "document_id": "project-authored-lao-v1-plain-p0001",
+      "subset": "clean-print",
+      "tags": [
+        "language:mixed",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.36794582392776526,
+      "wer": 0.9285714285714286,
+      "elapsed_seconds": 4.367165419003868,
+      "reference_characters": 443,
+      "hypothesis_characters": 441
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0002",
+      "document_id": "project-authored-lao-v1-plain-p0002",
+      "subset": "clean-print",
+      "tags": [
+        "language:lao",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.32456140350877194,
+      "wer": 0.9090909090909091,
+      "elapsed_seconds": 4.075582293997286,
+      "reference_characters": 456,
+      "hypothesis_characters": 450
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0003",
+      "document_id": "project-authored-lao-v1-plain-p0003",
+      "subset": "clean-print",
+      "tags": [
+        "language:mixed",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.4329004329004329,
+      "wer": 0.8333333333333334,
+      "elapsed_seconds": 3.8849348349976935,
+      "reference_characters": 462,
+      "hypothesis_characters": 449
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0004",
+      "document_id": "project-authored-lao-v1-plain-p0004",
+      "subset": "clean-print",
+      "tags": [
+        "language:mixed",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.44144144144144143,
+      "wer": 0.7647058823529411,
+      "elapsed_seconds": 2.9833875020049163,
+      "reference_characters": 444,
+      "hypothesis_characters": 438
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0005",
+      "document_id": "project-authored-lao-v1-plain-p0005",
+      "subset": "clean-print",
+      "tags": [
+        "language:mixed",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.5466377440347071,
+      "wer": 0.9,
+      "elapsed_seconds": 3.9637192520021927,
+      "reference_characters": 461,
+      "hypothesis_characters": 458
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0006",
+      "document_id": "project-authored-lao-v1-plain-p0006",
+      "subset": "clean-print",
+      "tags": [
+        "language:lao",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.3642691415313225,
+      "wer": 0.7777777777777778,
+      "elapsed_seconds": 3.6425722089988994,
+      "reference_characters": 431,
+      "hypothesis_characters": 410
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0007",
+      "document_id": "project-authored-lao-v1-plain-p0007",
+      "subset": "clean-print",
+      "tags": [
+        "language:mixed",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.5054704595185996,
+      "wer": 0.8857142857142857,
+      "elapsed_seconds": 3.770193085001665,
+      "reference_characters": 457,
+      "hypothesis_characters": 446
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0008",
+      "document_id": "project-authored-lao-v1-plain-p0008",
+      "subset": "clean-print",
+      "tags": [
+        "language:lao",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.3577586206896552,
+      "wer": 0.8709677419354839,
+      "elapsed_seconds": 3.411186667995935,
+      "reference_characters": 464,
+      "hypothesis_characters": 449
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0009",
+      "document_id": "project-authored-lao-v1-plain-p0009",
+      "subset": "clean-print",
+      "tags": [
+        "language:mixed",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.4654471544715447,
+      "wer": 1.0,
+      "elapsed_seconds": 3.4493071680044523,
+      "reference_characters": 492,
+      "hypothesis_characters": 492
+    },
+    {
+      "id": "project-authored-lao-v1-plain-p0010",
+      "document_id": "project-authored-lao-v1-plain-p0010",
+      "subset": "clean-print",
+      "tags": [
+        "language:mixed",
+        "layout:plain",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:plain"
+      ],
+      "cer": 0.5719844357976653,
+      "wer": 0.9818181818181818,
+      "elapsed_seconds": 3.3909102930047084,
+      "reference_characters": 514,
+      "hypothesis_characters": 509
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0001",
+      "document_id": "project-authored-lao-v1-two-column-p0001",
+      "subset": "multi-column",
+      "tags": [
+        "language:mixed",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.5518763796909493,
+      "wer": 0.9642857142857143,
+      "elapsed_seconds": 3.176786751006148,
+      "reference_characters": 453,
+      "hypothesis_characters": 448
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0002",
+      "document_id": "project-authored-lao-v1-two-column-p0002",
+      "subset": "multi-column",
+      "tags": [
+        "language:lao",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.49356223175965663,
+      "wer": 0.9696969696969697,
+      "elapsed_seconds": 3.195935750998615,
+      "reference_characters": 466,
+      "hypothesis_characters": 462
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0003",
+      "document_id": "project-authored-lao-v1-two-column-p0003",
+      "subset": "multi-column",
+      "tags": [
+        "language:mixed",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.7796610169491526,
+      "wer": 0.9444444444444444,
+      "elapsed_seconds": 3.016357667998818,
+      "reference_characters": 472,
+      "hypothesis_characters": 460
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0004",
+      "document_id": "project-authored-lao-v1-two-column-p0004",
+      "subset": "multi-column",
+      "tags": [
+        "language:mixed",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.6101321585903083,
+      "wer": 0.8627450980392157,
+      "elapsed_seconds": 2.967685708004865,
+      "reference_characters": 454,
+      "hypothesis_characters": 449
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0005",
+      "document_id": "project-authored-lao-v1-two-column-p0005",
+      "subset": "multi-column",
+      "tags": [
+        "language:mixed",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.732484076433121,
+      "wer": 0.975,
+      "elapsed_seconds": 3.167407043001731,
+      "reference_characters": 471,
+      "hypothesis_characters": 469
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0006",
+      "document_id": "project-authored-lao-v1-two-column-p0006",
+      "subset": "multi-column",
+      "tags": [
+        "language:lao",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.6870748299319728,
+      "wer": 0.9166666666666666,
+      "elapsed_seconds": 2.9146179589952226,
+      "reference_characters": 441,
+      "hypothesis_characters": 420
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0007",
+      "document_id": "project-authored-lao-v1-two-column-p0007",
+      "subset": "multi-column",
+      "tags": [
+        "language:mixed",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.5867237687366167,
+      "wer": 0.9428571428571428,
+      "elapsed_seconds": 3.2924715429981006,
+      "reference_characters": 467,
+      "hypothesis_characters": 477
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0008",
+      "document_id": "project-authored-lao-v1-two-column-p0008",
+      "subset": "multi-column",
+      "tags": [
+        "language:lao",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.5527426160337553,
+      "wer": 0.9032258064516129,
+      "elapsed_seconds": 3.2215256260024034,
+      "reference_characters": 474,
+      "hypothesis_characters": 462
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0009",
+      "document_id": "project-authored-lao-v1-two-column-p0009",
+      "subset": "multi-column",
+      "tags": [
+        "language:mixed",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.6135458167330677,
+      "wer": 1.0,
+      "elapsed_seconds": 4.509438127002795,
+      "reference_characters": 502,
+      "hypothesis_characters": 502
+    },
+    {
+      "id": "project-authored-lao-v1-two-column-p0010",
+      "document_id": "project-authored-lao-v1-two-column-p0010",
+      "subset": "multi-column",
+      "tags": [
+        "language:mixed",
+        "layout:multi-column",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:two-column"
+      ],
+      "cer": 0.7175572519083969,
+      "wer": 1.0,
+      "elapsed_seconds": 4.634277459997975,
+      "reference_characters": 524,
+      "hypothesis_characters": 517
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0001",
+      "document_id": "project-authored-lao-v1-ruled-table-p0001",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.3885819521178637,
+      "wer": 0.9574468085106383,
+      "elapsed_seconds": 4.135824042998138,
+      "reference_characters": 543,
+      "hypothesis_characters": 542
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0002",
+      "document_id": "project-authored-lao-v1-ruled-table-p0002",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:lao",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.35251798561151076,
+      "wer": 0.9230769230769231,
+      "elapsed_seconds": 4.121127211001294,
+      "reference_characters": 556,
+      "hypothesis_characters": 559
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0003",
+      "document_id": "project-authored-lao-v1-ruled-table-p0003",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.4199288256227758,
+      "wer": 0.8727272727272727,
+      "elapsed_seconds": 3.9979809189972,
+      "reference_characters": 562,
+      "hypothesis_characters": 555
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0004",
+      "document_id": "project-authored-lao-v1-ruled-table-p0004",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.42830882352941174,
+      "wer": 0.7857142857142857,
+      "elapsed_seconds": 3.8159715849978966,
+      "reference_characters": 544,
+      "hypothesis_characters": 544
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0005",
+      "document_id": "project-authored-lao-v1-ruled-table-p0005",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.46524064171123,
+      "wer": 0.8983050847457628,
+      "elapsed_seconds": 4.226454751995334,
+      "reference_characters": 561,
+      "hypothesis_characters": 569
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0006",
+      "document_id": "project-authored-lao-v1-ruled-table-p0006",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:lao",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.3653483992467043,
+      "wer": 0.8181818181818182,
+      "elapsed_seconds": 3.976429084999836,
+      "reference_characters": 531,
+      "hypothesis_characters": 520
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0007",
+      "document_id": "project-authored-lao-v1-ruled-table-p0007",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.4326750448833034,
+      "wer": 0.9259259259259259,
+      "elapsed_seconds": 4.0916310860047815,
+      "reference_characters": 557,
+      "hypothesis_characters": 562
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0008",
+      "document_id": "project-authored-lao-v1-ruled-table-p0008",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:lao",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.38652482269503546,
+      "wer": 0.92,
+      "elapsed_seconds": 4.058510292998108,
+      "reference_characters": 564,
+      "hypothesis_characters": 552
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0009",
+      "document_id": "project-authored-lao-v1-ruled-table-p0009",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.46452702702702703,
+      "wer": 0.9642857142857143,
+      "elapsed_seconds": 4.200331335996452,
+      "reference_characters": 592,
+      "hypothesis_characters": 595
+    },
+    {
+      "id": "project-authored-lao-v1-ruled-table-p0010",
+      "document_id": "project-authored-lao-v1-ruled-table-p0010",
+      "subset": "simple-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:ruled",
+        "template:ruled-table"
+      ],
+      "cer": 0.5553745928338762,
+      "wer": 0.972972972972973,
+      "elapsed_seconds": 4.216428544001246,
+      "reference_characters": 614,
+      "hypothesis_characters": 613
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0001",
+      "document_id": "project-authored-lao-v1-borderless-table-p0001",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.45750452079566006,
+      "wer": 0.9361702127659575,
+      "elapsed_seconds": 4.11116700200364,
+      "reference_characters": 553,
+      "hypothesis_characters": 546
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0002",
+      "document_id": "project-authored-lao-v1-borderless-table-p0002",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:lao",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.38162544169611307,
+      "wer": 0.9230769230769231,
+      "elapsed_seconds": 4.057097210003121,
+      "reference_characters": 566,
+      "hypothesis_characters": 567
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0003",
+      "document_id": "project-authored-lao-v1-borderless-table-p0003",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.4388111888111888,
+      "wer": 0.8727272727272727,
+      "elapsed_seconds": 4.0540012100027525,
+      "reference_characters": 572,
+      "hypothesis_characters": 563
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0004",
+      "document_id": "project-authored-lao-v1-borderless-table-p0004",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.4548736462093863,
+      "wer": 0.8,
+      "elapsed_seconds": 3.745146418004879,
+      "reference_characters": 554,
+      "hypothesis_characters": 552
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0005",
+      "document_id": "project-authored-lao-v1-borderless-table-p0005",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.5253940455341506,
+      "wer": 0.8983050847457628,
+      "elapsed_seconds": 4.346825043001445,
+      "reference_characters": 571,
+      "hypothesis_characters": 569
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0006",
+      "document_id": "project-authored-lao-v1-borderless-table-p0006",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:lao",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.3826247689463956,
+      "wer": 0.8181818181818182,
+      "elapsed_seconds": 3.892698460003885,
+      "reference_characters": 541,
+      "hypothesis_characters": 528
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0007",
+      "document_id": "project-authored-lao-v1-borderless-table-p0007",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.43562610229276894,
+      "wer": 0.8703703703703703,
+      "elapsed_seconds": 4.108168876999116,
+      "reference_characters": 567,
+      "hypothesis_characters": 582
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0008",
+      "document_id": "project-authored-lao-v1-borderless-table-p0008",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:lao",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.39198606271777003,
+      "wer": 0.92,
+      "elapsed_seconds": 4.227310335998482,
+      "reference_characters": 574,
+      "hypothesis_characters": 561
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0009",
+      "document_id": "project-authored-lao-v1-borderless-table-p0009",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.47674418604651164,
+      "wer": 0.9821428571428571,
+      "elapsed_seconds": 4.166273961003753,
+      "reference_characters": 602,
+      "hypothesis_characters": 605
+    },
+    {
+      "id": "project-authored-lao-v1-borderless-table-p0010",
+      "document_id": "project-authored-lao-v1-borderless-table-p0010",
+      "subset": "complex-table",
+      "tags": [
+        "content:table",
+        "language:mixed",
+        "layout:table",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "table:borderless",
+        "template:borderless-table"
+      ],
+      "cer": 0.5689102564102564,
+      "wer": 0.972972972972973,
+      "elapsed_seconds": 4.28223087600054,
+      "reference_characters": 624,
+      "hypothesis_characters": 623
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0001",
+      "document_id": "project-authored-lao-v1-receipt-p0001",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:mixed",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.42418772563176893,
+      "wer": 0.96,
+      "elapsed_seconds": 4.075426793999213,
+      "reference_characters": 554,
+      "hypothesis_characters": 550
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0002",
+      "document_id": "project-authored-lao-v1-receipt-p0002",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:lao",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.37566137566137564,
+      "wer": 0.9454545454545454,
+      "elapsed_seconds": 4.180657919001533,
+      "reference_characters": 567,
+      "hypothesis_characters": 553
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0003",
+      "document_id": "project-authored-lao-v1-receipt-p0003",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:mixed",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.4432809773123909,
+      "wer": 0.896551724137931,
+      "elapsed_seconds": 5.154763751997962,
+      "reference_characters": 573,
+      "hypothesis_characters": 552
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0004",
+      "document_id": "project-authored-lao-v1-receipt-p0004",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:mixed",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.4540540540540541,
+      "wer": 0.821917808219178,
+      "elapsed_seconds": 7.40142583699344,
+      "reference_characters": 555,
+      "hypothesis_characters": 539
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0005",
+      "document_id": "project-authored-lao-v1-receipt-p0005",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:mixed",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.513986013986014,
+      "wer": 0.9193548387096774,
+      "elapsed_seconds": 6.781170459995337,
+      "reference_characters": 572,
+      "hypothesis_characters": 567
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0006",
+      "document_id": "project-authored-lao-v1-receipt-p0006",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:lao",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.36162361623616235,
+      "wer": 0.8448275862068966,
+      "elapsed_seconds": 4.503372334998858,
+      "reference_characters": 542,
+      "hypothesis_characters": 526
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0007",
+      "document_id": "project-authored-lao-v1-receipt-p0007",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:mixed",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.4295774647887324,
+      "wer": 0.9298245614035088,
+      "elapsed_seconds": 4.406643168003939,
+      "reference_characters": 568,
+      "hypothesis_characters": 576
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0008",
+      "document_id": "project-authored-lao-v1-receipt-p0008",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:lao",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.3947826086956522,
+      "wer": 0.9433962264150944,
+      "elapsed_seconds": 5.16326996099815,
+      "reference_characters": 575,
+      "hypothesis_characters": 554
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0009",
+      "document_id": "project-authored-lao-v1-receipt-p0009",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:mixed",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.4693200663349917,
+      "wer": 1.0,
+      "elapsed_seconds": 5.012452751994715,
+      "reference_characters": 603,
+      "hypothesis_characters": 603
+    },
+    {
+      "id": "project-authored-lao-v1-receipt-p0010",
+      "document_id": "project-authored-lao-v1-receipt-p0010",
+      "subset": "receipt",
+      "tags": [
+        "document:receipt",
+        "language:mixed",
+        "layout:receipt",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:receipt"
+      ],
+      "cer": 0.5504,
+      "wer": 0.987012987012987,
+      "elapsed_seconds": 4.82476166899869,
+      "reference_characters": 625,
+      "hypothesis_characters": 619
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0001",
+      "document_id": "project-authored-lao-v1-form-p0001",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:mixed",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.4682080924855491,
+      "wer": 1.0,
+      "elapsed_seconds": 4.026740626999526,
+      "reference_characters": 519,
+      "hypothesis_characters": 512
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0002",
+      "document_id": "project-authored-lao-v1-form-p0002",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:lao",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.42857142857142855,
+      "wer": 0.9807692307692307,
+      "elapsed_seconds": 4.201998085998639,
+      "reference_characters": 532,
+      "hypothesis_characters": 528
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0003",
+      "document_id": "project-authored-lao-v1-form-p0003",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:mixed",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.5111524163568774,
+      "wer": 0.9272727272727272,
+      "elapsed_seconds": 3.944355377003376,
+      "reference_characters": 538,
+      "hypothesis_characters": 524
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0004",
+      "document_id": "project-authored-lao-v1-form-p0004",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:mixed",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.4980769230769231,
+      "wer": 0.8285714285714286,
+      "elapsed_seconds": 3.828960086000734,
+      "reference_characters": 520,
+      "hypothesis_characters": 516
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0005",
+      "document_id": "project-authored-lao-v1-form-p0005",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:mixed",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.5437616387337058,
+      "wer": 0.9661016949152542,
+      "elapsed_seconds": 4.058913834996929,
+      "reference_characters": 537,
+      "hypothesis_characters": 541
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0006",
+      "document_id": "project-authored-lao-v1-form-p0006",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:lao",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.43984220907297833,
+      "wer": 0.8363636363636363,
+      "elapsed_seconds": 3.9260212110020802,
+      "reference_characters": 507,
+      "hypothesis_characters": 480
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0007",
+      "document_id": "project-authored-lao-v1-form-p0007",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:mixed",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.49343339587242024,
+      "wer": 0.9444444444444444,
+      "elapsed_seconds": 4.119534375997318,
+      "reference_characters": 533,
+      "hypothesis_characters": 542
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0008",
+      "document_id": "project-authored-lao-v1-form-p0008",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:lao",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.44814814814814813,
+      "wer": 0.98,
+      "elapsed_seconds": 4.357190002003335,
+      "reference_characters": 540,
+      "hypothesis_characters": 527
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0009",
+      "document_id": "project-authored-lao-v1-form-p0009",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:mixed",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.5264084507042254,
+      "wer": 1.0,
+      "elapsed_seconds": 4.655305251995742,
+      "reference_characters": 568,
+      "hypothesis_characters": 568
+    },
+    {
+      "id": "project-authored-lao-v1-form-p0010",
+      "document_id": "project-authored-lao-v1-form-p0010",
+      "subset": "form",
+      "tags": [
+        "document:form",
+        "language:mixed",
+        "layout:form",
+        "page-id:qr-v1",
+        "qa:digital-capture-suite",
+        "source:capture-pack",
+        "source:digital-capture-suite",
+        "template:form"
+      ],
+      "cer": 0.6389830508474577,
+      "wer": 1.0,
+      "elapsed_seconds": 4.35643987700314,
+      "reference_characters": 590,
+      "hypothesis_characters": 581
+    }
+  ],
+  "qa": {
+    "kind": "digital-capture-suite",
+    "suite_id": "project-authored-lao-v1",
+    "not_real_benchmark": true,
+    "sample_count": 60,
+    "templates": {
+      "borderless-table": 10,
+      "form": 10,
+      "plain": 10,
+      "receipt": 10,
+      "ruled-table": 10,
+      "two-column": 10
+    },
+    "warning": "Generated digital pages measure template/OCR pipeline sanity only. Do not report these results as real scan/photo OCR accuracy."
+  }
+}

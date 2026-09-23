@@ -191,6 +191,7 @@ Override them with:
 - `OCR_ENGINE=tesseract|owned`
 - `OCR_LANGUAGES`
 - `OCR_PSM`
+- `OCR_TESSDATA_DIR` (optional custom Tesseract traineddata directory)
 - `OCR_MODEL_PATH` (required for `OCR_ENGINE=owned`)
 - `OCR_DECODER=greedy|beam`
 - `OCR_BEAM_WIDTH`
@@ -284,6 +285,7 @@ lao-ocr export-layout-detector --checkpoint training/layout/runs/tiny-unet-v1/la
 lao-ocr train-reading-order --training-manifest training/layout.jsonl --dataset-root <dataset> --output training/layout/runs/reading-order-v1 --device auto
 lao-ocr export-reading-order --checkpoint training/layout/runs/reading-order-v1/reading-order.pt --output training/layout/runs/reading-order-v1/reading-order.pt2
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
+# Optional: add --tessdata-dir /path/to/tessdata for hashed custom weights
 lao-ocr compare-benchmarks --baseline baseline.json --candidate candidate.json --output comparison.json
 lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
@@ -315,6 +317,7 @@ See:
 - [docs/docx-fidelity-benchmark.md](docs/docx-fidelity-benchmark.md)
 - [docs/benchmark-bundles.md](docs/benchmark-bundles.md)
 - [docs/benchmark-comparison.md](docs/benchmark-comparison.md)
+- [docs/tesseract-models.md](docs/tesseract-models.md)
 - [docs/benchmark-freeze.md](docs/benchmark-freeze.md)
 - [docs/benchmark-readiness.md](docs/benchmark-readiness.md)
 - [docs/benchmark-source-review.md](docs/benchmark-source-review.md)

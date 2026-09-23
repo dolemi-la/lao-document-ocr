@@ -8,6 +8,7 @@ services:
     environment:
       OCR_LANGUAGES: lao+eng
       OCR_PSM: "3"
+      OCR_TESSDATA_DIR: "${OCR_TESSDATA_DIR:-}"
       MAX_PAGES: "60"
       MAX_PAGE_PIXELS: "${MAX_PAGE_PIXELS:-40000000}"
       MAX_UPLOAD_BYTES: "26214400"

@@ -49,6 +49,7 @@ def _parser() -> argparse.ArgumentParser:
     convert.add_argument("--engine", choices=["tesseract", "owned"], default="tesseract")
     convert.add_argument("--languages", default="lao+eng")
     convert.add_argument("--psm", type=int, default=3)
+    convert.add_argument("--tessdata-dir", type=Path)
     convert.add_argument("--model", type=Path)
     convert.add_argument("--calibration", type=Path)
     convert.add_argument(
@@ -283,6 +284,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     benchmark.add_argument("--languages", default="lao+eng")
     benchmark.add_argument("--psm", type=int, default=3)
+    benchmark.add_argument("--tessdata-dir", type=Path)
     benchmark.add_argument("--model", type=Path)
     benchmark.add_argument("--calibration", type=Path)
     benchmark.add_argument(
@@ -342,6 +344,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     capture_suite_qa.add_argument("--languages", default="lao+eng")
     capture_suite_qa.add_argument("--psm", type=int, default=3)
+    capture_suite_qa.add_argument("--tessdata-dir", type=Path)
     capture_suite_qa.add_argument("--model", type=Path)
     capture_suite_qa.add_argument("--calibration", type=Path)
     capture_suite_qa.add_argument(
@@ -689,7 +692,11 @@ def _parser() -> argparse.ArgumentParser:
 
 def _build_ocr_engine(args: argparse.Namespace):
     if args.engine == "tesseract":
-        engine = TesseractEngine(languages=args.languages, psm=args.psm)
+        engine = TesseractEngine(
+            languages=args.languages,
+            psm=args.psm,
+            tessdata_dir=args.tessdata_dir,
+        )
         if not engine.is_available():
             available = ", ".join(engine.available_languages())
             raise ValueError(

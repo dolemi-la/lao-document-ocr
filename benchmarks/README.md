@@ -246,3 +246,26 @@ Publication readiness counts `source:real-document` samples, or capture-pack sam
 ## Digital capture-suite QA
 
 Use `benchmark-capture-suite` to sanity-check generated templates before physical capture. Its report includes `qa.not_real_benchmark=true`; never substitute this for the real scan/photo benchmark. See [../docs/capture-suite-qa.md](../docs/capture-suite-qa.md).
+
+## Tesseract traineddata provenance
+
+For published baselines, prefer `--tessdata-dir` with an explicit traineddata directory. Benchmark engine metadata then records SHA-256 hashes of the Lao/English `.traineddata` files. See [../docs/tesseract-models.md](../docs/tesseract-models.md).
+
+## Published digital QA artifact
+
+The repository includes one reproducible **non-real** digital QA report:
+
+```text
+benchmarks/results/project-authored-lao-v1-digital-qa-tessdata-best-psm3.json
+```
+
+It was produced on the 60-page project-authored generated capture suite with Tesseract 5.5.0, PSM 3, and explicitly selected Lao/English traineddata whose SHA-256 values are embedded in the report. The report records `qa.not_real_benchmark=true`.
+
+Observed digital QA result:
+
+```text
+CER 0.4800
+WER 0.9169
+```
+
+These numbers are regression/sanity data only. They are **not** the Phase 1 real scan/photo Tesseract baseline.

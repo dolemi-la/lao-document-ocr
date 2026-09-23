@@ -48,6 +48,7 @@ Status: in progress
 - [ ] simple/complex tables
 - [ ] receipts/forms as separate subsets
 - [x] CER/WER reporting by subset
+- [x] configurable Tesseract traineddata with model hashes
 - [x] benchmark release bundle with report SHA-256/source revision
 - [x] frozen test-set manifest/lock with file hashes
 - [x] real-source benchmark readiness gate by coverage dimension

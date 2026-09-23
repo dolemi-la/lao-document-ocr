@@ -61,6 +61,7 @@ MAX_PAGE_PIXELS = int(os.getenv("MAX_PAGE_PIXELS", "40000000"))
 OCR_ENGINE = os.getenv("OCR_ENGINE", "tesseract").strip().lower()
 OCR_LANGUAGES = os.getenv("OCR_LANGUAGES", "lao+eng")
 OCR_PSM = int(os.getenv("OCR_PSM", "3"))
+OCR_TESSDATA_DIR = os.getenv("OCR_TESSDATA_DIR") or None
 OCR_MODEL_PATH = os.getenv("OCR_MODEL_PATH") or None
 OCR_CALIBRATION_PATH = os.getenv("OCR_CALIBRATION_PATH") or None
 OCR_DEVICE = os.getenv("OCR_DEVICE", "cpu").strip().lower()
@@ -353,7 +354,11 @@ def _reading_order_resolver():
 
 def _engine() -> OcrEngine:
     if OCR_ENGINE == "tesseract":
-        return TesseractEngine(languages=OCR_LANGUAGES, psm=OCR_PSM)
+        return TesseractEngine(
+            languages=OCR_LANGUAGES,
+            psm=OCR_PSM,
+            tessdata_dir=OCR_TESSDATA_DIR,
+        )
     if OCR_ENGINE == "owned":
         if not OCR_MODEL_PATH:
             raise OcrEngineError("OCR_MODEL_PATH is required when OCR_ENGINE=owned")
