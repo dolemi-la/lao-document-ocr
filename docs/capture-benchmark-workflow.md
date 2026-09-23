@@ -27,8 +27,8 @@ lao-ocr generate-capture-pack \
   --output benchmarks/capture-packs/baseline-v1 \
   --font /path/to/NotoSansLao-Regular.ttf \
   --pack-id baseline-v1 \
-  --text-license CC0-1.0 \
-  --text-provenance "Project-authored Lao benchmark text released CC0" \
+  --text-license Apache-2.0 \
+  --text-provenance "Project-authored Lao benchmark text released Apache-2.0" \
   --dpi 150 \
   --lines-per-page 10 \
   --max-pages 100
@@ -53,8 +53,8 @@ lao-ocr generate-capture-pack \
   --output benchmarks/capture-packs/multi-column-v1 \
   --font /path/to/NotoSansLao-Regular.ttf \
   --pack-id multi-column-v1 \
-  --text-license CC0-1.0 \
-  --text-provenance "Project-authored Lao benchmark text released CC0" \
+  --text-license Apache-2.0 \
+  --text-provenance "Project-authored Lao benchmark text released Apache-2.0" \
   --template two-column
 ```
 

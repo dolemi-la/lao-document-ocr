@@ -5,7 +5,7 @@ PYTEST := $(VENV)/bin/pytest
 RUFF := $(VENV)/bin/ruff
 UVICORN := $(VENV)/bin/uvicorn
 
-.PHONY: install dev test lint format api web docker-up docker-down
+.PHONY: install dev test lint format api web docker-up docker-down capture-suite
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -36,3 +36,7 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+
+capture-suite:
+	./scripts/generate_public_capture_suite.sh

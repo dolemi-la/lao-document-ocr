@@ -48,3 +48,21 @@ def test_unclear_sources_are_not_approved() -> None:
 
     assert by_id["khamlao-moe-derived-corpus"]["status"] == "not-approved"
     assert by_id["lao-sabaidee"]["status"] == "pending-unavailable"
+
+
+def test_project_authored_corpus_is_approved_for_public_capture_source() -> None:
+    payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    source = next(
+        item
+        for item in payload["sources"]
+        if item["id"] == "project-authored-lao-v1"
+    )
+
+    assert source["license"] == "Apache-2.0"
+    assert source["status"] == "approved-public-capture-source"
+    assert "public-capture-pack-source-text" in source["allowed_uses"]
+    assert "public-benchmark-ground-truth-source" in source["allowed_uses"]
+    assert (
+        "claiming-digital-pages-as-real-optical-evidence"
+        in source["disallowed_uses"]
+    )

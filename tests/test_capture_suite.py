@@ -1,3 +1,4 @@
+import csv
 from pathlib import Path
 
 import pymupdf
@@ -65,6 +66,26 @@ def test_generate_capture_suite_builds_combined_pdf(tmp_path) -> None:
     assert all(pack.page_count == 1 for pack in suite.packs)
     assert all((root / pack.manifest).is_file() for pack in suite.packs)
     assert all((root / pack.printable_pdf).is_file() for pack in suite.packs)
+    assert suite.worksheet == "capture-worksheet.csv"
+    worksheet = root / suite.worksheet
+    assert worksheet.is_file()
+    with worksheet.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert [row["combined_page"] for row in rows] == ["1", "2", "3"]
+    assert [row["template"] for row in rows] == [
+        "plain",
+        "two-column",
+        "ruled-table",
+    ]
+    assert [row["page_id"] for row in rows] == [
+        "baseline-plain-p0001",
+        "baseline-two-column-p0001",
+        "baseline-ruled-table-p0001",
+    ]
+    assert all(
+        row["required_capture_modes"] == "flatbed-scan;phone-photo"
+        for row in rows
+    )
 
     combined = root / suite.combined_pdf
     assert combined.is_file()

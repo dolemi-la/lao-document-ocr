@@ -1,0 +1,18 @@
+{
+  "schema_version": "1",
+  "id": "project-authored-lao-v1",
+  "description": "Original project-authored Lao and mixed Lao/English text for printable OCR capture packs.",
+  "license": "CC0-1.0",
+  "source": "project-authored",
+  "intended_use": [
+    "capture-pack-source-text",
+    "public-benchmark-ground-truth-source",
+    "synthetic-rendering",
+    "OCR regression fixtures"
+  ],
+  "not_real_ocr_evidence": true,
+  "line_count": 81,
+  "sha256": "6864fa7052c51b88a88b51240b9f9168c985fd7c05359820406cd93b2ecf7ec5",
+  "language": "lo-with-mixed-en",
+  "rights_statement": "Created specifically for this project as redistributable benchmark/capture-pack source text; no third-party source corpus is required to use this file."
+}

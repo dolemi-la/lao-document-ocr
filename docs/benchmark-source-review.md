@@ -10,6 +10,17 @@ The machine-readable review registry is:
 
 ## Current decisions
 
+### Project-authored Lao capture text v1 — approved for public capture packs
+
+Source:
+
+`resources/corpora/project-authored-lao-v1.txt`
+
+License: Apache-2.0.
+
+This corpus is written specifically for the project and is the preferred default source for public printable capture campaigns. Generated digital pages are source material only; real benchmark readiness still requires registered optical scans/photos carrying `capture:optical-evidence`.
+
+
 ### HPLT v3 Lao — approved for text only
 
 Source:

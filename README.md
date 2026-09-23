@@ -319,6 +319,7 @@ See:
 - [docs/hplt-sampling.md](docs/hplt-sampling.md)
 - [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
 - [docs/capture-suite.md](docs/capture-suite.md)
+- [docs/project-authored-capture-campaign.md](docs/project-authored-capture-campaign.md)
 - [docs/capture-campaign-report.md](docs/capture-campaign-report.md)
 - [docs/synthetic-augmentation.md](docs/synthetic-augmentation.md)
 - [docs/language-model.md](docs/language-model.md)

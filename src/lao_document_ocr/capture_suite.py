@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import re
 from dataclasses import asdict, dataclass
@@ -35,6 +36,7 @@ class CaptureSuiteManifest:
     dpi: int
     combined_pdf: str
     packs: tuple[CaptureSuitePack, ...]
+    worksheet: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -45,6 +47,7 @@ class CaptureSuiteManifest:
             "font": self.font,
             "dpi": self.dpi,
             "combined_pdf": self.combined_pdf,
+            "worksheet": self.worksheet,
             "packs": [pack.to_dict() for pack in self.packs],
         }
 
@@ -95,6 +98,8 @@ def generate_capture_suite(
     font = Path(font_path)
     packs: list[CaptureSuitePack] = []
     pack_pdfs: list[Path] = []
+    worksheet_rows: list[dict[str, str | int]] = []
+    combined_page_number = 1
 
     for template in selected:
         pack_id = f"{suite_id}-{template.value}"
@@ -114,11 +119,26 @@ def generate_capture_suite(
         _, manifest = load_capture_pack(manifest_path)
         pdf_path = pack_dir / f"{pack_id}.pdf"
         pack_pdfs.append(pdf_path)
+        pack_manifest_relative = manifest_path.relative_to(output).as_posix()
+        for page in manifest.pages:
+            worksheet_rows.append(
+                {
+                    "combined_page": combined_page_number,
+                    "template": template.value,
+                    "pack_id": pack_id,
+                    "page_id": page.id,
+                    "pack_manifest": pack_manifest_relative,
+                    "digital_page": page.image,
+                    "ground_truth": page.ground_truth,
+                    "required_capture_modes": "flatbed-scan;phone-photo",
+                }
+            )
+            combined_page_number += 1
         packs.append(
             CaptureSuitePack(
                 template=template.value,
                 pack_id=pack_id,
-                manifest=manifest_path.relative_to(output).as_posix(),
+                manifest=pack_manifest_relative,
                 printable_pdf=pdf_path.relative_to(output).as_posix(),
                 page_count=len(manifest.pages),
             )
@@ -126,6 +146,24 @@ def generate_capture_suite(
 
     combined_pdf = output / f"{suite_id}.pdf"
     _merge_pdfs(pack_pdfs, combined_pdf)
+
+    worksheet_path = output / "capture-worksheet.csv"
+    with worksheet_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "combined_page",
+                "template",
+                "pack_id",
+                "page_id",
+                "pack_manifest",
+                "digital_page",
+                "ground_truth",
+                "required_capture_modes",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(worksheet_rows)
 
     suite = CaptureSuiteManifest(
         schema_version="1",
@@ -136,6 +174,7 @@ def generate_capture_suite(
         dpi=dpi,
         combined_pdf=combined_pdf.name,
         packs=tuple(packs),
+        worksheet=worksheet_path.name,
     )
     suite_manifest = output / "capture-suite.json"
     suite_manifest.write_text(
@@ -180,4 +219,9 @@ def load_capture_suite(path: str | Path) -> CaptureSuiteManifest:
         dpi=int(payload["dpi"]),
         combined_pdf=str(payload["combined_pdf"]),
         packs=packs,
+        worksheet=(
+            str(payload["worksheet"])
+            if payload.get("worksheet") is not None
+            else None
+        ),
     )
