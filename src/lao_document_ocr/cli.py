@@ -102,6 +102,31 @@ def _parser() -> argparse.ArgumentParser:
     dataset_report.add_argument("--output", required=True, type=Path)
     dataset_report.add_argument("--no-hash-check", action="store_true")
 
+    readiness = subparsers.add_parser(
+        "benchmark-readiness",
+        help="Gate benchmark publication on real-data coverage dimensions.",
+    )
+    readiness.add_argument("--manifest", required=True, type=Path)
+    readiness.add_argument("--dataset-root", required=True, type=Path)
+    readiness.add_argument("--output", required=True, type=Path)
+    readiness.add_argument(
+        "--split",
+        choices=[split.value for split in DatasetSplit],
+        default=DatasetSplit.TEST.value,
+    )
+    readiness.add_argument(
+        "--min-documents-per-dimension",
+        type=int,
+        default=1,
+    )
+    readiness.add_argument("--min-total-documents", type=int, default=0)
+    readiness.add_argument(
+        "--min-layout-labeled-documents",
+        type=int,
+        default=0,
+    )
+    readiness.add_argument("--no-hash-check", action="store_true")
+
     freeze = subparsers.add_parser(
         "freeze-benchmark",
         help="Freeze one dataset split into a hashed benchmark manifest + lock file.",
@@ -629,6 +654,34 @@ def _validate(args: argparse.Namespace) -> int:
     print(f"Valid dataset: {len(samples)} samples")
     print(json.dumps(counts, indent=2, sort_keys=True))
     return 0
+
+
+def _benchmark_readiness(args: argparse.Namespace) -> int:
+    from lao_document_ocr.benchmark_readiness import (
+        build_benchmark_readiness_report,
+        write_benchmark_readiness_report,
+    )
+
+    samples = load_manifest(args.manifest)
+    report = build_benchmark_readiness_report(
+        samples,
+        args.dataset_root,
+        split=DatasetSplit(args.split),
+        min_documents_per_dimension=args.min_documents_per_dimension,
+        min_total_documents=args.min_total_documents,
+        min_layout_labeled_documents=args.min_layout_labeled_documents,
+        verify_hashes=not args.no_hash_check,
+    )
+    output = write_benchmark_readiness_report(report, args.output)
+    print(f"Report: {output}")
+    print(f"Split: {report['split']}")
+    print(f"Documents: {report['document_count']}")
+    print(
+        "Missing dimensions: "
+        + (", ".join(report["missing_dimensions"]) or "none")
+    )
+    print(f"Readiness: {'READY' if report['ready'] else 'NOT READY'}")
+    return 0 if report["ready"] else 1
 
 
 def _freeze_benchmark(args: argparse.Namespace) -> int:
@@ -1355,6 +1408,8 @@ def main() -> int:
             return _validate(args)
         if args.command == "dataset-report":
             return _dataset_report(args)
+        if args.command == "benchmark-readiness":
+            return _benchmark_readiness(args)
         if args.command == "freeze-benchmark":
             return _freeze_benchmark(args)
         if args.command == "verify-benchmark-freeze":

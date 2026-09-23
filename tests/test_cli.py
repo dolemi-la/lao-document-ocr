@@ -1299,3 +1299,72 @@ def test_recognize_line_cli_forwards_language_model_options(
     assert captured["language_model_path"] == tmp_path / "lm.json"
     assert captured["language_model_weight"] == 0.35
     assert captured["language_model_token_bonus"] == 0.08
+
+
+def test_benchmark_readiness_cli_reports_ready_for_complete_dimensions(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import hashlib
+
+    specs = [
+        ("clean", "clean-print", ["capture:flatbed-scan"]),
+        ("noisy", "noisy-scan", ["capture:degraded-scan"]),
+        ("phone", "phone-photo", ["capture:phone-photo"]),
+        ("mixed", "clean-print", ["language:mixed"]),
+        ("columns", "clean-print", ["layout:multi-column"]),
+        ("ruled", "clean-print", ["table:ruled"]),
+        ("borderless", "clean-print", ["table:borderless"]),
+        ("receipt", "clean-print", ["document:receipt"]),
+        ("form", "clean-print", ["document:form"]),
+    ]
+    entries = []
+    for index, (sample_id, subset, tags) in enumerate(specs, start=1):
+        image = tmp_path / f"{sample_id}.png"
+        truth = tmp_path / f"{sample_id}.txt"
+        Image.new("RGB", (100, 60), (index * 20, 240, 250)).save(image)
+        truth.write_text(f"truth {sample_id}", encoding="utf-8")
+        entries.append(
+            {
+                "id": sample_id,
+                "document_id": f"doc-{sample_id}",
+                "split": "test",
+                "subset": subset,
+                "source": image.name,
+                "ground_truth": truth.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI readiness test",
+                "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
+                "tags": tags,
+            }
+        )
+
+    manifest = tmp_path / "manifest.jsonl"
+    output = tmp_path / "readiness.json"
+    manifest.write_text(
+        "\n".join(json.dumps(entry) for entry in entries) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "benchmark-readiness",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output",
+            str(output),
+            "--min-total-documents",
+            "9",
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["ready"] is True
+    assert payload["missing_dimensions"] == []
+    assert "Readiness: READY" in capsys.readouterr().out

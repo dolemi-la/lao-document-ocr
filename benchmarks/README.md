@@ -226,3 +226,17 @@ lao-ocr freeze-benchmark \
 Verify the lock before every published benchmark run with `verify-benchmark-freeze`. See [../docs/benchmark-freeze.md](../docs/benchmark-freeze.md).
 
 When publishing baseline/candidate results, use `--freeze-lock <lock.json>` with `lao-ocr benchmark` so the command refuses to run if the frozen test set has changed.
+
+## Benchmark readiness
+
+Before freezing/publishing a test set, verify coverage across real capture/layout dimensions:
+
+```bash
+lao-ocr benchmark-readiness \
+  --manifest benchmarks/manifest-v1.jsonl \
+  --dataset-root benchmarks/public \
+  --split test \
+  --output benchmarks/results/readiness-v1.json
+```
+
+Increase `--min-documents-per-dimension`, `--min-total-documents`, and/or `--min-layout-labeled-documents` for a release-quality gate. See [../docs/benchmark-readiness.md](../docs/benchmark-readiness.md).

@@ -34,6 +34,7 @@ Status: in progress
 - [x] structured printable capture templates for multi-column/table/receipt/form collection
 - [x] combined multi-template capture suite generator
 - [x] capture campaign completion report by template/device mode
+- [x] real-data benchmark readiness coverage gate
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos
