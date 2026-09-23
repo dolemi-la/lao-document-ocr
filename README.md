@@ -278,6 +278,7 @@ lao-ocr freeze-benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --
 lao-ocr verify-benchmark-freeze --lock benchmark.lock.json --dataset-root <dataset>
 lao-ocr dataset-report --manifest <manifest.jsonl> --dataset-root <dataset> --output dataset-report.json
 lao-ocr build-review-queue --manifest <manifest.jsonl> --dataset-root <dataset> --output-dir /tmp/review
+lao-ocr apply-review-decisions --manifest <manifest.jsonl> --dataset-root <dataset> --decisions /tmp/review/review-decisions.csv
 lao-ocr review-dataset-sample --manifest <manifest.jsonl> --dataset-root <dataset> --id <sample-id> --status approved --reviewer <alias>
 lao-ocr benchmark-readiness --manifest <manifest.jsonl> --dataset-root <dataset> --output readiness.json
 lao-ocr prepare-layout-training-manifest --manifest <manifest.jsonl> --dataset-root <dataset> --output training/layout.jsonl

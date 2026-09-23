@@ -70,6 +70,10 @@ At minimum, verify:
 
 Approval is a human attestation that these checks were performed; it is not a claim that OCR output is correct.
 
+## Apply many explicit decisions safely
+
+`build-review-queue` creates `review-decisions.csv`. Fill only explicit `approved`/`rejected` decisions, run `apply-review-decisions` once without `--confirm` to validate the entire sheet, then rerun with `--confirm` for one atomic manifest update. See [review-queue.md](review-queue.md).
+
 ## Dataset coverage report
 
 `dataset-report` includes:

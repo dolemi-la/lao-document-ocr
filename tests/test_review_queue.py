@@ -1,3 +1,4 @@
+import csv
 import json
 from datetime import UTC, datetime
 
@@ -67,6 +68,15 @@ def test_review_queue_defaults_to_unreviewed_and_rejected(tmp_path) -> None:
     }
     assert all(entry["thumbnail"] for entry in payload["entries"])
     assert html_path.is_file()
+    decisions_path = json_path.parent / payload["decision_template"]
+    assert decisions_path.is_file()
+    with decisions_path.open(encoding="utf-8", newline="") as handle:
+        decision_rows = list(csv.DictReader(handle))
+    assert {row["id"] for row in decision_rows} == {
+        "unreviewed",
+        "rejected",
+    }
+    assert all(row["status"] == "" for row in decision_rows)
     assert review_queue_summary(json_path) == {
         "sample_count": 2,
         "with_problems": 0,

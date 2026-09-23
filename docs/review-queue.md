@@ -118,3 +118,56 @@ Rebuild the queue after decisions are recorded. Approved samples disappear from 
 The review bundle may contain thumbnails and full ground-truth text from the benchmark dataset.
 
 Treat it as local review material. Do not publish/share the generated queue unless the underlying benchmark content is already approved for that audience.
+
+## Batch decision sheet
+
+Every generated review queue also includes:
+
+```text
+review-decisions.csv
+```
+
+Columns:
+
+```text
+id,current_status,status,reviewer,notes,subset,tags
+```
+
+Reviewer-editable columns are:
+
+- `status` — leave blank to skip, or set `approved` / `rejected`
+- `reviewer` — required when a status is supplied
+- `notes` — optional but recommended for rejections
+
+Do not change the `id` column.
+
+### Validate the sheet without writing
+
+`apply-review-decisions` is a dry-run unless `--confirm` is present:
+
+```bash
+lao-ocr apply-review-decisions \
+  --manifest benchmarks/public/manifest.jsonl \
+  --dataset-root benchmarks/public \
+  --decisions /tmp/lao-ocr-review/review-decisions.csv \
+  --report /tmp/lao-ocr-review/review-apply-report.json
+```
+
+The dry-run validates every explicit decision. Approved samples must pass file/hash/dataset validation.
+
+### Apply atomically
+
+After the dry-run is clean:
+
+```bash
+lao-ocr apply-review-decisions \
+  --manifest benchmarks/public/manifest.jsonl \
+  --dataset-root benchmarks/public \
+  --decisions /tmp/lao-ocr-review/review-decisions.csv \
+  --confirm \
+  --report /tmp/lao-ocr-review/review-apply-report.json
+```
+
+The apply is all-or-nothing. If one approval is invalid, no review decision from that CSV is written.
+
+Blank-status rows are ignored, so reviewers may decide only a subset of the queue and leave the rest pending.

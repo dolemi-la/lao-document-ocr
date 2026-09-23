@@ -1751,3 +1751,96 @@ def test_build_review_queue_cli_generates_local_bundle(
     captured = capsys.readouterr()
     assert "Samples: 1" in captured.out
     assert "With problems: 0" in captured.out
+
+
+def test_apply_review_decisions_cli_dry_run_then_confirm(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import csv
+    import hashlib
+
+    from lao_document_ocr.dataset import load_manifest
+
+    image = tmp_path / "batch-review.png"
+    truth = tmp_path / "batch-review.txt"
+    Image.new("RGB", (160, 100), (205, 245, 255)).save(image)
+    truth.write_text("ສະບາຍດີ", encoding="utf-8")
+    manifest = tmp_path / "batch-review-manifest.jsonl"
+    manifest.write_text(
+        json.dumps(
+            {
+                "id": "batch-review-001",
+                "document_id": "batch-review-doc-001",
+                "split": "test",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI batch review test",
+                "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    decisions = tmp_path / "review-decisions.csv"
+    with decisions.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["id", "status", "reviewer", "notes"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "id": "batch-review-001",
+                "status": "approved",
+                "reviewer": "Reviewer A",
+                "notes": "Checked capture and truth",
+            }
+        )
+    report = tmp_path / "review-report.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "apply-review-decisions",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--decisions",
+            str(decisions),
+            "--report",
+            str(report),
+        ],
+    )
+    assert main() == 0
+    assert load_manifest(manifest)[0].review is None
+    assert json.loads(report.read_text(encoding="utf-8"))["dry_run"] is True
+    assert "Mode: DRY RUN" in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "apply-review-decisions",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--decisions",
+            str(decisions),
+            "--confirm",
+        ],
+    )
+    assert main() == 0
+    reviewed = load_manifest(manifest)[0]
+    assert reviewed.review is not None
+    assert reviewed.review.status.value == "approved"
+    assert reviewed.review.reviewer == "Reviewer A"
+    assert "Mode: APPLIED" in capsys.readouterr().out

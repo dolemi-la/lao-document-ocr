@@ -265,6 +265,16 @@ def _parser() -> argparse.ArgumentParser:
     review_queue.add_argument("--thumbnail-width", type=int, default=900)
     review_queue.add_argument("--thumbnail-height", type=int, default=1200)
 
+    apply_reviews = subparsers.add_parser(
+        "apply-review-decisions",
+        help="Validate/apply explicit CSV review decisions transactionally.",
+    )
+    apply_reviews.add_argument("--manifest", required=True, type=Path)
+    apply_reviews.add_argument("--dataset-root", required=True, type=Path)
+    apply_reviews.add_argument("--decisions", required=True, type=Path)
+    apply_reviews.add_argument("--confirm", action="store_true")
+    apply_reviews.add_argument("--report", type=Path)
+
     layout_benchmark = subparsers.add_parser(
         "benchmark-layout",
         help="Compare two document AST JSON files for layout/structure quality.",
@@ -1050,8 +1060,32 @@ def _build_review_queue(args: argparse.Namespace) -> int:
     summary = review_queue_summary(json_path)
     print(f"Review HTML: {html_path}")
     print(f"Review JSON: {json_path}")
+    print(f"Decision CSV: {json_path.parent / 'review-decisions.csv'}")
     print(f"Samples: {summary['sample_count']}")
     print(f"With problems: {summary['with_problems']}")
+    return 0
+
+
+def _apply_review_decisions(args: argparse.Namespace) -> int:
+    from lao_document_ocr.dataset_review import apply_review_decisions
+
+    report = apply_review_decisions(
+        args.manifest,
+        args.dataset_root,
+        args.decisions,
+        confirm=args.confirm,
+    )
+    if args.report is not None:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"Report: {args.report}")
+    print(f"Mode: {'APPLIED' if args.confirm else 'DRY RUN'}")
+    print(f"Decisions: {report['decision_count']}")
+    print(f"Approved: {report['approved_count']}")
+    print(f"Rejected: {report['rejected_count']}")
     return 0
 
 
@@ -1700,6 +1734,8 @@ def main() -> int:
             return _review_dataset_sample(args)
         if args.command == "build-review-queue":
             return _build_review_queue(args)
+        if args.command == "apply-review-decisions":
+            return _apply_review_decisions(args)
         if args.command == "benchmark-layout":
             return _benchmark_layout(args)
         if args.command == "benchmark-docx":

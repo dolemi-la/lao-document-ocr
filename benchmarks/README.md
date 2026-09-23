@@ -276,4 +276,4 @@ Registered real captures are not publication-ready until a reviewer records `rev
 
 ## Local review queue
 
-Generate a local HTML/JSON queue for unreviewed/rejected benchmark captures with `lao-ocr build-review-queue`. It renders safe thumbnails and ground truth without mutating the manifest. See [../docs/review-queue.md](../docs/review-queue.md).
+Generate a local HTML/JSON queue for unreviewed/rejected benchmark captures with `lao-ocr build-review-queue`. It also emits a decision CSV that can be dry-run and atomically applied with `apply-review-decisions`. The queue renders safe thumbnails and ground truth without mutating the manifest. See [../docs/review-queue.md](../docs/review-queue.md).

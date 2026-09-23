@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 from __future__ import annotations
 
+import csv
 import html
 import json
 from dataclasses import dataclass
@@ -202,10 +203,39 @@ def build_review_queue(
         "entries": [entry.to_dict() for entry in entries],
     }
     json_path = output / "review-queue.json"
+    payload["decision_template"] = "review-decisions.csv"
     json_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+
+    decisions_path = output / "review-decisions.csv"
+    with decisions_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "id",
+                "current_status",
+                "status",
+                "reviewer",
+                "notes",
+                "subset",
+                "tags",
+            ],
+        )
+        writer.writeheader()
+        for entry in entries:
+            writer.writerow(
+                {
+                    "id": entry.id,
+                    "current_status": entry.review_status,
+                    "status": "",
+                    "reviewer": "",
+                    "notes": "",
+                    "subset": entry.subset,
+                    "tags": " ".join(entry.tags),
+                }
+            )
 
     html_path = output / "index.html"
     html_path.write_text(

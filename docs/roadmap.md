@@ -42,6 +42,7 @@ Status: in progress
 - [x] real-data benchmark readiness coverage gate
 - [x] machine-readable manual review approval gate before public freeze
 - [x] local visual review queue for benchmark capture approval
+- [x] transactional batch review decision sheet workflow
 - [ ] clean printed scans
 - [ ] noisy scans
 - [ ] phone photos
