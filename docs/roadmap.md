@@ -58,6 +58,7 @@ Status: in progress
 - [x] real-source benchmark readiness gate by coverage dimension
 - [x] capture optical-evidence integrity check against digital re-encodes
 - [x] benchmark command enforces frozen test-set lock
+- [x] OCR reports cryptographically bound to verified frozen test-set lock
 - [ ] Tesseract baseline report
 
 Exit condition: every model change can be measured on a fixed, legal, documented dataset.

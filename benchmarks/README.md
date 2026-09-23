@@ -277,3 +277,7 @@ Registered real captures are not publication-ready until a reviewer records `rev
 ## Local review queue
 
 Generate a local HTML/JSON queue for unreviewed/rejected benchmark captures with `lao-ocr build-review-queue`. It also emits a decision CSV that can be dry-run and atomically applied with `apply-review-decisions`. The queue renders safe thumbnails and ground truth without mutating the manifest. See [../docs/review-queue.md](../docs/review-queue.md).
+
+## Frozen-report provenance
+
+Run publishable baseline/candidate OCR with `--freeze-lock`. Benchmark JSON then records the freeze-lock SHA-256 and frozen-manifest SHA-256, and `compare-benchmarks` refuses cross-freeze comparisons.

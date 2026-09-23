@@ -96,3 +96,18 @@ lao-ocr benchmark \
 ```
 
 The command verifies the frozen manifest and every locked source/ground-truth/layout hash before initializing the OCR engine. A tampered benchmark therefore fails before producing a report.
+
+## Benchmark report binding
+
+When `lao-ocr benchmark` runs with `--freeze-lock`, the generated OCR report embeds:
+
+- the freeze-lock filename
+- SHA-256 of the freeze-lock file
+- frozen-manifest filename
+- frozen-manifest SHA-256
+- split/sample count
+- freeze source revision when recorded
+
+This proves which frozen benchmark definition was verified immediately before OCR execution.
+
+`compare-benchmarks` rejects a baseline/candidate pair if only one report is freeze-bound or if their lock/manifest hashes differ, even when their sample IDs are otherwise identical.

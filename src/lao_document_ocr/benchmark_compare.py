@@ -108,6 +108,49 @@ def _slice_comparisons(
     return comparisons, regressions
 
 
+def _validate_freeze_binding(
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+) -> dict[str, Any] | None:
+    baseline_freeze = baseline.get("freeze")
+    candidate_freeze = candidate.get("freeze")
+
+    if baseline_freeze is None and candidate_freeze is None:
+        return None
+    if not isinstance(baseline_freeze, dict) or not isinstance(
+        candidate_freeze, dict
+    ):
+        raise BenchmarkComparisonError(
+            "Both benchmark reports must include frozen-lock provenance"
+        )
+
+    required = ("lock_sha256", "frozen_manifest_sha256")
+    for key in required:
+        baseline_value = baseline_freeze.get(key)
+        candidate_value = candidate_freeze.get(key)
+        if not isinstance(baseline_value, str) or not baseline_value:
+            raise BenchmarkComparisonError(
+                f"Baseline frozen-lock provenance is missing {key}"
+            )
+        if not isinstance(candidate_value, str) or not candidate_value:
+            raise BenchmarkComparisonError(
+                f"Candidate frozen-lock provenance is missing {key}"
+            )
+        if baseline_value != candidate_value:
+            raise BenchmarkComparisonError(
+                "Benchmark reports use different frozen test sets "
+                f"({key} mismatch)"
+            )
+
+    return {
+        "lock_sha256": baseline_freeze["lock_sha256"],
+        "frozen_manifest_sha256": baseline_freeze["frozen_manifest_sha256"],
+        "lock_file": baseline_freeze.get("lock_file"),
+        "frozen_manifest": baseline_freeze.get("frozen_manifest"),
+        "sample_count": baseline_freeze.get("sample_count"),
+    }
+
+
 def compare_benchmark_reports(
     baseline: dict[str, Any],
     candidate: dict[str, Any],
@@ -125,6 +168,8 @@ def compare_benchmark_reports(
 
     if baseline.get("split") != candidate.get("split"):
         raise BenchmarkComparisonError("Benchmark reports use different splits")
+
+    freeze_binding = _validate_freeze_binding(baseline, candidate)
 
     baseline_signature = _sample_signature(baseline)
     candidate_signature = _sample_signature(candidate)
@@ -178,6 +223,7 @@ def compare_benchmark_reports(
         "schema_version": "1",
         "generated_at": datetime.now(UTC).isoformat(),
         "split": baseline.get("split"),
+        "freeze": freeze_binding,
         "primary_metric": primary_metric,
         "thresholds": {
             "min_improvement": min_improvement,

@@ -1208,8 +1208,12 @@ def _compare_benchmarks(args: argparse.Namespace) -> int:
 
 
 def _benchmark(args: argparse.Namespace) -> int:
+    freeze_identity = None
     if args.freeze_lock is not None:
-        from lao_document_ocr.benchmark_freeze import verify_benchmark_freeze
+        from lao_document_ocr.benchmark_freeze import (
+            benchmark_freeze_identity,
+            verify_benchmark_freeze,
+        )
 
         freeze_errors = verify_benchmark_freeze(
             args.freeze_lock,
@@ -1221,6 +1225,7 @@ def _benchmark(args: argparse.Namespace) -> int:
                 "Frozen benchmark verification failed:\n"
                 + "\n".join(f"- {error}" for error in freeze_errors)
             )
+        freeze_identity = benchmark_freeze_identity(args.freeze_lock)
 
     samples = load_manifest(args.manifest)
 
@@ -1235,6 +1240,8 @@ def _benchmark(args: argparse.Namespace) -> int:
         verify_hashes=not args.no_hash_check,
         reading_order_resolver=reading_order_resolver,
     )
+    if freeze_identity is not None:
+        report["freeze"] = freeze_identity
     output = write_report(report, args.output)
     overall = report["overall"]
     print(f"Report: {output}")

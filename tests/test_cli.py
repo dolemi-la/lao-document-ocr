@@ -1899,3 +1899,88 @@ def test_build_capture_kit_cli(tmp_path, monkeypatch, capsys) -> None:
         assert manifest["excludes_internal_suite_paths"] is True
 
     assert "Capture kit:" in capsys.readouterr().out
+
+
+def test_benchmark_report_embeds_verified_freeze_identity(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import hashlib
+
+    import lao_document_ocr.cli as cli_module
+    from lao_document_ocr.benchmark_freeze import freeze_benchmark
+    from lao_document_ocr.dataset import DatasetSample, DatasetSplit, DatasetSubset
+    from lao_document_ocr.models import BoundingBox
+    from lao_document_ocr.ocr.base import OcrEngine, RecognizedLine
+
+    class FixedEngine(OcrEngine):
+        def is_available(self) -> bool:
+            return True
+
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            return [
+                RecognizedLine(
+                    text="hello world",
+                    bbox=BoundingBox(x=10, y=10, width=120, height=24),
+                    confidence=1.0,
+                    block_id=1,
+                    paragraph_id=1,
+                    line_id=1,
+                )
+            ]
+
+    image = tmp_path / "page.png"
+    truth = tmp_path / "page.txt"
+    Image.new("RGB", (300, 120), (210, 255, 255)).save(image)
+    truth.write_text("hello world", encoding="utf-8")
+    sample = DatasetSample(
+        id="sample-001",
+        document_id="doc-001",
+        split=DatasetSplit.TEST,
+        subset=DatasetSubset.CLEAN_PRINT,
+        source=image.name,
+        ground_truth=truth.name,
+        license="CC0-1.0",
+        provenance="CLI freeze provenance test",
+        sha256=hashlib.sha256(image.read_bytes()).hexdigest(),
+        tags=["language:mixed"],
+    )
+    frozen = tmp_path / "frozen.jsonl"
+    lock = tmp_path / "test-v1.lock.json"
+    freeze_benchmark(
+        [sample],
+        tmp_path,
+        output_manifest=frozen,
+        output_lock=lock,
+        source_revision="freeze-rev",
+    )
+    output = tmp_path / "benchmark.json"
+
+    monkeypatch.setattr(cli_module, "_build_ocr_engine", lambda args: FixedEngine())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "benchmark",
+            "--manifest",
+            str(frozen),
+            "--dataset-root",
+            str(tmp_path),
+            "--output",
+            str(output),
+            "--freeze-lock",
+            str(lock),
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["freeze"]["lock_file"] == lock.name
+    assert payload["freeze"]["lock_sha256"] == hashlib.sha256(
+        lock.read_bytes()
+    ).hexdigest()
+    assert payload["freeze"]["frozen_manifest_sha256"] == hashlib.sha256(
+        frozen.read_bytes()
+    ).hexdigest()
+    assert payload["freeze"]["source_revision"] == "freeze-rev"

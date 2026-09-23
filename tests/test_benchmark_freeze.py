@@ -134,3 +134,29 @@ def test_public_freeze_accepts_reviewed_real_capture(tmp_path) -> None:
     )
     payload = json.loads(lock.read_text(encoding="utf-8"))
     assert payload["samples"][0]["review"]["status"] == "approved"
+
+
+def test_freeze_identity_hashes_lock_file(tmp_path) -> None:
+    import hashlib
+
+    from lao_document_ocr.benchmark_freeze import benchmark_freeze_identity
+
+    sample = _sample(tmp_path, "identity", DatasetSplit.TEST)
+    manifest, lock = freeze_benchmark(
+        [sample],
+        tmp_path,
+        output_manifest=tmp_path / "frozen.jsonl",
+        output_lock=tmp_path / "freeze.lock.json",
+        source_revision="abc123",
+    )
+
+    identity = benchmark_freeze_identity(lock)
+
+    assert identity["lock_file"] == "freeze.lock.json"
+    assert identity["lock_sha256"] == hashlib.sha256(lock.read_bytes()).hexdigest()
+    assert identity["frozen_manifest"] == manifest.name
+    assert identity["frozen_manifest_sha256"] == hashlib.sha256(
+        manifest.read_bytes()
+    ).hexdigest()
+    assert identity["sample_count"] == 1
+    assert identity["source_revision"] == "abc123"

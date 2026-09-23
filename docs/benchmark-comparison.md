@@ -79,3 +79,9 @@ CER is the default primary metric because Lao word boundaries are not always rep
 - `2` — reports cannot be compared safely because of schema/sample-set/configuration mismatch
 
 Keep the baseline JSON, candidate JSON, comparison JSON, layout/table metrics, DOCX fidelity report, and benchmark release bundle together for releases.
+
+## Frozen-lock provenance
+
+For publishable comparisons, run both baseline and candidate with the same `--freeze-lock`. Each report embeds that lock's SHA-256 plus the frozen-manifest SHA-256.
+
+If either report is bound to a freeze, `compare-benchmarks` requires both reports to be bound to the same frozen test set. A one-sided binding or hash mismatch is rejected as an invalid comparison instead of being treated as a quality result.

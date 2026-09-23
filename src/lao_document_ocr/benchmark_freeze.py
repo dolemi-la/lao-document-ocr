@@ -175,6 +175,34 @@ def freeze_benchmark(
     return manifest_path, lock_path
 
 
+def benchmark_freeze_identity(lock_path: str | Path) -> dict[str, Any]:
+    lock_file = Path(lock_path)
+    try:
+        data = lock_file.read_bytes()
+        lock = json.loads(data.decode("utf-8"))
+    except OSError as exc:
+        raise BenchmarkFreezeError(
+            f"Could not read benchmark lock: {lock_file}"
+        ) from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BenchmarkFreezeError(
+            f"Invalid benchmark lock JSON: {lock_file}"
+        ) from exc
+
+    if lock.get("schema_version") != "1":
+        raise BenchmarkFreezeError("Unsupported benchmark lock schema")
+
+    return {
+        "lock_file": lock_file.name,
+        "lock_sha256": _sha256_bytes(data),
+        "frozen_manifest": lock.get("frozen_manifest"),
+        "frozen_manifest_sha256": lock.get("frozen_manifest_sha256"),
+        "split": lock.get("split"),
+        "sample_count": lock.get("sample_count"),
+        "source_revision": lock.get("source_revision"),
+    }
+
+
 def verify_benchmark_freeze(
     lock_path: str | Path,
     dataset_root: str | Path,

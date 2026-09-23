@@ -115,3 +115,51 @@ def test_invalid_thresholds_are_rejected() -> None:
             _report(cer=0.15),
             min_improvement=-0.01,
         )
+
+
+def test_matching_frozen_lock_provenance_is_preserved() -> None:
+    baseline = _report(cer=0.20)
+    candidate = _report(cer=0.15)
+    freeze = {
+        "lock_file": "test-v1.lock.json",
+        "lock_sha256": "a" * 64,
+        "frozen_manifest": "test-v1.jsonl",
+        "frozen_manifest_sha256": "b" * 64,
+        "sample_count": 2,
+    }
+    baseline["freeze"] = dict(freeze)
+    candidate["freeze"] = dict(freeze)
+
+    report = compare_benchmark_reports(baseline, candidate)
+
+    assert report["passed"] is True
+    assert report["freeze"]["lock_sha256"] == "a" * 64
+    assert report["freeze"]["frozen_manifest_sha256"] == "b" * 64
+
+
+def test_one_sided_frozen_lock_provenance_is_rejected() -> None:
+    baseline = _report(cer=0.20)
+    candidate = _report(cer=0.15)
+    baseline["freeze"] = {
+        "lock_sha256": "a" * 64,
+        "frozen_manifest_sha256": "b" * 64,
+    }
+
+    with pytest.raises(BenchmarkComparisonError, match="Both benchmark reports"):
+        compare_benchmark_reports(baseline, candidate)
+
+
+def test_mismatched_frozen_lock_provenance_is_rejected() -> None:
+    baseline = _report(cer=0.20)
+    candidate = _report(cer=0.15)
+    baseline["freeze"] = {
+        "lock_sha256": "a" * 64,
+        "frozen_manifest_sha256": "b" * 64,
+    }
+    candidate["freeze"] = {
+        "lock_sha256": "c" * 64,
+        "frozen_manifest_sha256": "b" * 64,
+    }
+
+    with pytest.raises(BenchmarkComparisonError, match="different frozen test sets"):
+        compare_benchmark_reports(baseline, candidate)
