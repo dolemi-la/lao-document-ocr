@@ -33,7 +33,7 @@ def _sample(tmp_path, sample_id, subset, tags, *, document_id=None, layout=False
         license="CC0-1.0",
         provenance="readiness unit test",
         sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
-        tags=tags,
+        tags=[*tags, "source:real-capture"],
     )
 
 
@@ -123,3 +123,40 @@ def test_layout_label_target_can_be_required(tmp_path) -> None:
     assert report["layout_labeled_documents_passed"] is True
     assert report["validation"]["ok"] is False
     assert report["ready"] is False
+
+
+def test_synthetic_only_samples_do_not_satisfy_release_readiness(tmp_path) -> None:
+    sample = _sample(
+        tmp_path,
+        "synthetic",
+        DatasetSubset.CLEAN_PRINT,
+        ["capture:flatbed-scan"],
+    )
+    sample.tags = [tag for tag in sample.tags if tag != "source:real-capture"]
+    sample.tags.append("source:capture-pack")
+
+    report = build_benchmark_readiness_report([sample], tmp_path)
+
+    assert report["eligible_sample_count"] == 0
+    assert report["unverified_source_samples"] == ["synthetic"]
+    assert report["dimensions"]["clean-print"]["passed"] is False
+    assert report["ready"] is False
+
+
+def test_unverified_source_override_is_for_local_smoke_only(tmp_path) -> None:
+    samples = _complete_samples(tmp_path)
+    for sample in samples:
+        sample.tags = [
+            tag for tag in sample.tags if tag != "source:real-capture"
+        ]
+        sample.tags.append("source:capture-pack")
+
+    report = build_benchmark_readiness_report(
+        samples,
+        tmp_path,
+        require_real_sources=False,
+    )
+
+    assert report["eligible_sample_count"] == len(samples)
+    assert report["missing_dimensions"] == []
+    assert report["ready"] is True

@@ -240,3 +240,5 @@ lao-ocr benchmark-readiness \
 ```
 
 Increase `--min-documents-per-dimension`, `--min-total-documents`, and/or `--min-layout-labeled-documents` for a release-quality gate. See [../docs/benchmark-readiness.md](../docs/benchmark-readiness.md).
+
+Publication readiness counts only `source:real-capture` / `source:real-document` samples by default; synthetic/capture-pack-only samples are excluded from coverage.

@@ -126,6 +126,14 @@ def _parser() -> argparse.ArgumentParser:
         default=0,
     )
     readiness.add_argument("--no-hash-check", action="store_true")
+    readiness.add_argument(
+        "--allow-unverified-sources",
+        action="store_true",
+        help=(
+            "Allow samples without source:real-capture/source:real-document tags. "
+            "Intended for local smoke checks, not public benchmark releases."
+        ),
+    )
 
     freeze = subparsers.add_parser(
         "freeze-benchmark",
@@ -640,6 +648,7 @@ def _validate(args: argparse.Namespace) -> int:
         samples,
         args.dataset_root,
         verify_hashes=not args.no_hash_check,
+        require_real_sources=not args.allow_unverified_sources,
     )
     if errors:
         for error in errors:

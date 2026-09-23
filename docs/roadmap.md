@@ -45,6 +45,7 @@ Status: in progress
 - [x] CER/WER reporting by subset
 - [x] benchmark release bundle with report SHA-256/source revision
 - [x] frozen test-set manifest/lock with file hashes
+- [x] real-source benchmark readiness gate by coverage dimension
 - [x] benchmark command enforces frozen test-set lock
 - [ ] Tesseract baseline report
 

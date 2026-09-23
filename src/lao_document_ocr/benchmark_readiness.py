@@ -26,6 +26,16 @@ class CoverageDimension:
         return any(tag in sample_tags for tag in self.tags)
 
 
+REAL_SOURCE_TAGS = {
+    "source:real-capture",
+    "source:real-document",
+}
+
+
+def _is_real_source(sample: DatasetSample) -> bool:
+    return bool(REAL_SOURCE_TAGS & set(sample.tags))
+
+
 DEFAULT_COVERAGE_DIMENSIONS = (
     CoverageDimension(
         "clean-print",
@@ -84,6 +94,7 @@ def build_benchmark_readiness_report(
     min_total_documents: int = 0,
     min_layout_labeled_documents: int = 0,
     verify_hashes: bool = True,
+    require_real_sources: bool = True,
 ) -> dict:
     if min_documents_per_dimension < 1:
         raise ValueError("min_documents_per_dimension must be at least 1")
@@ -98,17 +109,27 @@ def build_benchmark_readiness_report(
         verify_hashes=verify_hashes,
     )
     selected = [sample for sample in samples if sample.split == split]
-    document_ids = {sample.document_id for sample in selected}
+    eligible = (
+        [sample for sample in selected if _is_real_source(sample)]
+        if require_real_sources
+        else selected
+    )
+    document_ids = {sample.document_id for sample in eligible}
     layout_document_ids = {
         sample.document_id
-        for sample in selected
+        for sample in eligible
         if sample.layout_ground_truth is not None
     }
+    unverified_source_samples = [
+        sample.id
+        for sample in selected
+        if not _is_real_source(sample)
+    ]
 
     dimensions: dict[str, dict] = {}
     missing: list[str] = []
     for dimension in DEFAULT_COVERAGE_DIMENSIONS:
-        matching = [sample for sample in selected if dimension.matches(sample)]
+        matching = [sample for sample in eligible if dimension.matches(sample)]
         matching_documents = sorted({sample.document_id for sample in matching})
         passed = len(matching_documents) >= min_documents_per_dimension
         dimensions[dimension.name] = {
@@ -140,7 +161,11 @@ def build_benchmark_readiness_report(
             "errors": validation_errors,
         },
         "sample_count": len(selected),
+        "eligible_sample_count": len(eligible),
         "document_count": len(document_ids),
+        "require_real_sources": require_real_sources,
+        "accepted_real_source_tags": sorted(REAL_SOURCE_TAGS),
+        "unverified_source_samples": sorted(unverified_source_samples),
         "minimum_total_documents": min_total_documents,
         "total_documents_passed": total_documents_passed,
         "layout_labeled_document_count": len(layout_document_ids),

@@ -1336,7 +1336,7 @@ def test_benchmark_readiness_cli_reports_ready_for_complete_dimensions(
                 "license": "CC0-1.0",
                 "provenance": "CLI readiness test",
                 "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
-                "tags": tags,
+                "tags": [*tags, "source:real-capture"],
             }
         )
 
@@ -1368,3 +1368,60 @@ def test_benchmark_readiness_cli_reports_ready_for_complete_dimensions(
     assert payload["ready"] is True
     assert payload["missing_dimensions"] == []
     assert "Readiness: READY" in capsys.readouterr().out
+
+
+def test_benchmark_readiness_cli_requires_real_source_tags(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import hashlib
+
+    image = tmp_path / "synthetic.png"
+    truth = tmp_path / "synthetic.txt"
+    Image.new("RGB", (100, 60), (120, 240, 250)).save(image)
+    truth.write_text("synthetic", encoding="utf-8")
+    manifest = tmp_path / "manifest.jsonl"
+    output = tmp_path / "readiness.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "id": "synthetic",
+                "document_id": "doc-synthetic",
+                "split": "test",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI readiness source test",
+                "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
+                "tags": [
+                    "capture:flatbed-scan",
+                    "source:capture-pack",
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "benchmark-readiness",
+            "--manifest",
+            str(manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["eligible_sample_count"] == 0
+    assert payload["unverified_source_samples"] == ["synthetic"]
+    assert "Readiness: NOT READY" in capsys.readouterr().out

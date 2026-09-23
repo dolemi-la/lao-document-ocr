@@ -42,6 +42,25 @@ document:form
 
 This is why benchmark readiness uses multi-axis tags rather than forcing every sample into one exclusive category.
 
+## Real-source requirement
+
+By default, publication readiness only counts samples explicitly tagged as real optical evidence:
+
+```text
+source:real-capture
+source:real-document
+```
+
+Digital capture-pack pages and synthetic renders do **not** satisfy the release gate by themselves, even if they carry layout/capture-style tags. This prevents a synthetic-only test set from being reported as a real-world benchmark.
+
+For local tooling smoke checks only, this guard can be bypassed with:
+
+```bash
+--allow-unverified-sources
+```
+
+Do not use that override for a published benchmark release.
+
 ## Stricter release targets
 
 Projects can require more independent documents per dimension:
