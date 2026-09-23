@@ -1510,3 +1510,67 @@ def test_register_capture_directory_cli_forwards_bulk_options(
     rendered = capsys.readouterr().out
     assert "Planned captures: 60" in rendered
     assert "Dry run: yes" in rendered
+
+
+def test_benchmark_capture_suite_cli_marks_report_as_digital_qa(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import lao_document_ocr.cli as cli_module
+    from lao_document_ocr.capture_suite import generate_capture_suite
+    from lao_document_ocr.capture_templates import CaptureTemplate
+    from lao_document_ocr.models import BoundingBox
+    from lao_document_ocr.ocr.base import OcrEngine, RecognizedLine
+
+    class FixedQaEngine(OcrEngine):
+        def is_available(self) -> bool:
+            return True
+
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            return [
+                RecognizedLine(
+                    text="digital qa",
+                    bbox=BoundingBox(x=10, y=10, width=120, height=24),
+                    confidence=1.0,
+                    block_id=1,
+                    paragraph_id=1,
+                    line_id=1,
+                )
+            ]
+
+    suite_manifest = generate_capture_suite(
+        ["ສະບາຍດີ", "ຂອບໃຈ", "Lao OCR", "20,000 ₭"],
+        tmp_path / "qa-suite",
+        _cli_font_path(),
+        suite_id="cli-qa",
+        text_license="Apache-2.0",
+        text_provenance="CLI digital QA corpus",
+        templates=[CaptureTemplate.PLAIN, CaptureTemplate.RECEIPT],
+        dpi=96,
+        lines_per_page=4,
+        max_pages_per_template=1,
+    )
+    output = tmp_path / "qa-report.json"
+
+    monkeypatch.setattr(cli_module, "_build_ocr_engine", lambda args: FixedQaEngine())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "benchmark-capture-suite",
+            "--suite-manifest",
+            str(suite_manifest),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["qa"]["not_real_benchmark"] is True
+    assert payload["qa"]["sample_count"] == 2
+    assert set(payload["qa"]["templates"]) == {"plain", "receipt"}
+    captured = capsys.readouterr()
+    assert "not real benchmark accuracy" in captured.out

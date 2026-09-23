@@ -38,6 +38,7 @@ Status: in progress
 - [x] capture campaign completion report by template/device mode
 - [x] atomic bulk capture-directory registration workflow
 - [x] machine-readable page-ID QR markers for capture-suite integrity
+- [x] digital capture-suite OCR QA benchmark (explicitly non-real)
 - [x] real-data benchmark readiness coverage gate
 - [ ] clean printed scans
 - [ ] noisy scans

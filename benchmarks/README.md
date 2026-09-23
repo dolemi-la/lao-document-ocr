@@ -242,3 +242,7 @@ lao-ocr benchmark-readiness \
 Increase `--min-documents-per-dimension`, `--min-total-documents`, and/or `--min-layout-labeled-documents` for a release-quality gate. See [../docs/benchmark-readiness.md](../docs/benchmark-readiness.md).
 
 Publication readiness counts `source:real-document` samples, or capture-pack samples carrying both `source:real-capture` and `capture:optical-evidence`. Synthetic/capture-pack-only samples and unchecked `source:real-capture` entries are excluded.
+
+## Digital capture-suite QA
+
+Use `benchmark-capture-suite` to sanity-check generated templates before physical capture. Its report includes `qa.not_real_benchmark=true`; never substitute this for the real scan/photo benchmark. See [../docs/capture-suite-qa.md](../docs/capture-suite-qa.md).

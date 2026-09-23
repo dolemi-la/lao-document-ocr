@@ -326,6 +326,60 @@ def _parser() -> argparse.ArgumentParser:
         help="Verify this benchmark lock before running OCR.",
     )
 
+    capture_suite_qa = subparsers.add_parser(
+        "benchmark-capture-suite",
+        help=(
+            "Run OCR against generated capture-suite pages for digital QA only; "
+            "never treat this as real scan/photo accuracy."
+        ),
+    )
+    capture_suite_qa.add_argument("--suite-manifest", required=True, type=Path)
+    capture_suite_qa.add_argument("--output", required=True, type=Path)
+    capture_suite_qa.add_argument(
+        "--engine",
+        choices=["tesseract", "owned"],
+        default="tesseract",
+    )
+    capture_suite_qa.add_argument("--languages", default="lao+eng")
+    capture_suite_qa.add_argument("--psm", type=int, default=3)
+    capture_suite_qa.add_argument("--model", type=Path)
+    capture_suite_qa.add_argument("--calibration", type=Path)
+    capture_suite_qa.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="cpu",
+    )
+    capture_suite_qa.add_argument(
+        "--decoder",
+        choices=["greedy", "beam"],
+        default="greedy",
+    )
+    capture_suite_qa.add_argument("--beam-width", type=int, default=10)
+    _add_language_model_arguments(capture_suite_qa)
+    capture_suite_qa.add_argument(
+        "--layout-detector",
+        choices=["morphology", "learned"],
+        default="morphology",
+    )
+    capture_suite_qa.add_argument("--layout-model", type=Path)
+    capture_suite_qa.add_argument(
+        "--layout-confidence",
+        type=float,
+        default=0.55,
+    )
+    capture_suite_qa.add_argument(
+        "--reading-order",
+        choices=["deterministic", "learned"],
+        default="deterministic",
+    )
+    capture_suite_qa.add_argument("--reading-order-model", type=Path)
+    capture_suite_qa.add_argument(
+        "--reading-order-max-blocks",
+        type=int,
+        default=256,
+    )
+    capture_suite_qa.add_argument("--no-hash-check", action="store_true")
+
     hplt = subparsers.add_parser(
         "sample-hplt-lao",
         help="Stream a bounded Lao text sample from the official HPLT v3 sorted shards.",
@@ -633,43 +687,57 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _convert_document(args: argparse.Namespace) -> int:
+def _build_ocr_engine(args: argparse.Namespace):
     if args.engine == "tesseract":
         engine = TesseractEngine(languages=args.languages, psm=args.psm)
-    else:
-        if args.model is None:
-            raise ValueError("--model is required when --engine=owned")
-        from lao_document_ocr.ocr import OwnedRecognizerEngine
-
-        engine = OwnedRecognizerEngine(
-            args.model,
-            calibration_path=args.calibration,
-            device=args.device,
-            decoder=args.decoder,
-            beam_width=args.beam_width,
-            language_model_path=args.language_model,
-            language_model_weight=args.language_model_weight,
-            language_model_token_bonus=args.language_model_token_bonus,
-            region_detector_name=args.layout_detector,
-            layout_model_path=args.layout_model,
-            layout_confidence_threshold=args.layout_confidence,
-        )
-
-    reading_order_resolver = None
-    if args.reading_order == "learned":
-        if args.reading_order_model is None:
+        if not engine.is_available():
+            available = ", ".join(engine.available_languages())
             raise ValueError(
-                "--reading-order-model is required when --reading-order=learned"
+                f"Required OCR languages '{args.languages}' are unavailable. "
+                f"Installed languages: {available or 'none'}"
             )
-        from lao_document_ocr.reading_order_inference import (
-            ExportedReadingOrderResolver,
-        )
+        return engine
 
-        reading_order_resolver = ExportedReadingOrderResolver(
-            args.reading_order_model,
-            device=args.device,
-            max_blocks=args.reading_order_max_blocks,
+    if args.model is None:
+        raise ValueError("--model is required when --engine=owned")
+    from lao_document_ocr.ocr import OwnedRecognizerEngine
+
+    return OwnedRecognizerEngine(
+        args.model,
+        calibration_path=args.calibration,
+        device=args.device,
+        decoder=args.decoder,
+        beam_width=args.beam_width,
+        language_model_path=args.language_model,
+        language_model_weight=args.language_model_weight,
+        language_model_token_bonus=args.language_model_token_bonus,
+        region_detector_name=args.layout_detector,
+        layout_model_path=args.layout_model,
+        layout_confidence_threshold=args.layout_confidence,
+    )
+
+
+def _build_reading_order_resolver(args: argparse.Namespace):
+    if args.reading_order != "learned":
+        return None
+    if args.reading_order_model is None:
+        raise ValueError(
+            "--reading-order-model is required when --reading-order=learned"
         )
+    from lao_document_ocr.reading_order_inference import (
+        ExportedReadingOrderResolver,
+    )
+
+    return ExportedReadingOrderResolver(
+        args.reading_order_model,
+        device=args.device,
+        max_blocks=args.reading_order_max_blocks,
+    )
+
+
+def _convert_document(args: argparse.Namespace) -> int:
+    reading_order_resolver = _build_reading_order_resolver(args)
+    engine = _build_ocr_engine(args)
 
     outputs = convert_document_to_outputs(
         args.input,
@@ -996,50 +1064,8 @@ def _benchmark(args: argparse.Namespace) -> int:
 
     samples = load_manifest(args.manifest)
 
-    if args.engine == "tesseract":
-        engine = TesseractEngine(languages=args.languages, psm=args.psm)
-        if not engine.is_available():
-            available = ", ".join(engine.available_languages())
-            print(
-                f"Required OCR languages '{args.languages}' are unavailable. "
-                f"Installed languages: {available or 'none'}",
-                file=sys.stderr,
-            )
-            return 2
-    else:
-        if args.model is None:
-            raise ValueError("--model is required when --engine=owned")
-        from lao_document_ocr.ocr import OwnedRecognizerEngine
-
-        engine = OwnedRecognizerEngine(
-            args.model,
-            calibration_path=args.calibration,
-            device=args.device,
-            decoder=args.decoder,
-            beam_width=args.beam_width,
-            language_model_path=args.language_model,
-            language_model_weight=args.language_model_weight,
-            language_model_token_bonus=args.language_model_token_bonus,
-            region_detector_name=args.layout_detector,
-            layout_model_path=args.layout_model,
-            layout_confidence_threshold=args.layout_confidence,
-        )
-
-    reading_order_resolver = None
-    if args.reading_order == "learned":
-        if args.reading_order_model is None:
-            raise ValueError(
-                "--reading-order-model is required when --reading-order=learned"
-            )
-        from lao_document_ocr.reading_order_inference import (
-            ExportedReadingOrderResolver,
-        )
-
-        reading_order_resolver = ExportedReadingOrderResolver(
-            args.reading_order_model,
-            device=args.device,
-            max_blocks=args.reading_order_max_blocks,
-        )
+    engine = _build_ocr_engine(args)
+    reading_order_resolver = _build_reading_order_resolver(args)
 
     report = benchmark_dataset(
         samples,
@@ -1052,6 +1078,27 @@ def _benchmark(args: argparse.Namespace) -> int:
     output = write_report(report, args.output)
     overall = report["overall"]
     print(f"Report: {output}")
+    print(f"Samples: {overall['samples']}")
+    print(f"CER: {overall['cer']:.4f}")
+    print(f"WER: {overall['wer']:.4f}")
+    return 0
+
+
+def _benchmark_capture_suite(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_suite_qa import benchmark_capture_suite
+
+    engine = _build_ocr_engine(args)
+    reading_order_resolver = _build_reading_order_resolver(args)
+    report = benchmark_capture_suite(
+        args.suite_manifest,
+        engine,
+        verify_hashes=not args.no_hash_check,
+        reading_order_resolver=reading_order_resolver,
+    )
+    output = write_report(report, args.output)
+    overall = report["overall"]
+    print(f"Report: {output}")
+    print("WARNING: digital capture-suite QA only; not real benchmark accuracy")
     print(f"Samples: {overall['samples']}")
     print(f"CER: {overall['cer']:.4f}")
     print(f"WER: {overall['wer']:.4f}")
@@ -1541,6 +1588,8 @@ def main() -> int:
             return _compare_benchmarks(args)
         if args.command == "benchmark":
             return _benchmark(args)
+        if args.command == "benchmark-capture-suite":
+            return _benchmark_capture_suite(args)
         if args.command == "sample-hplt-lao":
             return _sample_hplt_lao(args)
         if args.command == "prepare-corpus":

@@ -104,3 +104,7 @@ Do not count the generated digital pages as real optical benchmark evidence. The
 ## Track collection progress
 
 After captures start entering the public dataset, compare the suite against the dataset with `capture-campaign-report`. See [capture-campaign-report.md](capture-campaign-report.md).
+
+## Digital QA before physical capture
+
+You can run OCR against the generated digital pages with `benchmark-capture-suite` to catch template/pipeline regressions before printing. These numbers are explicitly **not** real benchmark accuracy. See [capture-suite-qa.md](capture-suite-qa.md).
