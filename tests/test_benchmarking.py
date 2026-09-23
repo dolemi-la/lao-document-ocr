@@ -63,3 +63,36 @@ def test_benchmark_dataset_reports_subset_metrics(tmp_path) -> None:
         "language:mixed",
     ]
     assert report["samples"][0]["id"] == "sample-001"
+
+
+def test_benchmark_records_reading_order_metadata(tmp_path) -> None:
+    class Resolver:
+        def metadata(self):
+            return {"name": "TestResolver", "version": "v1"}
+
+        def order(self, blocks, *, page_width, page_height):
+            return blocks
+
+    source = tmp_path / "page.png"
+    truth = tmp_path / "page.txt"
+    Image.new("RGB", (200, 100), "white").save(source)
+    truth.write_text("hello world", encoding="utf-8")
+    sample = DatasetSample(
+        id="sample",
+        document_id="doc",
+        split=DatasetSplit.TEST,
+        subset=DatasetSubset.CLEAN_PRINT,
+        source=source.name,
+        ground_truth=truth.name,
+        license="CC0-1.0",
+        provenance="unit test",
+    )
+
+    report = benchmark_dataset(
+        [sample],
+        tmp_path,
+        FixedEngine(),
+        reading_order_resolver=Resolver(),
+    )
+
+    assert report["reading_order"] == {"name": "TestResolver", "version": "v1"}

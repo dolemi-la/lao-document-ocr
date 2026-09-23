@@ -14,6 +14,7 @@ from lao_document_ocr.metrics import _levenshtein
 from lao_document_ocr.normalization import normalize_lao_text
 from lao_document_ocr.ocr.base import OcrEngine
 from lao_document_ocr.pipeline import process_document
+from lao_document_ocr.reading_order import ReadingOrderResolver
 
 
 @dataclass
@@ -63,6 +64,7 @@ def benchmark_dataset(
     *,
     split: DatasetSplit = DatasetSplit.TEST,
     verify_hashes: bool = True,
+    reading_order_resolver: ReadingOrderResolver | None = None,
 ) -> dict:
     samples = list(samples)
     validation_errors = validate_dataset(samples, dataset_root, verify_hashes=verify_hashes)
@@ -92,6 +94,7 @@ def benchmark_dataset(
             source_name=source_path.name,
             engine=engine,
             max_pages=1,
+            reading_order_resolver=reading_order_resolver,
         )
         hypothesis = normalize_lao_text(document.plain_text)
         elapsed = time.perf_counter() - item_started
@@ -123,6 +126,11 @@ def benchmark_dataset(
         "generated_at": datetime.now(UTC).isoformat(),
         "split": split.value,
         "engine": engine.metadata(),
+        "reading_order": (
+            reading_order_resolver.metadata()
+            if reading_order_resolver is not None
+            else {"name": "DeterministicReadingOrderResolver"}
+        ),
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),

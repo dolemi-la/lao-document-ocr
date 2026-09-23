@@ -276,6 +276,7 @@ lao-ocr export-layout-detector --checkpoint training/layout/runs/tiny-unet-v1/la
 lao-ocr train-reading-order --training-manifest training/layout.jsonl --dataset-root <dataset> --output training/layout/runs/reading-order-v1 --device auto
 lao-ocr export-reading-order --checkpoint training/layout/runs/reading-order-v1/reading-order.pt --output training/layout/runs/reading-order-v1/reading-order.pt2
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
+lao-ocr compare-benchmarks --baseline baseline.json --candidate candidate.json --output comparison.json
 lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json
 lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output docx-fidelity.json
 lao-ocr bundle-benchmarks --ocr ocr.json --layout layout.json --docx docx.json --revision <git-sha> --output bundle.json
@@ -301,6 +302,7 @@ See:
 - [docs/layout-benchmark.md](docs/layout-benchmark.md)
 - [docs/docx-fidelity-benchmark.md](docs/docx-fidelity-benchmark.md)
 - [docs/benchmark-bundles.md](docs/benchmark-bundles.md)
+- [docs/benchmark-comparison.md](docs/benchmark-comparison.md)
 - [docs/benchmark-source-review.md](docs/benchmark-source-review.md)
 - [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
 - [docs/capture-suite.md](docs/capture-suite.md)

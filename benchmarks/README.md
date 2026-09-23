@@ -195,3 +195,16 @@ Dataset samples may carry multiple tags in addition to their primary `subset`. O
 ## Layout-labeled coverage
 
 Samples may optionally reference reviewed Document-AST layout ground truth. `lao-ocr dataset-report` includes layout-labeled sample/document counts, coverage ratio, and breakdowns by split/subset so layout-training readiness is visible separately from OCR text coverage.
+
+## Compare owned OCR against Tesseract
+
+Run both engines on the same fixed split, then use the CI-friendly comparison gate:
+
+```bash
+lao-ocr compare-benchmarks \
+  --baseline benchmarks/results/tesseract-v1.json \
+  --candidate benchmarks/results/owned-v1.json \
+  --output benchmarks/results/owned-vs-tesseract.json
+```
+
+The comparator rejects sample-set/label mismatches, requires overall CER improvement by default, and caps regressions on shared subsets/tags. See [../docs/benchmark-comparison.md](../docs/benchmark-comparison.md).

@@ -59,6 +59,7 @@ Status: started
 - [x] confidence calibration pipeline (held-out dev report -> calibration artifact)
 - [x] versioned checkpoints/artifact checksums
 - [x] exported-recognizer regression benchmark pipeline
+- [x] fixed-set owned-vs-Tesseract benchmark comparison gate
 
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 

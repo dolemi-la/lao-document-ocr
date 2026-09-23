@@ -845,3 +845,107 @@ def test_convert_document_learned_reading_order_requires_model(
 
     assert main() == 1
     assert "--reading-order-model is required" in capsys.readouterr().err
+
+
+def test_compare_benchmarks_cli_returns_pass_and_writes_report(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    def report(cer):
+        return {
+            "schema_version": "1",
+            "split": "test",
+            "engine": {"name": "engine"},
+            "reading_order": {"name": "DeterministicReadingOrderResolver"},
+            "overall": {"cer": cer, "wer": cer * 2, "samples": 1},
+            "subsets": {
+                "clean-print": {"cer": cer, "wer": cer * 2, "samples": 1}
+            },
+            "tags": {},
+            "samples": [
+                {
+                    "id": "sample",
+                    "subset": "clean-print",
+                    "tags": [],
+                    "cer": cer,
+                }
+            ],
+        }
+
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output = tmp_path / "comparison.json"
+    baseline.write_text(json.dumps(report(0.20)), encoding="utf-8")
+    candidate.write_text(json.dumps(report(0.10)), encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "compare-benchmarks",
+            "--baseline",
+            str(baseline),
+            "--candidate",
+            str(candidate),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["passed"] is True
+    assert "Gate: PASS" in capsys.readouterr().out
+
+
+def test_compare_benchmarks_cli_returns_one_on_regression(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    base = {
+        "schema_version": "1",
+        "split": "test",
+        "engine": {"name": "engine"},
+        "reading_order": {"name": "DeterministicReadingOrderResolver"},
+        "overall": {"cer": 0.10, "wer": 0.20, "samples": 1},
+        "subsets": {
+            "clean-print": {"cer": 0.10, "wer": 0.20, "samples": 1}
+        },
+        "tags": {},
+        "samples": [
+            {
+                "id": "sample",
+                "subset": "clean-print",
+                "tags": [],
+                "cer": 0.10,
+            }
+        ],
+    }
+    candidate_payload = json.loads(json.dumps(base))
+    candidate_payload["overall"]["cer"] = 0.11
+    candidate_payload["subsets"]["clean-print"]["cer"] = 0.11
+
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output = tmp_path / "comparison.json"
+    baseline.write_text(json.dumps(base), encoding="utf-8")
+    candidate.write_text(json.dumps(candidate_payload), encoding="utf-8")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "compare-benchmarks",
+            "--baseline",
+            str(baseline),
+            "--candidate",
+            str(candidate),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert main() == 1

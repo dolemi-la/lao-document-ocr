@@ -175,6 +175,29 @@ def _parser() -> argparse.ArgumentParser:
     bundle.add_argument("--revision", required=True)
     bundle.add_argument("--label")
 
+    compare_benchmarks = subparsers.add_parser(
+        "compare-benchmarks",
+        help="Compare a candidate OCR benchmark against a fixed baseline.",
+    )
+    compare_benchmarks.add_argument("--baseline", required=True, type=Path)
+    compare_benchmarks.add_argument("--candidate", required=True, type=Path)
+    compare_benchmarks.add_argument("--output", required=True, type=Path)
+    compare_benchmarks.add_argument(
+        "--primary-metric",
+        choices=["cer", "wer"],
+        default="cer",
+    )
+    compare_benchmarks.add_argument(
+        "--min-improvement",
+        type=float,
+        default=0.0,
+    )
+    compare_benchmarks.add_argument(
+        "--max-slice-regression",
+        type=float,
+        default=0.02,
+    )
+
     benchmark = subparsers.add_parser("benchmark", help="Run OCR against a dataset split.")
     benchmark.add_argument("--manifest", required=True, type=Path)
     benchmark.add_argument("--dataset-root", required=True, type=Path)
@@ -184,8 +207,42 @@ def _parser() -> argparse.ArgumentParser:
         choices=[split.value for split in DatasetSplit],
         default=DatasetSplit.TEST.value,
     )
+    benchmark.add_argument(
+        "--engine",
+        choices=["tesseract", "owned"],
+        default="tesseract",
+    )
     benchmark.add_argument("--languages", default="lao+eng")
     benchmark.add_argument("--psm", type=int, default=3)
+    benchmark.add_argument("--model", type=Path)
+    benchmark.add_argument("--calibration", type=Path)
+    benchmark.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="cpu",
+    )
+    benchmark.add_argument(
+        "--layout-detector",
+        choices=["morphology", "learned"],
+        default="morphology",
+    )
+    benchmark.add_argument("--layout-model", type=Path)
+    benchmark.add_argument(
+        "--layout-confidence",
+        type=float,
+        default=0.55,
+    )
+    benchmark.add_argument(
+        "--reading-order",
+        choices=["deterministic", "learned"],
+        default="deterministic",
+    )
+    benchmark.add_argument("--reading-order-model", type=Path)
+    benchmark.add_argument(
+        "--reading-order-max-blocks",
+        type=int,
+        default=256,
+    )
     benchmark.add_argument("--no-hash-check", action="store_true")
 
     corpus = subparsers.add_parser(
@@ -663,17 +720,82 @@ def _bundle_benchmarks(args: argparse.Namespace) -> int:
     return 0
 
 
+def _compare_benchmarks(args: argparse.Namespace) -> int:
+    from lao_document_ocr.benchmark_compare import (
+        BenchmarkComparisonError,
+        compare_benchmark_reports,
+        load_benchmark_report,
+        write_comparison_report,
+    )
+
+    try:
+        baseline = load_benchmark_report(args.baseline)
+        candidate = load_benchmark_report(args.candidate)
+        report = compare_benchmark_reports(
+            baseline,
+            candidate,
+            primary_metric=args.primary_metric,
+            min_improvement=args.min_improvement,
+            max_slice_regression=args.max_slice_regression,
+        )
+    except BenchmarkComparisonError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    output = write_comparison_report(report, args.output)
+    overall = report["overall"]
+    print(f"Report: {output}")
+    print(f"Metric: {report['primary_metric']}")
+    print(f"Baseline: {overall['baseline']:.4f}")
+    print(f"Candidate: {overall['candidate']:.4f}")
+    print(f"Improvement: {overall['improvement']:.4f}")
+    print(f"Slice regressions: {len(report['regressions'])}")
+    print(f"Gate: {'PASS' if report['passed'] else 'FAIL'}")
+    return 0 if report["passed"] else 1
+
+
 def _benchmark(args: argparse.Namespace) -> int:
     samples = load_manifest(args.manifest)
-    engine = TesseractEngine(languages=args.languages, psm=args.psm)
-    if not engine.is_available():
-        available = ", ".join(engine.available_languages())
-        print(
-            f"Required OCR languages '{args.languages}' are unavailable. "
-            f"Installed languages: {available or 'none'}",
-            file=sys.stderr,
+
+    if args.engine == "tesseract":
+        engine = TesseractEngine(languages=args.languages, psm=args.psm)
+        if not engine.is_available():
+            available = ", ".join(engine.available_languages())
+            print(
+                f"Required OCR languages '{args.languages}' are unavailable. "
+                f"Installed languages: {available or 'none'}",
+                file=sys.stderr,
+            )
+            return 2
+    else:
+        if args.model is None:
+            raise ValueError("--model is required when --engine=owned")
+        from lao_document_ocr.ocr import OwnedRecognizerEngine
+
+        engine = OwnedRecognizerEngine(
+            args.model,
+            calibration_path=args.calibration,
+            device=args.device,
+            region_detector_name=args.layout_detector,
+            layout_model_path=args.layout_model,
+            layout_confidence_threshold=args.layout_confidence,
         )
-        return 2
+
+    reading_order_resolver = None
+    if args.reading_order == "learned":
+        if args.reading_order_model is None:
+            raise ValueError(
+                "--reading-order-model is required when --reading-order=learned"
+            )
+        from lao_document_ocr.reading_order_inference import (
+            ExportedReadingOrderResolver,
+        )
+
+        reading_order_resolver = ExportedReadingOrderResolver(
+            args.reading_order_model,
+            device=args.device,
+            max_blocks=args.reading_order_max_blocks,
+        )
 
     report = benchmark_dataset(
         samples,
@@ -681,6 +803,7 @@ def _benchmark(args: argparse.Namespace) -> int:
         engine,
         split=DatasetSplit(args.split),
         verify_hashes=not args.no_hash_check,
+        reading_order_resolver=reading_order_resolver,
     )
     output = write_report(report, args.output)
     overall = report["overall"]
@@ -1055,6 +1178,8 @@ def main() -> int:
             return _benchmark_docx(args)
         if args.command == "bundle-benchmarks":
             return _bundle_benchmarks(args)
+        if args.command == "compare-benchmarks":
+            return _compare_benchmarks(args)
         if args.command == "benchmark":
             return _benchmark(args)
         if args.command == "prepare-corpus":
