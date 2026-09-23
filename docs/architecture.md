@@ -75,6 +75,10 @@ Detects clear ruled grids using horizontal/vertical morphology, assigns OCR line
 
 Detects borderless tables only from strong repeated OCR geometry. `aligned-text-v2` infers stable columns from at least two full rows, keeps the numeric/value-column guard for two-column tables, and allows irregular rows only when every column is still covered by explicit horizontal spans. This supports merged headers while rejecting simple missing cells that do not geometrically span adjacent anchors. Vertical borderless merges remain intentionally unsupported.
 
+### `src/lao_document_ocr/learned_tables.py`
+
+Uses learned layout `table` semantic regions as a bounded context for looser row/column clustering. This allows sparse or irregular borderless tables to be reconstructed without weakening the global borderless-table heuristic for ordinary page text. Ambiguous regions fall back to normal text/heuristic processing instead of forcing a table.
+
 ### `src/lao_document_ocr/text_regions.py`
 
 Defines the text-region detector interface and the current morphology-based implementation. Region-first detection separates columns/paragraph zones before line detection, reducing cross-column interference while keeping the interface replaceable by a learned detector later.

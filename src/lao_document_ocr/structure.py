@@ -6,6 +6,7 @@ from statistics import median
 from PIL import Image
 
 from lao_document_ocr.borderless_tables import detect_borderless_tables
+from lao_document_ocr.learned_tables import detect_learned_tables
 from lao_document_ocr.models import Block, BoundingBox
 from lao_document_ocr.normalization import normalize_lao_text
 from lao_document_ocr.ocr.base import RecognizedLine
@@ -85,6 +86,10 @@ def build_page_blocks(lines: list[RecognizedLine], image: Image.Image) -> list[B
             for table, table_lines in assignments
         ]
 
+    remaining, learned_table_blocks = detect_learned_tables(
+        remaining,
+        page_width=image.width,
+    )
     remaining, borderless_blocks = detect_borderless_tables(
         remaining,
         page_width=image.width,
@@ -92,5 +97,6 @@ def build_page_blocks(lines: list[RecognizedLine], image: Image.Image) -> list[B
 
     blocks = build_blocks(remaining)
     blocks.extend(ruled_blocks)
+    blocks.extend(learned_table_blocks)
     blocks.extend(borderless_blocks)
     return order_blocks(blocks, page_width=image.width)
