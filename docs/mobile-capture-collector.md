@@ -166,3 +166,7 @@ lao-ocr register-capture-directory \
 ```
 
 Then continue with optical-evidence checks, registration, manual review, readiness checks, and benchmark freeze.
+
+## Transfer the completed session
+
+Use the **Download capture submission ZIP** button or `pack-capture-submission` to produce one checksum-bound blind archive for transfer to a maintainer. Verify/extract it before bulk registration. See [capture-submission.md](capture-submission.md).

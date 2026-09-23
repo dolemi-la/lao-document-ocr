@@ -17,11 +17,12 @@ from pathlib import Path, PurePosixPath
 from typing import Annotated
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from PIL import Image
 
 from lao_document_ocr.capture_page_id import decode_page_id
 from lao_document_ocr.capture_registration import CaptureMode
+from lao_document_ocr.capture_submission import build_capture_submission
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _ACCESS_TOKEN = re.compile(r"^[A-Za-z0-9._~-]{16,256}$")
@@ -549,6 +550,7 @@ small{{color:#777;display:block;margin-top:8px}}
 <button id="upload">Save capture</button>
 <button id="retake" class="danger" type="button">Delete saved capture / retake</button>
 <a class="button secondary" href="/kit.pdf" target="_blank" rel="noopener">Open printable reference PDF</a>
+<a class="button secondary" href="/api/export">Download capture submission ZIP</a>
 <div id="message"></div>
 <small>Use only on a trusted local network. This collector kit contains no ground truth.</small>
 </div>
@@ -770,6 +772,28 @@ def create_collector_app(
             "capture_file": destination.name,
             "size_bytes": destination.stat().st_size,
         }
+
+    @app.get("/api/export")
+    def export_submission() -> FileResponse:
+        filename = (
+            f"{session.kit.suite_id}-{session.capture_id}-"
+            f"{session.mode.value}.submission.zip"
+        )
+        destination = session.output_dir / filename
+        try:
+            build_capture_submission(
+                session.output_dir,
+                destination,
+                max_page_pixels=session.max_page_pixels,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return FileResponse(
+            destination,
+            media_type="application/zip",
+            filename=filename,
+        )
+
 
     @app.delete("/api/captures/{page_id}")
     def delete_capture(page_id: str) -> dict:

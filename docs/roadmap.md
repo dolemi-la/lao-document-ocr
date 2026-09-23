@@ -36,6 +36,7 @@ Status: in progress
 - [x] combined multi-template capture suite generator
 - [x] collector-safe reproducible capture-kit packaging
 - [x] mobile/browser collector service for blind capture kits
+- [x] checksum-bound blind capture submission ZIP handoff
 - [x] byte-reproducible combined capture PDF + collector ZIP generation
 - [x] manual CI workflow for revision-bound collector ZIP + SHA-256 artifact
 - [x] project-authored rights-clear Lao capture corpus + printable 60-page campaign

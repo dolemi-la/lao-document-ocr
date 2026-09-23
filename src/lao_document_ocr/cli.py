@@ -569,6 +569,30 @@ def _parser() -> argparse.ArgumentParser:
     capture_kit.add_argument("--output", required=True, type=Path)
     capture_kit.add_argument("--revision")
 
+    pack_submission = subparsers.add_parser(
+        "pack-capture-submission",
+        help="Package a collector session into a checksum-bound blind submission ZIP.",
+    )
+    pack_submission.add_argument("--capture-dir", required=True, type=Path)
+    pack_submission.add_argument("--output", required=True, type=Path)
+    pack_submission.add_argument("--require-complete", action="store_true")
+    pack_submission.add_argument("--max-page-pixels", type=int, default=80_000_000)
+
+    verify_submission = subparsers.add_parser(
+        "verify-capture-submission",
+        help="Verify checksums/schema/images in a capture submission ZIP.",
+    )
+    verify_submission.add_argument("--submission", required=True, type=Path)
+    verify_submission.add_argument("--max-page-pixels", type=int, default=80_000_000)
+
+    extract_submission = subparsers.add_parser(
+        "extract-capture-submission",
+        help="Verify and extract captures into a private directory for import.",
+    )
+    extract_submission.add_argument("--submission", required=True, type=Path)
+    extract_submission.add_argument("--output-dir", required=True, type=Path)
+    extract_submission.add_argument("--max-page-pixels", type=int, default=80_000_000)
+
     serve_capture_kit = subparsers.add_parser(
         "serve-capture-kit",
         help="Serve a collector-safe capture kit with a mobile camera upload UI.",
@@ -1457,6 +1481,46 @@ def _build_capture_kit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _pack_capture_submission(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_submission import build_capture_submission
+
+    output = build_capture_submission(
+        args.capture_dir,
+        args.output,
+        require_complete=args.require_complete,
+        max_page_pixels=args.max_page_pixels,
+    )
+    print(f"Capture submission: {output}")
+    return 0
+
+
+def _verify_capture_submission(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_submission import verify_capture_submission
+
+    submission = verify_capture_submission(
+        args.submission,
+        max_page_pixels=args.max_page_pixels,
+    )
+    print(f"Suite: {submission.suite_id}")
+    print(f"Capture ID: {submission.capture_id}")
+    print(f"Mode: {submission.mode}")
+    print(f"Captured: {submission.captured_pages}/{submission.expected_pages}")
+    print(f"Complete: {submission.complete}")
+    return 0
+
+
+def _extract_capture_submission(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_submission import extract_capture_submission
+
+    output = extract_capture_submission(
+        args.submission,
+        args.output_dir,
+        max_page_pixels=args.max_page_pixels,
+    )
+    print(f"Extracted capture submission: {output}")
+    return 0
+
+
 def _serve_capture_kit(args: argparse.Namespace) -> int:
     import secrets
 
@@ -1873,6 +1937,12 @@ def main() -> int:
             return _generate_capture_suite(args)
         if args.command == "build-capture-kit":
             return _build_capture_kit(args)
+        if args.command == "pack-capture-submission":
+            return _pack_capture_submission(args)
+        if args.command == "verify-capture-submission":
+            return _verify_capture_submission(args)
+        if args.command == "extract-capture-submission":
+            return _extract_capture_submission(args)
         if args.command == "serve-capture-kit":
             return _serve_capture_kit(args)
         if args.command == "capture-campaign-report":

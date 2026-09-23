@@ -302,6 +302,9 @@ lao-ocr generate-capture-suite --corpus training/data/lao-lines.txt --output ben
 lao-ocr build-capture-kit --suite-manifest benchmarks/capture-packs/baseline-suite-v1/capture-suite.json --output baseline-suite-v1.collector.zip --revision <git-sha>
 lao-ocr serve-capture-kit --kit <collector.zip> --output-dir <captures/session> --capture-id phone-a --mode phone-photo
 # prints a random token-protected collector URL by default
+lao-ocr pack-capture-submission --capture-dir <captures/session> --output capture.submission.zip --require-complete
+lao-ocr verify-capture-submission --submission capture.submission.zip
+lao-ocr extract-capture-submission --submission capture.submission.zip --output-dir <incoming/session>
 lao-ocr benchmark-capture-suite --suite-manifest <capture-suite.json> --engine tesseract --output digital-qa.json
 lao-ocr capture-campaign-report --suite-manifest <capture-suite.json> --dataset-manifest <manifest.jsonl> --output campaign-report.json
 lao-ocr register-capture --help
@@ -334,6 +337,7 @@ See:
 - [docs/capture-suite.md](docs/capture-suite.md)
 - [docs/capture-kit.md](docs/capture-kit.md)
 - [docs/mobile-capture-collector.md](docs/mobile-capture-collector.md)
+- [docs/capture-submission.md](docs/capture-submission.md)
 
 Maintainers can also run the manual GitHub Actions workflow **Build Collector Capture Kit** to generate a revision-bound collector ZIP + SHA-256 artifact without committing generated benchmark files.
 - [docs/capture-suite-qa.md](docs/capture-suite-qa.md)

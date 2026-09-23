@@ -2124,3 +2124,80 @@ def test_serve_capture_kit_cli_uses_explicit_access_token(
 
     assert main() == 0
     assert calls["kwargs"]["access_token"] == "collector-token-explicit-1234"
+
+
+def test_capture_submission_cli_pack_verify_extract(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    capture_dir = tmp_path / "collector-session"
+    capture_dir.mkdir()
+    (capture_dir / ".collector-session.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "suite_id": "suite-v1",
+                "source_revision": "abc123",
+                "kit_sha256": "a" * 64,
+                "capture_id": "phone-a",
+                "mode": "phone-photo",
+                "require_qr": True,
+                "expected_pages": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    Image.new("RGB", (120, 80), (120, 160, 200)).save(
+        capture_dir / "suite-v1-p0001.jpg"
+    )
+    submission = tmp_path / "submission.zip"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "pack-capture-submission",
+            "--capture-dir",
+            str(capture_dir),
+            "--output",
+            str(submission),
+            "--require-complete",
+        ],
+    )
+    assert main() == 0
+    assert submission.is_file()
+    assert "Capture submission:" in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "verify-capture-submission",
+            "--submission",
+            str(submission),
+        ],
+    )
+    assert main() == 0
+    output = capsys.readouterr().out
+    assert "Captured: 1/1" in output
+    assert "Complete: True" in output
+
+    extracted = tmp_path / "extracted-submission"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "extract-capture-submission",
+            "--submission",
+            str(submission),
+            "--output-dir",
+            str(extracted),
+        ],
+    )
+    assert main() == 0
+    assert (extracted / "suite-v1-p0001.jpg").is_file()
+    assert (extracted / "capture-submission.json").is_file()

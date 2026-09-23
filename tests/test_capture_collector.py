@@ -464,3 +464,34 @@ def test_collector_rejects_weak_access_token(tmp_path) -> None:
             require_qr=False,
             access_token="short",
         )
+
+
+def test_collector_exports_verified_capture_submission(tmp_path) -> None:
+    from lao_document_ocr.capture_submission import verify_capture_submission
+
+    output = tmp_path / "captures-export"
+    app = create_collector_app(
+        _kit(tmp_path),
+        output,
+        capture_id="phone-export",
+        mode=CaptureMode.PHONE_PHOTO,
+        require_qr=False,
+    )
+    client = TestClient(app)
+    uploaded = client.post(
+        "/api/captures/suite-plain-p0001",
+        files={"file": ("camera.jpg", _jpeg_bytes(), "image/jpeg")},
+    )
+    assert uploaded.status_code == 201
+
+    response = client.get("/api/export")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/zip")
+
+    submission_path = tmp_path / "exported.zip"
+    submission_path.write_bytes(response.content)
+    submission = verify_capture_submission(submission_path)
+    assert submission.suite_id == "suite"
+    assert submission.capture_id == "phone-export"
+    assert submission.mode == "phone-photo"
+    assert submission.captured_pages == 1
