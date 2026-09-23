@@ -36,6 +36,7 @@ Status: in progress
 - [x] combined multi-template capture suite generator
 - [x] project-authored rights-clear Lao capture corpus + printable 60-page campaign
 - [x] capture campaign completion report by template/device mode
+- [x] atomic bulk capture-directory registration workflow
 - [x] real-data benchmark readiness coverage gate
 - [ ] clean printed scans
 - [ ] noisy scans

@@ -296,6 +296,7 @@ lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benc
 lao-ocr generate-capture-suite --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-suite-v1 --font <font.ttf> --suite-id baseline-suite-v1 --text-license CC0-1.0 --text-provenance <source>
 lao-ocr capture-campaign-report --suite-manifest <capture-suite.json> --dataset-manifest <manifest.jsonl> --output campaign-report.json
 lao-ocr register-capture --help
+lao-ocr register-capture-directory --help
 lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2
 lao-ocr export-recognizer --checkpoint training/runs/crnn-v2/recognizer.pt --output training/runs/crnn-v2/recognizer.pt2
 lao-ocr benchmark-recognizer --manifest training/generated/v1/manifest.jsonl --model training/runs/crnn-v2/recognizer.pt2 --output training/runs/crnn-v2/benchmark.json
@@ -320,6 +321,7 @@ See:
 - [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
 - [docs/capture-suite.md](docs/capture-suite.md)
 - [docs/project-authored-capture-campaign.md](docs/project-authored-capture-campaign.md)
+- [docs/bulk-capture-registration.md](docs/bulk-capture-registration.md)
 - [docs/capture-campaign-report.md](docs/capture-campaign-report.md)
 - [docs/synthetic-augmentation.md](docs/synthetic-augmentation.md)
 - [docs/language-model.md](docs/language-model.md)

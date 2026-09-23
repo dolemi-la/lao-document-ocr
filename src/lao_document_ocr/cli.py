@@ -477,6 +477,31 @@ def _parser() -> argparse.ArgumentParser:
     capture_register.add_argument("--notes")
     capture_register.add_argument("--confirm-release", action="store_true")
 
+    capture_directory = subparsers.add_parser(
+        "register-capture-directory",
+        help=(
+            "Bulk-register captures whose filenames exactly match capture-suite "
+            "page IDs."
+        ),
+    )
+    capture_directory.add_argument("--suite-manifest", required=True, type=Path)
+    capture_directory.add_argument("--capture-dir", required=True, type=Path)
+    capture_directory.add_argument("--capture-id", required=True)
+    capture_directory.add_argument(
+        "--mode",
+        required=True,
+        choices=["flatbed-scan", "degraded-scan", "phone-photo"],
+    )
+    capture_directory.add_argument("--contributor", required=True)
+    capture_directory.add_argument("--release-license", required=True)
+    capture_directory.add_argument("--dataset-root", required=True, type=Path)
+    capture_directory.add_argument("--dataset-manifest", required=True, type=Path)
+    capture_directory.add_argument("--notes")
+    capture_directory.add_argument("--confirm-release", action="store_true")
+    capture_directory.add_argument("--require-complete", action="store_true")
+    capture_directory.add_argument("--dry-run", action="store_true")
+    capture_directory.add_argument("--report", type=Path)
+
     layout_train = subparsers.add_parser(
         "train-layout-detector",
         help="Train the project-owned semantic layout segmentation model.",
@@ -1216,6 +1241,39 @@ def _register_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def _register_capture_directory(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_batch import (
+        register_capture_directory,
+        write_capture_batch_report,
+    )
+    from lao_document_ocr.capture_registration import CaptureMode
+
+    report = register_capture_directory(
+        suite_manifest=args.suite_manifest,
+        capture_dir=args.capture_dir,
+        capture_id=args.capture_id,
+        capture_mode=CaptureMode(args.mode),
+        contributor=args.contributor,
+        release_license=args.release_license,
+        dataset_root=args.dataset_root,
+        dataset_manifest=args.dataset_manifest,
+        confirm_release=args.confirm_release,
+        require_complete=args.require_complete,
+        dry_run=args.dry_run,
+        notes=args.notes,
+    )
+    if args.report is not None:
+        output = write_capture_batch_report(report, args.report)
+        print(f"Report: {output}")
+    print(f"Suite: {report.suite_id}")
+    print(f"Planned captures: {report.planned_captures}")
+    print(f"Registered captures: {report.registered_captures}")
+    print(f"Missing pages: {len(report.missing_page_ids)}")
+    print(f"Ignored files: {len(report.ignored_files)}")
+    print(f"Dry run: {'yes' if report.dry_run else 'no'}")
+    return 0
+
+
 def _train_layout_detector(args: argparse.Namespace) -> int:
     try:
         from lao_document_ocr.layout_segmentation_training import (
@@ -1499,6 +1557,8 @@ def main() -> int:
             return _capture_campaign_report(args)
         if args.command == "register-capture":
             return _register_capture(args)
+        if args.command == "register-capture-directory":
+            return _register_capture_directory(args)
         if args.command == "train-layout-detector":
             return _train_layout_detector(args)
         if args.command == "export-layout-detector":

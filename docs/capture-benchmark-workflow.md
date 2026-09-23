@@ -245,3 +245,7 @@ This matters because one real page can simultaneously be a phone photo, mixed La
 ## Track campaign completion
 
 Use `lao-ocr capture-campaign-report` to see which capture-suite pages still need flatbed/phone/degraded captures before freezing the benchmark test set. See [capture-campaign-report.md](capture-campaign-report.md).
+
+## Bulk registration
+
+For scanner/phone sessions containing many capture-suite pages, use `register-capture-directory`. Filenames must match the printed page IDs. Dry-run/preflight and rollback behavior are documented in [bulk-capture-registration.md](bulk-capture-registration.md).

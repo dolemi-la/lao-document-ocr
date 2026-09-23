@@ -1435,3 +1435,78 @@ def test_benchmark_readiness_cli_requires_real_source_tags(
     assert payload["eligible_sample_count"] == 0
     assert payload["unverified_source_samples"] == ["synthetic"]
     assert "Readiness: NOT READY" in capsys.readouterr().out
+
+
+def test_register_capture_directory_cli_forwards_bulk_options(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import lao_document_ocr.capture_batch as capture_batch
+    from lao_document_ocr.capture_batch import CaptureBatchReport
+
+    captured = {}
+
+    def fake_register_capture_directory(**kwargs):
+        captured.update(kwargs)
+        return CaptureBatchReport(
+            suite_id="campaign-v1",
+            capture_id="phone-a",
+            capture_mode="phone-photo",
+            expected_pages=60,
+            discovered_captures=60,
+            planned_captures=60,
+            registered_captures=0,
+            missing_page_ids=(),
+            ignored_files=(".DS_Store",),
+            registered_sample_ids=(),
+            dry_run=True,
+        )
+
+    monkeypatch.setattr(
+        capture_batch,
+        "register_capture_directory",
+        fake_register_capture_directory,
+    )
+    report = tmp_path / "bulk-report.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "register-capture-directory",
+            "--suite-manifest",
+            str(tmp_path / "capture-suite.json"),
+            "--capture-dir",
+            str(tmp_path / "phone"),
+            "--capture-id",
+            "phone-a",
+            "--mode",
+            "phone-photo",
+            "--contributor",
+            "CLI Contributor",
+            "--release-license",
+            "CC0-1.0",
+            "--dataset-root",
+            str(tmp_path / "dataset"),
+            "--dataset-manifest",
+            str(tmp_path / "dataset" / "manifest.jsonl"),
+            "--require-complete",
+            "--dry-run",
+            "--report",
+            str(report),
+        ],
+    )
+
+    assert main() == 0
+    assert captured["capture_id"] == "phone-a"
+    assert captured["capture_mode"].value == "phone-photo"
+    assert captured["require_complete"] is True
+    assert captured["dry_run"] is True
+    assert captured["confirm_release"] is False
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["planned_captures"] == 60
+    assert payload["dry_run"] is True
+    rendered = capsys.readouterr().out
+    assert "Planned captures: 60" in rendered
+    assert "Dry run: yes" in rendered

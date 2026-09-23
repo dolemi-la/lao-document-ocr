@@ -157,6 +157,28 @@ template:<template>
 <layout/content/language tags>
 ```
 
+## Bulk-register a full device run
+
+For a 60-page scan/photo session, name each file exactly after its printed page ID and use `register-capture-directory` instead of 60 individual commands.
+
+Dry-run first:
+
+```bash
+lao-ocr register-capture-directory \
+  --suite-manifest benchmarks/capture-packs/project-authored-lao-v1/capture-suite.json \
+  --capture-dir /path/to/captures/phone-a \
+  --capture-id phone-a \
+  --mode phone-photo \
+  --contributor "Contributor Alias" \
+  --release-license CC0-1.0 \
+  --dataset-root benchmarks/public \
+  --dataset-manifest benchmarks/public/manifest.jsonl \
+  --require-complete \
+  --dry-run
+```
+
+Then rerun without `--dry-run` and add `--confirm-release`. See [bulk-capture-registration.md](bulk-capture-registration.md) for the complete workflow and rollback behavior.
+
 ## Track campaign completion
 
 ```bash
