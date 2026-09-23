@@ -87,3 +87,25 @@ def test_legacy_calibration_without_decoder_loads_as_greedy(tmp_path) -> None:
         encoding="utf-8",
     )
     assert ConfidenceCalibration.load(path).decoder == "greedy"
+
+
+def test_fit_from_lm_beam_report_records_fusion_signature() -> None:
+    report = {
+        "model": {
+            "decoder": "beam",
+            "language_model": {"sha256": "a" * 64},
+            "language_model_weight": 0.35,
+            "language_model_token_bonus": 0.1,
+        },
+        "samples": [
+            {"uncalibrated_confidence": 0.3, "cer": 0.8},
+            {"uncalibrated_confidence": 0.9, "cer": 0.1},
+        ],
+    }
+
+    calibration = fit_from_recognizer_report(report, max_bins=2)
+
+    assert calibration.decoder == "beam"
+    assert calibration.language_model_sha256 == "a" * 64
+    assert calibration.language_model_weight == pytest.approx(0.35)
+    assert calibration.language_model_token_bonus == pytest.approx(0.1)

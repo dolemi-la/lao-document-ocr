@@ -1202,3 +1202,100 @@ def test_generate_synthetic_cli_balanced_profiles(tmp_path, monkeypatch) -> None
         "noisy-scan",
         "phone-photo",
     ]
+
+
+def test_train_char_lm_cli_writes_vocab_bound_artifact(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    from lao_document_ocr.vocabulary import CharacterVocabulary
+
+    corpus = tmp_path / "lm-corpus.txt"
+    vocab_path = tmp_path / "vocab.json"
+    output = tmp_path / "char-lm.json"
+    corpus.write_text("ສະບາຍດີ\nສະບາຍດີ\nຂອບໃຈ\n", encoding="utf-8")
+    vocab = CharacterVocabulary.from_texts(["ສະບາຍດີ", "ຂອບໃຈ"])
+    vocab.save(vocab_path)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "train-char-lm",
+            "--corpus",
+            str(corpus),
+            "--vocabulary",
+            str(vocab_path),
+            "--output",
+            str(output),
+            "--order",
+            "3",
+            "--alpha",
+            "0.2",
+        ],
+    )
+
+    assert main() == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["type"] == "character-ngram"
+    assert payload["order"] == 3
+    assert payload["alpha"] == 0.2
+    assert payload["vocabulary_checksum"] == vocab.checksum()
+    assert payload["training_stats"]["used_lines"] == 3
+    assert "Language model:" in capsys.readouterr().out
+
+
+def test_recognize_line_cli_forwards_language_model_options(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import lao_document_ocr.recognizer_inference as inference
+
+    captured = {}
+
+    class FakeResult:
+        text = "ok"
+        confidence = 0.8
+        calibrated_confidence = None
+
+    class FakeRecognizer:
+        def __init__(self, model, **kwargs):
+            captured["model"] = model
+            captured.update(kwargs)
+
+        def recognize(self, image):
+            captured["image"] = image
+            return FakeResult()
+
+    monkeypatch.setattr(inference, "ExportedLineRecognizer", FakeRecognizer)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "recognize-line",
+            "--model",
+            str(tmp_path / "model.pt2"),
+            "--image",
+            str(tmp_path / "line.png"),
+            "--decoder",
+            "beam",
+            "--beam-width",
+            "12",
+            "--language-model",
+            str(tmp_path / "lm.json"),
+            "--language-model-weight",
+            "0.35",
+            "--language-model-token-bonus",
+            "0.08",
+        ],
+    )
+
+    assert main() == 0
+    assert captured["decoder"] == "beam"
+    assert captured["beam_width"] == 12
+    assert captured["language_model_path"] == tmp_path / "lm.json"
+    assert captured["language_model_weight"] == 0.35
+    assert captured["language_model_token_bonus"] == 0.08

@@ -117,3 +117,46 @@ def test_invalid_inputs_are_rejected() -> None:
         ctc_prefix_beam_search(
             np.full((2, 2), float("-inf")),
         )
+
+
+def test_extension_scorer_can_change_beam_ranking_without_rewriting_acoustic_score() -> None:
+    probs = np.asarray(
+        [
+            [0.10, 0.55, 0.35],
+            [0.70, 0.15, 0.15],
+        ],
+        dtype=np.float64,
+    )
+    log_probs = np.log(probs)
+
+    baseline = ctc_prefix_beam_search(log_probs, beam_width=8)
+
+    def scorer(prefix, token_id):
+        del prefix
+        return 0.0 if token_id == 1 else 2.0
+
+    fused = ctc_prefix_beam_search(
+        log_probs,
+        beam_width=8,
+        extension_scorer=scorer,
+        scorer_weight=1.0,
+    )
+
+    assert baseline.token_ids == (1,)
+    assert fused.token_ids == (2,)
+    assert fused.language_model_log_probability == pytest.approx(2.0)
+    assert fused.ranking_score > fused.log_probability
+    assert fused.log_probability == pytest.approx(
+        math.log(0.3125)
+    )
+
+
+def test_invalid_shallow_fusion_configuration_is_rejected() -> None:
+    values = np.zeros((2, 2), dtype=np.float64)
+
+    with pytest.raises(ValueError, match="scorer_weight"):
+        ctc_prefix_beam_search(values, scorer_weight=-0.1)
+    with pytest.raises(ValueError, match="requires extension_scorer"):
+        ctc_prefix_beam_search(values, scorer_weight=0.2)
+    with pytest.raises(ValueError, match="token_bonus"):
+        ctc_prefix_beam_search(values, token_bonus=float("nan"))

@@ -800,6 +800,9 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
             device,
             decoder,
             beam_width,
+            language_model_path,
+            language_model_weight,
+            language_model_token_bonus,
             region_detector_name,
             layout_model_path,
             layout_confidence_threshold,
@@ -811,6 +814,9 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
                     "device": device,
                     "decoder": decoder,
                     "beam_width": beam_width,
+                    "language_model_path": language_model_path,
+                    "language_model_weight": language_model_weight,
+                    "language_model_token_bonus": language_model_token_bonus,
                     "region_detector_name": region_detector_name,
                     "layout_model_path": layout_model_path,
                     "layout_confidence_threshold": layout_confidence_threshold,
@@ -824,6 +830,9 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
     monkeypatch.setattr(api_main, "OCR_DEVICE", "cuda")
     monkeypatch.setattr(api_main, "OCR_DECODER", "beam")
     monkeypatch.setattr(api_main, "OCR_BEAM_WIDTH", 7)
+    monkeypatch.setattr(api_main, "OCR_LANGUAGE_MODEL_PATH", "/models/char-lm.json")
+    monkeypatch.setattr(api_main, "OCR_LANGUAGE_MODEL_WEIGHT", 0.35)
+    monkeypatch.setattr(api_main, "OCR_LANGUAGE_MODEL_TOKEN_BONUS", 0.08)
     monkeypatch.setattr(api_main, "OCR_LAYOUT_DETECTOR", "learned")
     monkeypatch.setattr(api_main, "OCR_LAYOUT_MODEL_PATH", "/models/layout.pt2")
     monkeypatch.setattr(api_main, "OCR_LAYOUT_CONFIDENCE", 0.61)
@@ -839,6 +848,9 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
                 "device": "cuda",
                 "decoder": "beam",
                 "beam_width": 7,
+                "language_model_path": "/models/char-lm.json",
+                "language_model_weight": 0.35,
+                "language_model_token_bonus": 0.08,
                 "region_detector_name": "learned",
                 "layout_model_path": "/models/layout.pt2",
                 "layout_confidence_threshold": 0.61,

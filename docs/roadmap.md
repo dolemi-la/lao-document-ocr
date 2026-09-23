@@ -64,6 +64,7 @@ Status: started
 - [x] versioned checkpoints/artifact checksums
 - [x] exported-recognizer regression benchmark pipeline
 - [x] fixed-set owned-vs-Tesseract benchmark comparison gate
+- [x] optional character n-gram shallow fusion for CTC beam decoding
 
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 

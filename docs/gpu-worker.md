@@ -189,6 +189,9 @@ The GPU preset also exposes:
 ```text
 OCR_DECODER=greedy
 OCR_BEAM_WIDTH=10
+OCR_LANGUAGE_MODEL_PATH=
+OCR_LANGUAGE_MODEL_WEIGHT=0
+OCR_LANGUAGE_MODEL_TOKEN_BONUS=0
 ```
 
-Beam search currently runs its prefix-search logic on CPU after model logits are produced, so it can increase end-to-end latency even when neural inference runs on CUDA. Keep greedy as the default unless frozen-benchmark results justify beam decoding.
+Beam search currently runs its prefix-search logic on CPU after model logits are produced, so it can increase end-to-end latency even when neural inference runs on CUDA. Character n-gram shallow fusion is also CPU-side and requires `OCR_DECODER=beam`. Keep greedy/no-LM as the default unless frozen-benchmark results justify the added latency.

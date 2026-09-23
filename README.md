@@ -194,6 +194,9 @@ Override them with:
 - `OCR_MODEL_PATH` (required for `OCR_ENGINE=owned`)
 - `OCR_DECODER=greedy|beam`
 - `OCR_BEAM_WIDTH`
+- `OCR_LANGUAGE_MODEL_PATH` (optional character n-gram model; beam decoder only)
+- `OCR_LANGUAGE_MODEL_WEIGHT`
+- `OCR_LANGUAGE_MODEL_TOKEN_BONUS`
 - `OCR_CALIBRATION_PATH` (optional for the owned recognizer)
 - `OCR_DEVICE` (`cpu`, `cuda`, `mps`, or `auto`; default `cpu`)
 - `OCR_LAYOUT_DETECTOR` (`morphology` or `learned`)
@@ -286,6 +289,7 @@ lao-ocr benchmark-docx --reference reference.pdf --docx output.docx --output doc
 lao-ocr bundle-benchmarks --ocr ocr.json --layout layout.json --docx docx.json --revision <git-sha> --output bundle.json
 lao-ocr prepare-corpus --input <source.txt> --output training/data/lao-lines.txt
 lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output training/generated/v1 --font <font.ttf> --augmentation-profile balanced
+lao-ocr train-char-lm --corpus training/data/lao-lines.txt --vocabulary training/runs/crnn-v2/vocab.json --output training/runs/crnn-v2/char-lm.json
 lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-v1 --font <font.ttf> --pack-id baseline-v1 --text-license CC0-1.0 --text-provenance <source> --template plain
 lao-ocr generate-capture-suite --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-suite-v1 --font <font.ttf> --suite-id baseline-suite-v1 --text-license CC0-1.0 --text-provenance <source>
 lao-ocr capture-campaign-report --suite-manifest <capture-suite.json> --dataset-manifest <manifest.jsonl> --output campaign-report.json
@@ -313,6 +317,7 @@ See:
 - [docs/capture-suite.md](docs/capture-suite.md)
 - [docs/capture-campaign-report.md](docs/capture-campaign-report.md)
 - [docs/synthetic-augmentation.md](docs/synthetic-augmentation.md)
+- [docs/language-model.md](docs/language-model.md)
 
 Synthetic smoke numbers are pipeline sanity checks only and must not be presented as real-document accuracy.
 

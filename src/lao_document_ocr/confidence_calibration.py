@@ -24,6 +24,9 @@ class ConfidenceCalibration:
     raw_mae: float
     calibrated_mae: float
     decoder: str = "greedy"
+    language_model_sha256: str | None = None
+    language_model_weight: float = 0.0
+    language_model_token_bonus: float = 0.0
 
     def calibrate(self, confidence: float) -> float:
         if not self.bins:
@@ -48,6 +51,9 @@ class ConfidenceCalibration:
             "raw_mae": self.raw_mae,
             "calibrated_mae": self.calibrated_mae,
             "decoder": self.decoder,
+            "language_model_sha256": self.language_model_sha256,
+            "language_model_weight": self.language_model_weight,
+            "language_model_token_bonus": self.language_model_token_bonus,
             "bins": [asdict(bucket) for bucket in self.bins],
         }
 
@@ -74,6 +80,15 @@ class ConfidenceCalibration:
             raw_mae=float(payload.get("raw_mae", 0.0)),
             calibrated_mae=float(payload.get("calibrated_mae", 0.0)),
             decoder=str(payload.get("decoder", "greedy")),
+            language_model_sha256=(
+                str(payload["language_model_sha256"])
+                if payload.get("language_model_sha256") is not None
+                else None
+            ),
+            language_model_weight=float(payload.get("language_model_weight", 0.0)),
+            language_model_token_bonus=float(
+                payload.get("language_model_token_bonus", 0.0)
+            ),
         )
 
 
@@ -92,6 +107,9 @@ def fit_confidence_calibration(
     *,
     max_bins: int = 10,
     decoder: str = "greedy",
+    language_model_sha256: str | None = None,
+    language_model_weight: float = 0.0,
+    language_model_token_bonus: float = 0.0,
 ) -> ConfidenceCalibration:
     if len(points) < 2:
         raise ValueError("At least two calibration points are required")
@@ -100,6 +118,12 @@ def fit_confidence_calibration(
     decoder = decoder.strip().lower()
     if decoder not in {"greedy", "beam"}:
         raise ValueError("decoder must be one of: greedy, beam")
+    if language_model_sha256 is not None and decoder != "beam":
+        raise ValueError("language model calibration requires beam decoder")
+    if not math.isfinite(language_model_weight) or language_model_weight < 0:
+        raise ValueError("language_model_weight must be finite and non-negative")
+    if not math.isfinite(language_model_token_bonus):
+        raise ValueError("language_model_token_bonus must be finite")
 
     validated = sorted(_validate_point(*point) for point in points)
     bin_count = min(max_bins, len(validated))
@@ -128,6 +152,9 @@ def fit_confidence_calibration(
         raw_mae=0.0,
         calibrated_mae=0.0,
         decoder=decoder,
+        language_model_sha256=language_model_sha256,
+        language_model_weight=language_model_weight,
+        language_model_token_bonus=language_model_token_bonus,
     )
     raw_mae = sum(abs(confidence - accuracy) for confidence, accuracy in validated) / len(
         validated
@@ -145,6 +172,9 @@ def fit_confidence_calibration(
         raw_mae=raw_mae,
         calibrated_mae=calibrated_mae,
         decoder=decoder,
+        language_model_sha256=language_model_sha256,
+        language_model_weight=language_model_weight,
+        language_model_token_bonus=language_model_token_bonus,
     )
 
 
@@ -169,8 +199,32 @@ def fit_from_recognizer_report(
         if isinstance(model, dict)
         else "greedy"
     )
+    language_model = (
+        model.get("language_model")
+        if isinstance(model, dict)
+        else None
+    )
+    language_model_sha256 = (
+        str(language_model.get("sha256"))
+        if isinstance(language_model, dict)
+        and language_model.get("sha256") is not None
+        else None
+    )
+    language_model_weight = (
+        float(model.get("language_model_weight", 0.0))
+        if isinstance(model, dict)
+        else 0.0
+    )
+    language_model_token_bonus = (
+        float(model.get("language_model_token_bonus", 0.0))
+        if isinstance(model, dict)
+        else 0.0
+    )
     return fit_confidence_calibration(
         points,
         max_bins=max_bins,
         decoder=decoder,
+        language_model_sha256=language_model_sha256,
+        language_model_weight=language_model_weight,
+        language_model_token_bonus=language_model_token_bonus,
     )

@@ -15,6 +15,10 @@ from lao_document_ocr.confidence_calibration import (  # noqa: E402
     CalibrationBin,
     ConfidenceCalibration,
 )
+from lao_document_ocr.language_model import (  # noqa: E402
+    save_language_model,
+    train_character_ngram_language_model,
+)
 from lao_document_ocr.recognizer_inference import (  # noqa: E402
     ExportedLineRecognizer,
     resolve_torch_device,
@@ -282,3 +286,174 @@ def test_beam_decoder_applies_matching_calibration(tmp_path) -> None:
     assert isinstance(result.text, str)
     assert 0 <= result.confidence <= 1
     assert result.calibrated_confidence == pytest.approx(0.77)
+
+
+def _language_model_for_vocab(tmp_path, vocab, lines=None):
+    model, _ = train_character_ngram_language_model(
+        lines or ["ab", "ab", "aa"],
+        vocab,
+        order=3,
+        alpha=0.1,
+    )
+    return save_language_model(model, tmp_path / "char-lm.json")
+
+
+def test_beam_recognizer_loads_matching_language_model(tmp_path) -> None:
+    artifact = _export_test_recognizer(tmp_path)
+    vocab = CharacterVocabulary.from_texts(["ab"])
+    language_model = _language_model_for_vocab(tmp_path, vocab)
+    image_path = tmp_path / "lm-line.png"
+    Image.new("L", (80, 32), 255).save(image_path)
+
+    recognizer = ExportedLineRecognizer(
+        artifact,
+        decoder="beam",
+        beam_width=5,
+        language_model_path=language_model,
+        language_model_weight=0.3,
+        language_model_token_bonus=0.1,
+    )
+    result = recognizer.recognize(image_path)
+
+    assert recognizer.metadata["language_model"]["type"] == "character-ngram"
+    assert recognizer.metadata["language_model"]["sha256"]
+    assert recognizer.metadata["language_model_weight"] == pytest.approx(0.3)
+    assert recognizer.metadata["language_model_token_bonus"] == pytest.approx(0.1)
+    assert result.decoder_ranking_score is not None
+    assert result.language_model_log_probability is not None
+
+
+def test_language_model_requires_beam_decoder(tmp_path) -> None:
+    artifact = _export_test_recognizer(tmp_path)
+    vocab = CharacterVocabulary.from_texts(["ab"])
+    language_model = _language_model_for_vocab(tmp_path, vocab)
+
+    with pytest.raises(ValueError, match="requires decoder='beam'"):
+        ExportedLineRecognizer(
+            artifact,
+            decoder="greedy",
+            language_model_path=language_model,
+            language_model_weight=0.3,
+        )
+
+
+def test_language_model_rejects_vocabulary_mismatch(tmp_path) -> None:
+    artifact = _export_test_recognizer(tmp_path)
+    other_vocab = CharacterVocabulary.from_texts(["abc"])
+    language_model = _language_model_for_vocab(
+        tmp_path,
+        other_vocab,
+        lines=["abc", "aba"],
+    )
+
+    with pytest.raises(ValueError, match="vocabulary checksum mismatch"):
+        ExportedLineRecognizer(
+            artifact,
+            decoder="beam",
+            language_model_path=language_model,
+            language_model_weight=0.3,
+        )
+
+
+def test_language_model_fusion_parameters_require_model(tmp_path) -> None:
+    artifact = _export_test_recognizer(tmp_path)
+
+    with pytest.raises(ValueError, match="require language_model_path"):
+        ExportedLineRecognizer(
+            artifact,
+            decoder="beam",
+            language_model_weight=0.3,
+        )
+    with pytest.raises(ValueError, match="must be positive"):
+        vocab = CharacterVocabulary.from_texts(["ab"])
+        language_model = _language_model_for_vocab(tmp_path, vocab)
+        ExportedLineRecognizer(
+            artifact,
+            decoder="beam",
+            language_model_path=language_model,
+            language_model_weight=0.0,
+        )
+
+
+def test_lm_calibration_must_match_language_model_and_fusion_parameters(tmp_path) -> None:
+    from lao_document_ocr.language_model import CharacterNgramLanguageModel
+
+    artifact = _export_test_recognizer(tmp_path)
+    vocab = CharacterVocabulary.from_texts(["ab"])
+    language_model_path = _language_model_for_vocab(tmp_path, vocab)
+    loaded_lm = CharacterNgramLanguageModel.load(language_model_path)
+
+    wrong_lm = ConfidenceCalibration(
+        schema_version="1",
+        method="lm-test",
+        sample_count=2,
+        bins=(CalibrationBin(0.0, 1.0, 0.5, 0.7, 2),),
+        raw_mae=0.1,
+        calibrated_mae=0.05,
+        decoder="beam",
+        language_model_sha256="0" * 64,
+        language_model_weight=0.3,
+        language_model_token_bonus=0.1,
+    )
+    wrong_lm_path = wrong_lm.save(tmp_path / "wrong-lm-calibration.json")
+
+    with pytest.raises(ValueError, match="language model mismatch"):
+        ExportedLineRecognizer(
+            artifact,
+            decoder="beam",
+            beam_width=5,
+            language_model_path=language_model_path,
+            language_model_weight=0.3,
+            language_model_token_bonus=0.1,
+            calibration_path=wrong_lm_path,
+        )
+
+    wrong_weight = ConfidenceCalibration(
+        schema_version="1",
+        method="lm-test",
+        sample_count=2,
+        bins=(CalibrationBin(0.0, 1.0, 0.5, 0.7, 2),),
+        raw_mae=0.1,
+        calibrated_mae=0.05,
+        decoder="beam",
+        language_model_sha256=loaded_lm.artifact_sha256,
+        language_model_weight=0.4,
+        language_model_token_bonus=0.1,
+    )
+    wrong_weight_path = wrong_weight.save(tmp_path / "wrong-weight-calibration.json")
+
+    with pytest.raises(ValueError, match="weight mismatch"):
+        ExportedLineRecognizer(
+            artifact,
+            decoder="beam",
+            beam_width=5,
+            language_model_path=language_model_path,
+            language_model_weight=0.3,
+            language_model_token_bonus=0.1,
+            calibration_path=wrong_weight_path,
+        )
+
+    matching = ConfidenceCalibration(
+        schema_version="1",
+        method="lm-test",
+        sample_count=2,
+        bins=(CalibrationBin(0.0, 1.0, 0.5, 0.7, 2),),
+        raw_mae=0.1,
+        calibrated_mae=0.05,
+        decoder="beam",
+        language_model_sha256=loaded_lm.artifact_sha256,
+        language_model_weight=0.3,
+        language_model_token_bonus=0.1,
+    )
+    matching_path = matching.save(tmp_path / "matching-calibration.json")
+
+    recognizer = ExportedLineRecognizer(
+        artifact,
+        decoder="beam",
+        beam_width=5,
+        language_model_path=language_model_path,
+        language_model_weight=0.3,
+        language_model_token_bonus=0.1,
+        calibration_path=matching_path,
+    )
+    assert recognizer.calibration is not None

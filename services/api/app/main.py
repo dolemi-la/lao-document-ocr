@@ -66,6 +66,11 @@ OCR_CALIBRATION_PATH = os.getenv("OCR_CALIBRATION_PATH") or None
 OCR_DEVICE = os.getenv("OCR_DEVICE", "cpu").strip().lower()
 OCR_DECODER = os.getenv("OCR_DECODER", "greedy").strip().lower()
 OCR_BEAM_WIDTH = int(os.getenv("OCR_BEAM_WIDTH", "10"))
+OCR_LANGUAGE_MODEL_PATH = os.getenv("OCR_LANGUAGE_MODEL_PATH") or None
+OCR_LANGUAGE_MODEL_WEIGHT = float(os.getenv("OCR_LANGUAGE_MODEL_WEIGHT", "0"))
+OCR_LANGUAGE_MODEL_TOKEN_BONUS = float(
+    os.getenv("OCR_LANGUAGE_MODEL_TOKEN_BONUS", "0")
+)
 OCR_LAYOUT_DETECTOR = os.getenv(
     "OCR_LAYOUT_DETECTOR",
     "morphology",
@@ -283,6 +288,9 @@ def _cached_owned_engine(
     device: str,
     decoder: str,
     beam_width: int,
+    language_model_path: str | None,
+    language_model_weight: float,
+    language_model_token_bonus: float,
     region_detector_name: str,
     layout_model_path: str | None,
     layout_confidence_threshold: float,
@@ -293,6 +301,9 @@ def _cached_owned_engine(
         device=device,
         decoder=decoder,
         beam_width=beam_width,
+        language_model_path=language_model_path,
+        language_model_weight=language_model_weight,
+        language_model_token_bonus=language_model_token_bonus,
         region_detector_name=region_detector_name,
         layout_model_path=layout_model_path,
         layout_confidence_threshold=layout_confidence_threshold,
@@ -352,6 +363,9 @@ def _engine() -> OcrEngine:
             OCR_DEVICE,
             OCR_DECODER,
             OCR_BEAM_WIDTH,
+            OCR_LANGUAGE_MODEL_PATH,
+            OCR_LANGUAGE_MODEL_WEIGHT,
+            OCR_LANGUAGE_MODEL_TOKEN_BONUS,
             OCR_LAYOUT_DETECTOR,
             OCR_LAYOUT_MODEL_PATH,
             OCR_LAYOUT_CONFIDENCE,

@@ -64,9 +64,12 @@ OCR_MODEL_PATH=/models/recognizer.pt2
 OCR_CALIBRATION_PATH=/models/calibration.json   # optional
 OCR_DECODER=greedy                              # greedy | beam
 OCR_BEAM_WIDTH=10                               # used when decoder=beam
+OCR_LANGUAGE_MODEL_PATH=/models/char-lm.json    # optional; beam only
+OCR_LANGUAGE_MODEL_WEIGHT=0.25
+OCR_LANGUAGE_MODEL_TOKEN_BONUS=0.0
 ```
 
-The API health endpoint reports the selected engine and model metadata.
+The API health endpoint reports the selected engine and model metadata. Character-LM shallow fusion is optional; see [language-model.md](language-model.md).
 
 The base API Docker image intentionally stays lightweight and does not include PyTorch. Use an environment/image that installs `.[train]` when selecting `OCR_ENGINE=owned`.
 

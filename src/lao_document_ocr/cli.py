@@ -27,6 +27,12 @@ from lao_document_ocr.synthetic import generate_synthetic_lines, load_corpus
 from lao_document_ocr.training_manifest import load_training_manifest
 
 
+def _add_language_model_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--language-model", type=Path)
+    parser.add_argument("--language-model-weight", type=float, default=0.0)
+    parser.add_argument("--language-model-token-bonus", type=float, default=0.0)
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="lao-ocr",
@@ -56,6 +62,7 @@ def _parser() -> argparse.ArgumentParser:
         default="greedy",
     )
     convert.add_argument("--beam-width", type=int, default=10)
+    _add_language_model_arguments(convert)
     convert.add_argument(
         "--layout-detector",
         choices=["morphology", "learned"],
@@ -256,6 +263,7 @@ def _parser() -> argparse.ArgumentParser:
         default="greedy",
     )
     benchmark.add_argument("--beam-width", type=int, default=10)
+    _add_language_model_arguments(benchmark)
     benchmark.add_argument(
         "--layout-detector",
         choices=["morphology", "learned"],
@@ -298,6 +306,16 @@ def _parser() -> argparse.ArgumentParser:
     corpus.add_argument("--min-lao-ratio", type=float, default=0.5)
     corpus.add_argument("--limit", type=int)
     corpus.add_argument("--keep-duplicates", action="store_true")
+
+    char_lm = subparsers.add_parser(
+        "train-char-lm",
+        help="Train a portable character n-gram language model for beam decoding.",
+    )
+    char_lm.add_argument("--corpus", required=True, type=Path)
+    char_lm.add_argument("--vocabulary", required=True, type=Path)
+    char_lm.add_argument("--output", required=True, type=Path)
+    char_lm.add_argument("--order", type=int, default=3)
+    char_lm.add_argument("--alpha", type=float, default=0.1)
 
     synthetic = subparsers.add_parser(
         "generate-synthetic",
@@ -504,6 +522,7 @@ def _parser() -> argparse.ArgumentParser:
         default="greedy",
     )
     recognize.add_argument("--beam-width", type=int, default=10)
+    _add_language_model_arguments(recognize)
 
     recognizer_benchmark = subparsers.add_parser(
         "benchmark-recognizer",
@@ -525,6 +544,7 @@ def _parser() -> argparse.ArgumentParser:
         default="greedy",
     )
     recognizer_benchmark.add_argument("--beam-width", type=int, default=10)
+    _add_language_model_arguments(recognizer_benchmark)
 
     calibrate = subparsers.add_parser(
         "calibrate-recognizer",
@@ -553,6 +573,9 @@ def _convert_document(args: argparse.Namespace) -> int:
             device=args.device,
             decoder=args.decoder,
             beam_width=args.beam_width,
+            language_model_path=args.language_model,
+            language_model_weight=args.language_model_weight,
+            language_model_token_bonus=args.language_model_token_bonus,
             region_detector_name=args.layout_detector,
             layout_model_path=args.layout_model,
             layout_confidence_threshold=args.layout_confidence,
@@ -891,6 +914,9 @@ def _benchmark(args: argparse.Namespace) -> int:
             device=args.device,
             decoder=args.decoder,
             beam_width=args.beam_width,
+            language_model_path=args.language_model,
+            language_model_weight=args.language_model_weight,
+            language_model_token_bonus=args.language_model_token_bonus,
             region_detector_name=args.layout_detector,
             layout_model_path=args.layout_model,
             layout_confidence_threshold=args.layout_confidence,
@@ -945,6 +971,26 @@ def _prepare_corpus(args: argparse.Namespace) -> int:
     output = write_corpus(lines, args.output)
     print(f"Corpus: {output}")
     print(f"Lines: {len(lines)}")
+    return 0
+
+
+def _train_char_lm(args: argparse.Namespace) -> int:
+    from lao_document_ocr.language_model import (
+        save_language_model,
+        train_character_ngram_language_model,
+    )
+    from lao_document_ocr.vocabulary import CharacterVocabulary
+
+    vocabulary = CharacterVocabulary.load(args.vocabulary)
+    model, stats = train_character_ngram_language_model(
+        load_corpus(args.corpus),
+        vocabulary,
+        order=args.order,
+        alpha=args.alpha,
+    )
+    output = save_language_model(model, args.output)
+    print(f"Language model: {output}")
+    print(json.dumps(stats.to_dict(), indent=2, sort_keys=True))
     return 0
 
 
@@ -1222,12 +1268,32 @@ def _recognize_line(args: argparse.Namespace) -> int:
         device=args.device,
         decoder=args.decoder,
         beam_width=args.beam_width,
+        language_model_path=args.language_model,
+        language_model_weight=args.language_model_weight,
+        language_model_token_bonus=args.language_model_token_bonus,
     )
     result = recognizer.recognize(args.image)
     print(result.text)
     print(f"uncalibrated_confidence={result.confidence:.4f}", file=sys.stderr)
     if result.calibrated_confidence is not None:
         print(f"calibrated_confidence={result.calibrated_confidence:.4f}", file=sys.stderr)
+    decoder_ranking_score = getattr(result, "decoder_ranking_score", None)
+    if decoder_ranking_score is not None:
+        print(
+            f"decoder_ranking_score={decoder_ranking_score:.4f}",
+            file=sys.stderr,
+        )
+    language_model_log_probability = getattr(
+        result,
+        "language_model_log_probability",
+        None,
+    )
+    if language_model_log_probability is not None:
+        print(
+            "language_model_log_probability="
+            f"{language_model_log_probability:.4f}",
+            file=sys.stderr,
+        )
     return 0
 
 
@@ -1252,6 +1318,9 @@ def _benchmark_recognizer(args: argparse.Namespace) -> int:
         device=args.device,
         decoder=args.decoder,
         beam_width=args.beam_width,
+        language_model_path=args.language_model,
+        language_model_weight=args.language_model_weight,
+        language_model_token_bonus=args.language_model_token_bonus,
     )
     report = benchmark_recognizer(samples, recognizer)
     output = write_recognizer_report(report, args.output)
@@ -1308,6 +1377,8 @@ def main() -> int:
             return _benchmark(args)
         if args.command == "prepare-corpus":
             return _prepare_corpus(args)
+        if args.command == "train-char-lm":
+            return _train_char_lm(args)
         if args.command == "generate-synthetic":
             return _generate_synthetic(args)
         if args.command == "generate-capture-pack":

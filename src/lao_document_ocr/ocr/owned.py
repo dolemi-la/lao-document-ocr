@@ -31,6 +31,9 @@ class OwnedRecognizerEngine(OcrEngine):
         device: str = "cpu",
         decoder: str = "greedy",
         beam_width: int = 10,
+        language_model_path: str | Path | None = None,
+        language_model_weight: float = 0.0,
+        language_model_token_bonus: float = 0.0,
         recognizer: ImageLineRecognizer | None = None,
         region_detector: TextRegionDetector | None = None,
         region_detector_name: str = "morphology",
@@ -82,6 +85,9 @@ class OwnedRecognizerEngine(OcrEngine):
                 device=device,
                 decoder=decoder,
                 beam_width=beam_width,
+                language_model_path=language_model_path,
+                language_model_weight=language_model_weight,
+                language_model_token_bonus=language_model_token_bonus,
             )
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
             raise OcrEngineError(f"Could not load owned recognizer: {exc}") from exc

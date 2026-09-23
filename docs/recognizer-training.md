@@ -166,3 +166,16 @@ Greedy and beam decoders produce different raw confidence distributions. Calibra
 ### Current sanity result
 
 On the existing 60-image synthetic overfit sanity set, `beam-width=10` produced the same CER as greedy (`~0.5143`), slightly worse WER, and roughly twice the runtime. This is **not a real-world accuracy result** and is not evidence to change the default decoder. Decoder choice should be decided only on the frozen rights-clear real benchmark.
+
+## Character n-gram shallow fusion
+
+After the recognizer vocabulary is frozen, you can train an optional character n-gram language model:
+
+```bash
+lao-ocr train-char-lm \
+  --corpus training/data/lao-lines.txt \
+  --vocabulary training/runs/crnn-v2/vocab.json \
+  --output training/runs/crnn-v2/char-lm.json
+```
+
+Use it only with beam decoding and tune fusion parameters on held-out dev data. Confidence calibration must be refit for the exact LM checksum/weight/token bonus. See [language-model.md](language-model.md).
