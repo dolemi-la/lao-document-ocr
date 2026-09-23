@@ -561,6 +561,14 @@ def _parser() -> argparse.ArgumentParser:
         help="Repeat to select templates. Omit to generate all templates.",
     )
 
+    capture_kit = subparsers.add_parser(
+        "build-capture-kit",
+        help="Package a capture suite into a collector-safe reproducible ZIP.",
+    )
+    capture_kit.add_argument("--suite-manifest", required=True, type=Path)
+    capture_kit.add_argument("--output", required=True, type=Path)
+    capture_kit.add_argument("--revision")
+
     campaign_report = subparsers.add_parser(
         "capture-campaign-report",
         help="Report missing/complete capture modes for a capture suite.",
@@ -1390,6 +1398,18 @@ def _generate_capture_suite(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_capture_kit(args: argparse.Namespace) -> int:
+    from lao_document_ocr.capture_kit import build_capture_kit
+
+    output = build_capture_kit(
+        args.suite_manifest,
+        args.output,
+        source_revision=args.revision,
+    )
+    print(f"Capture kit: {output}")
+    return 0
+
+
 def _capture_campaign_report(args: argparse.Namespace) -> int:
     from lao_document_ocr.capture_campaign import (
         build_capture_campaign_report,
@@ -1760,6 +1780,8 @@ def main() -> int:
             return _generate_capture_pack(args)
         if args.command == "generate-capture-suite":
             return _generate_capture_suite(args)
+        if args.command == "build-capture-kit":
+            return _build_capture_kit(args)
         if args.command == "capture-campaign-report":
             return _capture_campaign_report(args)
         if args.command == "register-capture":

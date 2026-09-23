@@ -1844,3 +1844,58 @@ def test_apply_review_decisions_cli_dry_run_then_confirm(
     assert reviewed.review.status.value == "approved"
     assert reviewed.review.reviewer == "Reviewer A"
     assert "Mode: APPLIED" in capsys.readouterr().out
+
+
+def test_build_capture_kit_cli(tmp_path, monkeypatch, capsys) -> None:
+    import zipfile
+
+    from lao_document_ocr.capture_suite import generate_capture_suite
+    from lao_document_ocr.capture_templates import CaptureTemplate
+
+    suite_manifest = generate_capture_suite(
+        ["ສະບາຍດີ", "ຂອບໃຈ", "OCR", "20,000 ₭"],
+        tmp_path / "collector-suite",
+        _cli_font_path(),
+        suite_id="collector-cli",
+        text_license="Apache-2.0",
+        text_provenance="CLI collector kit test",
+        templates=[CaptureTemplate.PLAIN, CaptureTemplate.RECEIPT],
+        dpi=96,
+        lines_per_page=4,
+        max_pages_per_template=1,
+    )
+    output = tmp_path / "collector-kit.zip"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "build-capture-kit",
+            "--suite-manifest",
+            str(suite_manifest),
+            "--output",
+            str(output),
+            "--revision",
+            "abc123",
+        ],
+    )
+
+    assert main() == 0
+    assert output.is_file()
+    with zipfile.ZipFile(output) as archive:
+        assert set(archive.namelist()) == {
+            "CAPTURE-INSTRUCTIONS.md",
+            "SHA256SUMS",
+            "capture-kit.json",
+            "capture-worksheet.csv",
+            "collector-cli.pdf",
+        }
+        worksheet = archive.read("capture-worksheet.csv").decode("utf-8")
+        assert "ground_truth" not in worksheet
+        assert "digital_page" not in worksheet
+        manifest = json.loads(archive.read("capture-kit.json"))
+        assert manifest["source_revision"] == "abc123"
+        assert manifest["excludes_internal_suite_paths"] is True
+
+    assert "Capture kit:" in capsys.readouterr().out

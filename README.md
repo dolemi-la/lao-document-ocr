@@ -299,6 +299,7 @@ lao-ocr generate-synthetic --corpus training/data/lao-lines.txt --output trainin
 lao-ocr train-char-lm --corpus training/data/lao-lines.txt --vocabulary training/runs/crnn-v2/vocab.json --output training/runs/crnn-v2/char-lm.json
 lao-ocr generate-capture-pack --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-v1 --font <font.ttf> --pack-id baseline-v1 --text-license CC0-1.0 --text-provenance <source> --template plain
 lao-ocr generate-capture-suite --corpus training/data/lao-lines.txt --output benchmarks/capture-packs/baseline-suite-v1 --font <font.ttf> --suite-id baseline-suite-v1 --text-license CC0-1.0 --text-provenance <source>
+lao-ocr build-capture-kit --suite-manifest benchmarks/capture-packs/baseline-suite-v1/capture-suite.json --output baseline-suite-v1.collector.zip --revision <git-sha>
 lao-ocr benchmark-capture-suite --suite-manifest <capture-suite.json> --engine tesseract --output digital-qa.json
 lao-ocr capture-campaign-report --suite-manifest <capture-suite.json> --dataset-manifest <manifest.jsonl> --output campaign-report.json
 lao-ocr register-capture --help
@@ -329,6 +330,7 @@ See:
 - [docs/hplt-sampling.md](docs/hplt-sampling.md)
 - [docs/capture-benchmark-workflow.md](docs/capture-benchmark-workflow.md)
 - [docs/capture-suite.md](docs/capture-suite.md)
+- [docs/capture-kit.md](docs/capture-kit.md)
 - [docs/capture-suite-qa.md](docs/capture-suite-qa.md)
 - [docs/project-authored-capture-campaign.md](docs/project-authored-capture-campaign.md)
 - [docs/bulk-capture-registration.md](docs/bulk-capture-registration.md)

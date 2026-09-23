@@ -108,3 +108,16 @@ After captures start entering the public dataset, compare the suite against the 
 ## Digital QA before physical capture
 
 You can run OCR against the generated digital pages with `benchmark-capture-suite` to catch template/pipeline regressions before printing. These numbers are explicitly **not** real benchmark accuracy. See [capture-suite-qa.md](capture-suite-qa.md).
+
+## Share a collector-safe kit
+
+Do not hand contributors the full suite directory. Build a reproducible collector ZIP that excludes ground truth, digital source pages, and internal paths:
+
+```bash
+lao-ocr build-capture-kit \
+  --suite-manifest benchmarks/capture-packs/baseline-suite-v1/capture-suite.json \
+  --output baseline-suite-v1.collector.zip \
+  --revision "$(git rev-parse HEAD)"
+```
+
+See [capture-kit.md](capture-kit.md).

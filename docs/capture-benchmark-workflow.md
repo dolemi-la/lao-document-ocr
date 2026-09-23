@@ -93,6 +93,8 @@ For multi-layout campaigns, generate one combined suite instead of separate pack
 
 New capture packs include a `page-id:qr-v1` marker in the top-right header. Keep it visible when printing/capturing. `register-capture-directory` uses it to map raw scanner/phone filenames back to the correct ground truth and rejects filename/QR disagreements.
 
+Before sending printable pages to contributors, package them with `build-capture-kit` so collectors receive no ground truth or digital source pages. See [capture-kit.md](capture-kit.md).
+
 ## 3. Capture real optical versions
 
 Print at approximately 100% scale.
