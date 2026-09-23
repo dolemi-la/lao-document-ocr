@@ -208,3 +208,19 @@ lao-ocr compare-benchmarks \
 ```
 
 The comparator rejects sample-set/label mismatches, requires overall CER improvement by default, and caps regressions on shared subsets/tags. See [../docs/benchmark-comparison.md](../docs/benchmark-comparison.md).
+
+## Freeze the reviewed test set
+
+Before publishing baseline/candidate numbers, freeze the reviewed test split:
+
+```bash
+lao-ocr freeze-benchmark \
+  --manifest benchmarks/manifest-v1.jsonl \
+  --dataset-root benchmarks/public \
+  --split test \
+  --output-manifest benchmarks/frozen/test-v1.jsonl \
+  --output-lock benchmarks/frozen/test-v1.lock.json \
+  --revision "$(git rev-parse HEAD)"
+```
+
+Verify the lock before every published benchmark run with `verify-benchmark-freeze`. See [../docs/benchmark-freeze.md](../docs/benchmark-freeze.md).

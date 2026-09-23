@@ -43,6 +43,7 @@ Status: in progress
 - [ ] receipts/forms as separate subsets
 - [x] CER/WER reporting by subset
 - [x] benchmark release bundle with report SHA-256/source revision
+- [x] frozen test-set manifest/lock with file hashes
 - [ ] Tesseract baseline report
 
 Exit condition: every model change can be measured on a fixed, legal, documented dataset.

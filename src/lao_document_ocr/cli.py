@@ -89,6 +89,29 @@ def _parser() -> argparse.ArgumentParser:
     dataset_report.add_argument("--output", required=True, type=Path)
     dataset_report.add_argument("--no-hash-check", action="store_true")
 
+    freeze = subparsers.add_parser(
+        "freeze-benchmark",
+        help="Freeze one dataset split into a hashed benchmark manifest + lock file.",
+    )
+    freeze.add_argument("--manifest", required=True, type=Path)
+    freeze.add_argument("--dataset-root", required=True, type=Path)
+    freeze.add_argument("--output-manifest", required=True, type=Path)
+    freeze.add_argument("--output-lock", required=True, type=Path)
+    freeze.add_argument(
+        "--split",
+        choices=[split.value for split in DatasetSplit],
+        default=DatasetSplit.TEST.value,
+    )
+    freeze.add_argument("--revision")
+
+    verify_freeze = subparsers.add_parser(
+        "verify-benchmark-freeze",
+        help="Verify a frozen benchmark manifest and all locked file hashes.",
+    )
+    verify_freeze.add_argument("--lock", required=True, type=Path)
+    verify_freeze.add_argument("--dataset-root", required=True, type=Path)
+    verify_freeze.add_argument("--manifest", type=Path)
+
     layout_training = subparsers.add_parser(
         "prepare-layout-training-manifest",
         help="Build a JSONL training manifest from layout-labeled dataset samples.",
@@ -540,6 +563,40 @@ def _validate(args: argparse.Namespace) -> int:
 
     print(f"Valid dataset: {len(samples)} samples")
     print(json.dumps(counts, indent=2, sort_keys=True))
+    return 0
+
+
+def _freeze_benchmark(args: argparse.Namespace) -> int:
+    from lao_document_ocr.benchmark_freeze import freeze_benchmark
+
+    samples = load_manifest(args.manifest)
+    frozen_manifest, lock = freeze_benchmark(
+        samples,
+        args.dataset_root,
+        output_manifest=args.output_manifest,
+        output_lock=args.output_lock,
+        split=DatasetSplit(args.split),
+        source_manifest=args.manifest,
+        source_revision=args.revision,
+    )
+    print(f"Frozen manifest: {frozen_manifest}")
+    print(f"Benchmark lock: {lock}")
+    return 0
+
+
+def _verify_benchmark_freeze(args: argparse.Namespace) -> int:
+    from lao_document_ocr.benchmark_freeze import verify_benchmark_freeze
+
+    errors = verify_benchmark_freeze(
+        args.lock,
+        args.dataset_root,
+        manifest_path=args.manifest,
+    )
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+    print("Frozen benchmark verified")
     return 0
 
 
@@ -1166,6 +1223,10 @@ def main() -> int:
             return _validate(args)
         if args.command == "dataset-report":
             return _dataset_report(args)
+        if args.command == "freeze-benchmark":
+            return _freeze_benchmark(args)
+        if args.command == "verify-benchmark-freeze":
+            return _verify_benchmark_freeze(args)
         if args.command == "prepare-layout-training-manifest":
             return _prepare_layout_training_manifest(args)
         if args.command == "prepare-layout-targets":

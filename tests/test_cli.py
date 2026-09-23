@@ -949,3 +949,139 @@ def test_compare_benchmarks_cli_returns_one_on_regression(
     )
 
     assert main() == 1
+
+
+def test_freeze_and_verify_benchmark_cli(tmp_path, monkeypatch, capsys) -> None:
+    import hashlib
+
+    image = tmp_path / "page.png"
+    truth = tmp_path / "page.txt"
+    Image.new("RGB", (100, 60), (200, 255, 255)).save(image)
+    truth.write_text("ສະບາຍດີ", encoding="utf-8")
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    source_manifest = tmp_path / "source.jsonl"
+    source_manifest.write_text(
+        json.dumps(
+            {
+                "id": "sample-001",
+                "document_id": "doc-001",
+                "split": "test",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI freeze test",
+                "sha256": digest,
+                "tags": ["language:lao"],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    frozen = tmp_path / "frozen.jsonl"
+    lock = tmp_path / "benchmark.lock.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "freeze-benchmark",
+            "--manifest",
+            str(source_manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output-manifest",
+            str(frozen),
+            "--output-lock",
+            str(lock),
+            "--revision",
+            "abc123",
+        ],
+    )
+    assert main() == 0
+    assert frozen.is_file()
+    assert lock.is_file()
+    assert "Benchmark lock:" in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "verify-benchmark-freeze",
+            "--lock",
+            str(lock),
+            "--dataset-root",
+            str(tmp_path),
+        ],
+    )
+    assert main() == 0
+    assert "Frozen benchmark verified" in capsys.readouterr().out
+
+
+def test_verify_benchmark_freeze_cli_detects_tamper(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import hashlib
+
+    image = tmp_path / "page.png"
+    truth = tmp_path / "page.txt"
+    Image.new("RGB", (100, 60), (180, 255, 255)).save(image)
+    truth.write_text("truth", encoding="utf-8")
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    source_manifest = tmp_path / "source.jsonl"
+    source_manifest.write_text(
+        json.dumps(
+            {
+                "id": "sample-001",
+                "document_id": "doc-001",
+                "split": "test",
+                "subset": "clean-print",
+                "source": image.name,
+                "ground_truth": truth.name,
+                "license": "CC0-1.0",
+                "provenance": "CLI freeze test",
+                "sha256": digest,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    frozen = tmp_path / "frozen.jsonl"
+    lock = tmp_path / "lock.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "freeze-benchmark",
+            "--manifest",
+            str(source_manifest),
+            "--dataset-root",
+            str(tmp_path),
+            "--output-manifest",
+            str(frozen),
+            "--output-lock",
+            str(lock),
+        ],
+    )
+    assert main() == 0
+
+    truth.write_text("tampered", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "verify-benchmark-freeze",
+            "--lock",
+            str(lock),
+            "--dataset-root",
+            str(tmp_path),
+        ],
+    )
+    assert main() == 1
