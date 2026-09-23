@@ -106,6 +106,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] filesystem result-storage adapter abstraction baseline
 - [x] S3-compatible/object-storage result adapter
 - [x] baseline security hardening/review (uploads, parser caps, headers, permissions, non-root API)
+- [x] automated Python/web dependency vulnerability scanning + Dependabot
 - [ ] external deployment penetration/security review
 - [x] Lao/English web accessibility baseline
 - [x] Lao/English web localization baseline

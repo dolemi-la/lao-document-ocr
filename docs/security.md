@@ -107,3 +107,24 @@ When adding new third-party assets/services, update the policy deliberately rath
 This baseline does not replace an external security assessment. Before exposing a high-volume public service, also consider reverse-proxy request/body/time limits, container CPU/memory/pid limits, network egress restrictions, TLS/HSTS at the edge, dependency/SBOM scanning, malware/content scanning if arbitrary public uploads are retained, authentication/authorization for private per-user documents, external queue/object-storage permissions, penetration testing, and abuse monitoring.
 
 The open-source local mode intentionally remains usable without account infrastructure.
+
+## Automated dependency scanning
+
+CI includes a dedicated dependency-security job.
+
+Python runtime plus optional S3 dependencies are extracted directly from `pyproject.toml` and audited with `pip-audit --strict`. The local project package itself is not treated as a PyPI dependency.
+
+Web production dependencies are audited with:
+
+```bash
+pnpm audit --prod --audit-level high
+```
+
+GitHub Dependabot is configured weekly for:
+
+- Python / `pyproject.toml`
+- pnpm / npm ecosystem under `apps/web`
+- Docker dependencies
+- GitHub Actions
+
+A dependency-audit failure should be fixed or explicitly reviewed before merge rather than silently disabled.
