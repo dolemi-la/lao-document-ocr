@@ -64,6 +64,8 @@ OCR_PSM = int(os.getenv("OCR_PSM", "3"))
 OCR_MODEL_PATH = os.getenv("OCR_MODEL_PATH") or None
 OCR_CALIBRATION_PATH = os.getenv("OCR_CALIBRATION_PATH") or None
 OCR_DEVICE = os.getenv("OCR_DEVICE", "cpu").strip().lower()
+OCR_DECODER = os.getenv("OCR_DECODER", "greedy").strip().lower()
+OCR_BEAM_WIDTH = int(os.getenv("OCR_BEAM_WIDTH", "10"))
 OCR_LAYOUT_DETECTOR = os.getenv(
     "OCR_LAYOUT_DETECTOR",
     "morphology",
@@ -279,6 +281,8 @@ def _cached_owned_engine(
     model_path: str,
     calibration_path: str | None,
     device: str,
+    decoder: str,
+    beam_width: int,
     region_detector_name: str,
     layout_model_path: str | None,
     layout_confidence_threshold: float,
@@ -287,6 +291,8 @@ def _cached_owned_engine(
         model_path,
         calibration_path=calibration_path,
         device=device,
+        decoder=decoder,
+        beam_width=beam_width,
         region_detector_name=region_detector_name,
         layout_model_path=layout_model_path,
         layout_confidence_threshold=layout_confidence_threshold,
@@ -344,6 +350,8 @@ def _engine() -> OcrEngine:
             OCR_MODEL_PATH,
             OCR_CALIBRATION_PATH,
             OCR_DEVICE,
+            OCR_DECODER,
+            OCR_BEAM_WIDTH,
             OCR_LAYOUT_DETECTOR,
             OCR_LAYOUT_MODEL_PATH,
             OCR_LAYOUT_CONFIDENCE,

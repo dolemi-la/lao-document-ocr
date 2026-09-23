@@ -192,6 +192,8 @@ Override them with:
 - `OCR_LANGUAGES`
 - `OCR_PSM`
 - `OCR_MODEL_PATH` (required for `OCR_ENGINE=owned`)
+- `OCR_DECODER=greedy|beam`
+- `OCR_BEAM_WIDTH`
 - `OCR_CALIBRATION_PATH` (optional for the owned recognizer)
 - `OCR_DEVICE` (`cpu`, `cuda`, `mps`, or `auto`; default `cpu`)
 - `OCR_LAYOUT_DETECTOR` (`morphology` or `learned`)
@@ -320,6 +322,8 @@ See [docs/architecture.md](docs/architecture.md).
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).
+
+Recognizer development includes an optional CTC prefix beam-search decoder; greedy remains the default.
 
 Recognizer development: [docs/recognizer-training.md](docs/recognizer-training.md).
 

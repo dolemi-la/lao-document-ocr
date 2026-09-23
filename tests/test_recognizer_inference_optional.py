@@ -172,3 +172,113 @@ def test_unavailable_explicit_accelerator_has_clear_error() -> None:
     if not mps_available:
         with pytest.raises(RuntimeError, match="MPS was requested"):
             resolve_torch_device("mps")
+
+
+def _export_test_recognizer(tmp_path):
+    vocab = CharacterVocabulary.from_texts(["ab"])
+    config = RecognizerConfig(
+        image_height=48,
+        max_width=128,
+        cnn_channels=64,
+        hidden_size=32,
+        lstm_layers=1,
+    )
+    model = LaoCrnnRecognizer(vocab.size, config)
+    model.eval()
+    example = torch.zeros((1, 1, config.image_height, config.max_width))
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"The tensor attributes .* were assigned during export.*",
+            category=UserWarning,
+        )
+        exported = torch.export.export(model, (example,))
+    artifact = tmp_path / "decoder-recognizer.pt2"
+    torch.export.save(exported, artifact)
+    metadata = {
+        "schema_version": "1",
+        "format": "torch-export",
+        "model": "LaoCrnnRecognizer",
+        "artifact": artifact.name,
+        "artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+        "vocabulary": vocab.to_dict(),
+        "vocabulary_checksum": vocab.checksum(),
+        "model_config": config.to_dict(),
+        "width_downsample_factor": model.width_downsample_factor,
+    }
+    artifact.with_suffix(".pt2.json").write_text(
+        json.dumps(metadata),
+        encoding="utf-8",
+    )
+    return artifact
+
+
+def test_recognizer_rejects_invalid_decoder_configuration(tmp_path) -> None:
+    artifact = _export_test_recognizer(tmp_path)
+
+    with pytest.raises(ValueError, match="decoder must be one of"):
+        ExportedLineRecognizer(artifact, decoder="unknown")
+    with pytest.raises(ValueError, match="beam_width"):
+        ExportedLineRecognizer(artifact, decoder="beam", beam_width=0)
+
+
+def test_beam_decoder_is_reported_in_runtime_metadata(tmp_path) -> None:
+    artifact = _export_test_recognizer(tmp_path)
+    recognizer = ExportedLineRecognizer(
+        artifact,
+        decoder="beam",
+        beam_width=7,
+    )
+
+    assert recognizer.metadata["decoder"] == "beam"
+    assert recognizer.metadata["beam_width"] == 7
+
+
+def test_beam_decoder_rejects_greedy_calibration(tmp_path) -> None:
+    artifact = _export_test_recognizer(tmp_path)
+    calibration = ConfidenceCalibration(
+        schema_version="1",
+        method="greedy-test",
+        sample_count=2,
+        bins=(CalibrationBin(0.0, 1.0, 0.5, 0.99, 2),),
+        raw_mae=0.1,
+        calibrated_mae=0.05,
+        decoder="greedy",
+    )
+    calibration_path = calibration.save(tmp_path / "greedy-calibration.json")
+
+    with pytest.raises(ValueError, match="decoder mismatch"):
+        ExportedLineRecognizer(
+            artifact,
+            calibration_path=calibration_path,
+            decoder="beam",
+            beam_width=5,
+        )
+
+
+def test_beam_decoder_applies_matching_calibration(tmp_path) -> None:
+    artifact = _export_test_recognizer(tmp_path)
+    calibration = ConfidenceCalibration(
+        schema_version="1",
+        method="beam-test",
+        sample_count=2,
+        bins=(CalibrationBin(0.0, 1.0, 0.5, 0.77, 2),),
+        raw_mae=0.1,
+        calibrated_mae=0.05,
+        decoder="beam",
+    )
+    calibration_path = calibration.save(tmp_path / "beam-calibration.json")
+    image_path = tmp_path / "beam-line.png"
+    Image.new("L", (80, 32), 255).save(image_path)
+
+    recognizer = ExportedLineRecognizer(
+        artifact,
+        calibration_path=calibration_path,
+        decoder="beam",
+        beam_width=5,
+    )
+    result = recognizer.recognize(image_path)
+
+    assert isinstance(result.text, str)
+    assert 0 <= result.confidence <= 1
+    assert result.calibrated_confidence == pytest.approx(0.77)

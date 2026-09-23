@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 
 from lao_document_ocr.confidence_calibration import ConfidenceCalibration
+from lao_document_ocr.ctc_decoding import ctc_prefix_beam_search
 from lao_document_ocr.recognizer_training import prepare_line_image, prepare_line_pil_image
 from lao_document_ocr.vocabulary import CharacterVocabulary
 
@@ -75,6 +76,8 @@ class ExportedLineRecognizer:
         *,
         calibration_path: str | Path | None = None,
         device: str = "cpu",
+        decoder: str = "greedy",
+        beam_width: int = 10,
     ) -> None:
         torch = _require_torch()
         self.artifact_path = Path(artifact_path)
@@ -89,9 +92,18 @@ class ExportedLineRecognizer:
         if expected_sha256 and _sha256_file(self.artifact_path) != expected_sha256:
             raise ValueError("Recognizer artifact SHA-256 does not match metadata")
         self.device = resolve_torch_device(device)
+        decoder_name = decoder.strip().lower()
+        if decoder_name not in {"greedy", "beam"}:
+            raise ValueError("decoder must be one of: greedy, beam")
+        if beam_width < 1:
+            raise ValueError("beam_width must be at least 1")
+        self.decoder = decoder_name
+        self.beam_width = beam_width
         self.metadata = {
             **metadata,
             "runtime_device": str(self.device),
+            "decoder": self.decoder,
+            "beam_width": self.beam_width if self.decoder == "beam" else None,
         }
 
         model_config = metadata["model_config"]
@@ -101,8 +113,18 @@ class ExportedLineRecognizer:
         self.vocabulary = CharacterVocabulary(tuple(metadata["vocabulary"]["characters"]))
 
         self.calibration = (
-            ConfidenceCalibration.load(calibration_path) if calibration_path is not None else None
+            ConfidenceCalibration.load(calibration_path)
+            if calibration_path is not None
+            else None
         )
+        if (
+            self.calibration is not None
+            and self.calibration.decoder != self.decoder
+        ):
+            raise ValueError(
+                "Confidence calibration decoder mismatch "
+                f"({self.calibration.decoder} != {self.decoder})"
+            )
 
         exported = torch.export.load(str(self.artifact_path))
         self.model = exported.module().to(self.device)
@@ -121,12 +143,40 @@ class ExportedLineRecognizer:
         valid = log_probs[:valid_timesteps, 0, :].detach().cpu()
 
         probabilities = valid.exp()
-        max_probabilities, token_ids = probabilities.max(dim=-1)
-        text = self.vocabulary.decode_ctc(token_ids.tolist())
-        confidence = float(max_probabilities.mean().item()) if valid_timesteps else 0.0
-        calibrated_confidence = (
-            self.calibration.calibrate(confidence) if self.calibration is not None else None
-        )
+        if self.decoder == "beam":
+            decoded = ctc_prefix_beam_search(
+                valid.numpy(),
+                beam_width=self.beam_width,
+            )
+            mapping = self.vocabulary.id_to_char
+            try:
+                text = "".join(mapping[token_id] for token_id in decoded.token_ids)
+            except KeyError as exc:
+                raise ValueError(
+                    f"Beam decoder returned token outside vocabulary: {exc.args[0]}"
+                ) from exc
+            confidence = float(
+                np.exp(decoded.log_probability / max(1, valid_timesteps))
+            )
+            confidence = max(0.0, min(1.0, confidence))
+            calibrated_confidence = (
+                self.calibration.calibrate(confidence)
+                if self.calibration is not None
+                else None
+            )
+        else:
+            max_probabilities, token_ids = probabilities.max(dim=-1)
+            text = self.vocabulary.decode_ctc(token_ids.tolist())
+            confidence = (
+                float(max_probabilities.mean().item())
+                if valid_timesteps
+                else 0.0
+            )
+            calibrated_confidence = (
+                self.calibration.calibrate(confidence)
+                if self.calibration is not None
+                else None
+            )
         return RecognitionResult(
             text=text,
             confidence=confidence,

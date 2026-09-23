@@ -181,3 +181,14 @@ OCR_READING_ORDER_MAX_BLOCKS=256
 ```
 
 Both optional models use the same `OCR_DEVICE` as the recognizer.
+
+## Decoder settings
+
+The GPU preset also exposes:
+
+```text
+OCR_DECODER=greedy
+OCR_BEAM_WIDTH=10
+```
+
+Beam search currently runs its prefix-search logic on CPU after model logits are produced, so it can increase end-to-end latency even when neural inference runs on CUDA. Keep greedy as the default unless frozen-benchmark results justify beam decoding.

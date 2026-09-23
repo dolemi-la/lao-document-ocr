@@ -62,6 +62,8 @@ To use the project-owned recognizer, install the training/inference dependencies
 OCR_ENGINE=owned
 OCR_MODEL_PATH=/models/recognizer.pt2
 OCR_CALIBRATION_PATH=/models/calibration.json   # optional
+OCR_DECODER=greedy                              # greedy | beam
+OCR_BEAM_WIDTH=10                               # used when decoder=beam
 ```
 
 The API health endpoint reports the selected engine and model metadata.
@@ -160,3 +162,7 @@ The hints are applied conservatively and do not fabricate missing table cells or
 With `OCR_LAYOUT_DETECTOR=learned`, the same layout model can preserve predicted `image` regions as real image blocks in the document AST/DOCX. The owned engine exposes the layout model as both its text-region and visual-region detector.
 
 Learned visual boxes are de-duplicated against OCR text/table/native-PDF regions before the deterministic raster and diagram fallbacks run.
+
+## Decoder policy
+
+Greedy decoding remains the production default. Prefix beam search is available as an experimental owned-recognizer option. Calibration files are decoder-specific; do not reuse a greedy calibration with beam decoding.

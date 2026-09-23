@@ -51,6 +51,12 @@ def _parser() -> argparse.ArgumentParser:
         default="cpu",
     )
     convert.add_argument(
+        "--decoder",
+        choices=["greedy", "beam"],
+        default="greedy",
+    )
+    convert.add_argument("--beam-width", type=int, default=10)
+    convert.add_argument(
         "--layout-detector",
         choices=["morphology", "learned"],
         default="morphology",
@@ -244,6 +250,12 @@ def _parser() -> argparse.ArgumentParser:
         choices=["cpu", "cuda", "mps", "auto"],
         default="cpu",
     )
+    benchmark.add_argument(
+        "--decoder",
+        choices=["greedy", "beam"],
+        default="greedy",
+    )
+    benchmark.add_argument("--beam-width", type=int, default=10)
     benchmark.add_argument(
         "--layout-detector",
         choices=["morphology", "learned"],
@@ -475,6 +487,12 @@ def _parser() -> argparse.ArgumentParser:
         choices=["cpu", "cuda", "mps", "auto"],
         default="cpu",
     )
+    recognize.add_argument(
+        "--decoder",
+        choices=["greedy", "beam"],
+        default="greedy",
+    )
+    recognize.add_argument("--beam-width", type=int, default=10)
 
     recognizer_benchmark = subparsers.add_parser(
         "benchmark-recognizer",
@@ -490,6 +508,12 @@ def _parser() -> argparse.ArgumentParser:
         choices=["cpu", "cuda", "mps", "auto"],
         default="cpu",
     )
+    recognizer_benchmark.add_argument(
+        "--decoder",
+        choices=["greedy", "beam"],
+        default="greedy",
+    )
+    recognizer_benchmark.add_argument("--beam-width", type=int, default=10)
 
     calibrate = subparsers.add_parser(
         "calibrate-recognizer",
@@ -516,6 +540,8 @@ def _convert_document(args: argparse.Namespace) -> int:
             args.model,
             calibration_path=args.calibration,
             device=args.device,
+            decoder=args.decoder,
+            beam_width=args.beam_width,
             region_detector_name=args.layout_detector,
             layout_model_path=args.layout_model,
             layout_confidence_threshold=args.layout_confidence,
@@ -852,6 +878,8 @@ def _benchmark(args: argparse.Namespace) -> int:
             args.model,
             calibration_path=args.calibration,
             device=args.device,
+            decoder=args.decoder,
+            beam_width=args.beam_width,
             region_detector_name=args.layout_detector,
             layout_model_path=args.layout_model,
             layout_confidence_threshold=args.layout_confidence,
@@ -1180,6 +1208,8 @@ def _recognize_line(args: argparse.Namespace) -> int:
         args.model,
         calibration_path=args.calibration,
         device=args.device,
+        decoder=args.decoder,
+        beam_width=args.beam_width,
     )
     result = recognizer.recognize(args.image)
     print(result.text)
@@ -1208,6 +1238,8 @@ def _benchmark_recognizer(args: argparse.Namespace) -> int:
         args.model,
         calibration_path=args.calibration,
         device=args.device,
+        decoder=args.decoder,
+        beam_width=args.beam_width,
     )
     report = benchmark_recognizer(samples, recognizer)
     output = write_recognizer_report(report, args.output)

@@ -129,3 +129,40 @@ A small local sanity run was used to verify that the training code can actually 
 These figures are **not model accuracy claims**. The text set is tiny, synthetic, and contains multiple augmented variants of the same phrases. Its only purpose is a training-pipeline sanity check.
 
 An earlier initialization collapsed entirely to CTC blank predictions even while loss decreased. `crnn-ctc-v2` therefore initializes the blank-class output bias negatively. Keep an explicit blank-collapse sanity test when changing the recognizer architecture or loss setup.
+
+## Decoder selection
+
+Greedy CTC decoding remains the default:
+
+```bash
+lao-ocr recognize-line \
+  --model training/runs/crnn-v2/recognizer.pt2 \
+  --image line.png \
+  --decoder greedy
+```
+
+An optional prefix beam-search decoder is available for model-development experiments:
+
+```bash
+lao-ocr recognize-line \
+  --model training/runs/crnn-v2/recognizer.pt2 \
+  --image line.png \
+  --decoder beam \
+  --beam-width 10
+```
+
+The same `--decoder` / `--beam-width` options are supported by `benchmark-recognizer`, full-page `benchmark`, and owned-model document conversion.
+
+Beam decoding uses log-space CTC prefix beam search and returns the highest summed CTC prefix probability rather than merely collapsing the single most likely path.
+
+### Confidence calibration is decoder-specific
+
+Greedy and beam decoders produce different raw confidence distributions. Calibration artifacts therefore record the decoder they were fitted from.
+
+- legacy calibration files without a decoder field are treated as `greedy`;
+- a greedy calibration cannot be loaded with beam decoding;
+- fit a separate calibration from a beam-decoded held-out development report before using calibrated beam confidence.
+
+### Current sanity result
+
+On the existing 60-image synthetic overfit sanity set, `beam-width=10` produced the same CER as greedy (`~0.5143`), slightly worse WER, and roughly twice the runtime. This is **not a real-world accuracy result** and is not evidence to change the default decoder. Decoder choice should be decided only on the frozen rights-clear real benchmark.

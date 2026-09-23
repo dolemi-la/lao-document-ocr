@@ -57,3 +57,33 @@ def test_load_rejects_unknown_schema(tmp_path) -> None:
     path.write_text(json.dumps({"schema_version": "99"}), encoding="utf-8")
     with pytest.raises(ValueError, match="schema"):
         ConfidenceCalibration.load(path)
+
+
+def test_fit_from_beam_report_records_decoder() -> None:
+    report = {
+        "model": {"decoder": "beam"},
+        "samples": [
+            {"uncalibrated_confidence": 0.3, "cer": 0.8},
+            {"uncalibrated_confidence": 0.9, "cer": 0.1},
+        ],
+    }
+    calibration = fit_from_recognizer_report(report, max_bins=2)
+    assert calibration.decoder == "beam"
+
+
+def test_legacy_calibration_without_decoder_loads_as_greedy(tmp_path) -> None:
+    path = tmp_path / "legacy.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "method": "legacy",
+                "sample_count": 0,
+                "raw_mae": 0.0,
+                "calibrated_mae": 0.0,
+                "bins": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert ConfidenceCalibration.load(path).decoder == "greedy"

@@ -29,6 +29,8 @@ class OwnedRecognizerEngine(OcrEngine):
         *,
         calibration_path: str | Path | None = None,
         device: str = "cpu",
+        decoder: str = "greedy",
+        beam_width: int = 10,
         recognizer: ImageLineRecognizer | None = None,
         region_detector: TextRegionDetector | None = None,
         region_detector_name: str = "morphology",
@@ -78,6 +80,8 @@ class OwnedRecognizerEngine(OcrEngine):
                 model_path,
                 calibration_path=calibration_path,
                 device=device,
+                decoder=decoder,
+                beam_width=beam_width,
             )
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
             raise OcrEngineError(f"Could not load owned recognizer: {exc}") from exc

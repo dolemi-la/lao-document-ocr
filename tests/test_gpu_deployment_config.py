@@ -21,6 +21,8 @@ def test_gpu_compose_selects_owned_engine_and_accelerator() -> None:
     assert "Dockerfile.owned-api" in content
     assert "OCR_ENGINE: owned" in content
     assert 'OCR_DEVICE: "${OCR_DEVICE:-cuda}"' in content
+    assert 'OCR_DECODER: "${OCR_DECODER:-greedy}"' in content
+    assert 'OCR_BEAM_WIDTH: "${OCR_BEAM_WIDTH:-10}"' in content
     assert 'JOB_MAX_WORKERS: "${GPU_JOB_MAX_WORKERS:-1}"' in content
     assert 'JOB_MAX_ACTIVE: "${GPU_JOB_MAX_ACTIVE:-4}"' in content
     assert 'gpus: all' in content
@@ -30,6 +32,8 @@ def test_gpu_compose_selects_owned_engine_and_accelerator() -> None:
 def test_gpu_preset_defaults_to_one_worker() -> None:
     content = GPU_ENV.read_text(encoding="utf-8")
     assert "OCR_DEVICE=cuda" in content
+    assert "OCR_DECODER=greedy" in content
+    assert "OCR_BEAM_WIDTH=10" in content
     assert "GPU_JOB_MAX_WORKERS=1" in content
     assert "GPU_JOB_MAX_ACTIVE=4" in content
     assert "TORCH_INDEX_URL=" in content
@@ -38,6 +42,8 @@ def test_gpu_preset_defaults_to_one_worker() -> None:
 def test_api_exposes_owned_recognizer_device_setting() -> None:
     content = MAIN.read_text(encoding="utf-8")
     assert 'OCR_DEVICE = os.getenv("OCR_DEVICE", "cpu")' in content
+    assert 'OCR_DECODER = os.getenv("OCR_DECODER", "greedy")' in content
+    assert 'OCR_BEAM_WIDTH = int(os.getenv("OCR_BEAM_WIDTH", "10"))' in content
     assert "_cached_owned_engine" in content
     assert "device=OCR_DEVICE" not in content
     assert "OCR_DEVICE," in content

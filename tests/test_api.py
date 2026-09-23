@@ -798,6 +798,8 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
             *,
             calibration_path,
             device,
+            decoder,
+            beam_width,
             region_detector_name,
             layout_model_path,
             layout_confidence_threshold,
@@ -807,6 +809,8 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
                     "model_path": model_path,
                     "calibration_path": calibration_path,
                     "device": device,
+                    "decoder": decoder,
+                    "beam_width": beam_width,
                     "region_detector_name": region_detector_name,
                     "layout_model_path": layout_model_path,
                     "layout_confidence_threshold": layout_confidence_threshold,
@@ -818,6 +822,8 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
     monkeypatch.setattr(api_main, "OCR_MODEL_PATH", "/models/recognizer.pt2")
     monkeypatch.setattr(api_main, "OCR_CALIBRATION_PATH", "/models/calibration.json")
     monkeypatch.setattr(api_main, "OCR_DEVICE", "cuda")
+    monkeypatch.setattr(api_main, "OCR_DECODER", "beam")
+    monkeypatch.setattr(api_main, "OCR_BEAM_WIDTH", 7)
     monkeypatch.setattr(api_main, "OCR_LAYOUT_DETECTOR", "learned")
     monkeypatch.setattr(api_main, "OCR_LAYOUT_MODEL_PATH", "/models/layout.pt2")
     monkeypatch.setattr(api_main, "OCR_LAYOUT_CONFIDENCE", 0.61)
@@ -831,6 +837,8 @@ def test_owned_engine_is_cached_and_receives_device(monkeypatch) -> None:
                 "model_path": "/models/recognizer.pt2",
                 "calibration_path": "/models/calibration.json",
                 "device": "cuda",
+                "decoder": "beam",
+                "beam_width": 7,
                 "region_detector_name": "learned",
                 "layout_model_path": "/models/layout.pt2",
                 "layout_confidence_threshold": 0.61,

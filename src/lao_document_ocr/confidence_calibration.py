@@ -23,6 +23,7 @@ class ConfidenceCalibration:
     bins: tuple[CalibrationBin, ...]
     raw_mae: float
     calibrated_mae: float
+    decoder: str = "greedy"
 
     def calibrate(self, confidence: float) -> float:
         if not self.bins:
@@ -46,6 +47,7 @@ class ConfidenceCalibration:
             "sample_count": self.sample_count,
             "raw_mae": self.raw_mae,
             "calibrated_mae": self.calibrated_mae,
+            "decoder": self.decoder,
             "bins": [asdict(bucket) for bucket in self.bins],
         }
 
@@ -71,6 +73,7 @@ class ConfidenceCalibration:
             bins=bins,
             raw_mae=float(payload.get("raw_mae", 0.0)),
             calibrated_mae=float(payload.get("calibrated_mae", 0.0)),
+            decoder=str(payload.get("decoder", "greedy")),
         )
 
 
@@ -88,11 +91,15 @@ def fit_confidence_calibration(
     points: list[tuple[float, float]],
     *,
     max_bins: int = 10,
+    decoder: str = "greedy",
 ) -> ConfidenceCalibration:
     if len(points) < 2:
         raise ValueError("At least two calibration points are required")
     if max_bins < 1:
         raise ValueError("max_bins must be at least 1")
+    decoder = decoder.strip().lower()
+    if decoder not in {"greedy", "beam"}:
+        raise ValueError("decoder must be one of: greedy, beam")
 
     validated = sorted(_validate_point(*point) for point in points)
     bin_count = min(max_bins, len(validated))
@@ -120,6 +127,7 @@ def fit_confidence_calibration(
         bins=tuple(bins),
         raw_mae=0.0,
         calibrated_mae=0.0,
+        decoder=decoder,
     )
     raw_mae = sum(abs(confidence - accuracy) for confidence, accuracy in validated) / len(
         validated
@@ -136,6 +144,7 @@ def fit_confidence_calibration(
         bins=tuple(bins),
         raw_mae=raw_mae,
         calibrated_mae=calibrated_mae,
+        decoder=decoder,
     )
 
 
@@ -154,4 +163,14 @@ def fit_from_recognizer_report(
         points.append((float(confidence), accuracy))
     if len(points) < 2:
         raise ValueError("Recognizer report has fewer than two usable calibration samples")
-    return fit_confidence_calibration(points, max_bins=max_bins)
+    model = report.get("model")
+    decoder = (
+        str(model.get("decoder", "greedy"))
+        if isinstance(model, dict)
+        else "greedy"
+    )
+    return fit_confidence_calibration(
+        points,
+        max_bins=max_bins,
+        decoder=decoder,
+    )

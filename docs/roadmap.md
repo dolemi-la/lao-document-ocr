@@ -59,6 +59,7 @@ Status: started
 - [x] line recognizer training pipeline (CRNN + CTC)
 - [x] model export for CPU inference (`torch.export`)
 - [x] confidence calibration pipeline (held-out dev report -> calibration artifact)
+- [x] optional CTC prefix beam-search decoder + decoder-specific calibration
 - [x] versioned checkpoints/artifact checksums
 - [x] exported-recognizer regression benchmark pipeline
 - [x] fixed-set owned-vs-Tesseract benchmark comparison gate

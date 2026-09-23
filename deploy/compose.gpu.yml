@@ -9,6 +9,8 @@ services:
     environment:
       OCR_ENGINE: owned
       OCR_DEVICE: "${OCR_DEVICE:-cuda}"
+      OCR_DECODER: "${OCR_DECODER:-greedy}"
+      OCR_BEAM_WIDTH: "${OCR_BEAM_WIDTH:-10}"
       OCR_MODEL_PATH: /models/recognizer.pt2
       OCR_CALIBRATION_PATH: "${OCR_CALIBRATION_PATH:-}"
       OCR_LAYOUT_DETECTOR: "${OCR_LAYOUT_DETECTOR:-morphology}"
