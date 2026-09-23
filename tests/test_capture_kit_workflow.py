@@ -34,7 +34,7 @@ def test_capture_kit_workflow_uploads_only_collector_zip_and_checksum() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     upload_section = text.split("- name: Upload collector kit", 1)[1]
 
-    assert "actions/upload-artifact@v4" in upload_section
+    assert "actions/upload-artifact@v7" in upload_section
     assert "project-authored-lao-v1.collector.zip" in upload_section
     assert "project-authored-lao-v1.collector.zip.sha256" in upload_section
     assert "capture-suite.json" not in upload_section
