@@ -5,6 +5,7 @@ import re
 from enum import StrEnum
 from pathlib import Path
 
+from lao_document_ocr.capture_authenticity import compare_capture_to_digital_source
 from lao_document_ocr.capture_pack import (
     capture_pack_page,
     load_capture_pack,
@@ -76,6 +77,22 @@ def register_capture(
     if not capture_path.is_file():
         raise FileNotFoundError(f"Capture image not found: {capture_path}")
 
+    authenticity = compare_capture_to_digital_source(
+        digital_page,
+        capture_path,
+    )
+    if not authenticity.has_visible_content:
+        raise ValueError(
+            "Capture image has too little visible page content; "
+            "submit a real scan/photo of the printed page."
+        )
+    if authenticity.likely_digital_copy:
+        raise ValueError(
+            "Capture image is visually indistinguishable from the digital "
+            "capture-pack page. Submit a real optical scan/photo instead "
+            "of a copied, resized, or re-encoded source image."
+        )
+
     sample_id = f"{page_id}-{capture_id.strip()}"
     provenance = (
         f"Real-world {capture_mode.value} of project capture-pack page {page_id}; "
@@ -84,7 +101,10 @@ def register_capture(
     )
     combined_notes = (
         f"capture_pack={pack.pack_id}; page_id={page_id}; "
-        f"text_license={pack.text_license}; text_provenance={pack.text_provenance}"
+        f"text_license={pack.text_license}; text_provenance={pack.text_provenance}; "
+        f"digital_similarity_mae={authenticity.normalized_mae:.4f}; "
+        f"digital_similarity_dhash={authenticity.dhash_distance}; "
+        f"foreground_fraction={authenticity.foreground_fraction:.6f}"
     )
     if notes:
         combined_notes += f"; {notes.strip()}"
@@ -103,6 +123,7 @@ def register_capture(
         tags=[
             *page.tags,
             f"capture:{capture_mode.value}",
+            "capture:optical-evidence",
             "source:real-capture",
         ],
         rights_confirmed=True,

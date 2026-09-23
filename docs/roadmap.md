@@ -46,6 +46,7 @@ Status: in progress
 - [x] benchmark release bundle with report SHA-256/source revision
 - [x] frozen test-set manifest/lock with file hashes
 - [x] real-source benchmark readiness gate by coverage dimension
+- [x] capture optical-evidence integrity check against digital re-encodes
 - [x] benchmark command enforces frozen test-set lock
 - [ ] Tesseract baseline report
 

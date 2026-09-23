@@ -133,6 +133,28 @@ Useful natural variation:
 
 Do not deliberately damage devices or perform unsafe capture setups.
 
+## Optical-evidence integrity check
+
+`register-capture` does not accept a digital copy/re-encode of the generated capture-pack page as real benchmark evidence. Before registration it checks:
+
+- visible foreground/content is present
+- page aspect similarity
+- normalized grayscale mean absolute error
+- perceptual dHash distance
+
+Near-identical digital re-encodes are rejected with an instruction to submit a real scan/photo. Blank or nearly blank captures are also rejected.
+
+Accepted capture-pack registrations receive:
+
+```text
+capture:optical-evidence
+source:real-capture
+```
+
+and store the digital-source similarity diagnostics in the sample notes for audit/review.
+
+The check is intentionally conservative: it is meant to catch accidental digital copies, not to prove forensic camera/scanner provenance by itself. Manual review is still required before freezing a public benchmark.
+
 ## 4. Register a capture
 
 ```bash

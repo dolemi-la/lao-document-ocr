@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from PIL import Image, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 from lao_document_ocr.capture_pack import generate_capture_pack
 from lao_document_ocr.capture_registration import (
@@ -47,7 +47,11 @@ def _pack(tmp_path) -> Path:
 
 def _capture(tmp_path, name: str = "capture.jpg") -> Path:
     path = tmp_path / name
-    Image.new("RGB", (900, 1200), "white").save(path)
+    image = Image.new("RGB", (900, 1200), (225, 220, 210))
+    draw = ImageDraw.Draw(image)
+    for y in range(180, 900, 80):
+        draw.rectangle((130, y, 760, y + 20), fill="black")
+    image.save(path, quality=82)
     return path
 
 
@@ -77,6 +81,7 @@ def test_register_phone_capture_uses_pack_truth_and_phone_subset(tmp_path) -> No
     assert "capture:phone-photo" in sample.tags
     assert "layout:plain" in sample.tags
     assert "source:real-capture" in sample.tags
+    assert "capture:optical-evidence" in sample.tags
     assert (
         "language:lao" in sample.tags
         or "language:mixed" in sample.tags
@@ -201,3 +206,45 @@ def test_structured_template_tags_flow_into_real_capture(tmp_path) -> None:
     assert "layout:multi-column" in sample.tags
     assert "template:two-column" in sample.tags
     assert "capture:phone-photo" in sample.tags
+
+
+def test_digital_reencode_is_rejected_as_non_optical_capture(tmp_path) -> None:
+    pack = _pack(tmp_path)
+    source = pack.parent / "pages" / "capture-p0001.png"
+    copied = tmp_path / "copied.jpg"
+    with Image.open(source) as image:
+        image.convert("RGB").save(copied, quality=85)
+
+    with pytest.raises(ValueError, match="visually indistinguishable"):
+        register_capture(
+            capture_pack_manifest=pack,
+            page_id="capture-p0001",
+            capture_image=copied,
+            capture_id="copied",
+            capture_mode=CaptureMode.PHONE_PHOTO,
+            contributor="Example Contributor",
+            release_license="CC0-1.0",
+            dataset_root=tmp_path / "dataset-copy",
+            dataset_manifest=tmp_path / "dataset-copy" / "manifest.jsonl",
+            confirm_release=True,
+        )
+
+
+def test_blank_capture_is_rejected(tmp_path) -> None:
+    pack = _pack(tmp_path)
+    blank = tmp_path / "blank.jpg"
+    Image.new("RGB", (900, 1200), "white").save(blank)
+
+    with pytest.raises(ValueError, match="too little visible page content"):
+        register_capture(
+            capture_pack_manifest=pack,
+            page_id="capture-p0001",
+            capture_image=blank,
+            capture_id="blank",
+            capture_mode=CaptureMode.PHONE_PHOTO,
+            contributor="Example Contributor",
+            release_license="CC0-1.0",
+            dataset_root=tmp_path / "dataset-blank",
+            dataset_manifest=tmp_path / "dataset-blank" / "manifest.jsonl",
+            confirm_release=True,
+        )

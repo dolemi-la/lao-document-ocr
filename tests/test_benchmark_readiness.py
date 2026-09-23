@@ -33,7 +33,11 @@ def _sample(tmp_path, sample_id, subset, tags, *, document_id=None, layout=False
         license="CC0-1.0",
         provenance="readiness unit test",
         sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
-        tags=[*tags, "source:real-capture"],
+        tags=[
+            *tags,
+            "capture:optical-evidence",
+            "source:real-capture",
+        ],
     )
 
 
@@ -147,7 +151,9 @@ def test_unverified_source_override_is_for_local_smoke_only(tmp_path) -> None:
     samples = _complete_samples(tmp_path)
     for sample in samples:
         sample.tags = [
-            tag for tag in sample.tags if tag != "source:real-capture"
+            tag
+            for tag in sample.tags
+            if tag not in {"source:real-capture", "capture:optical-evidence"}
         ]
         sample.tags.append("source:capture-pack")
 

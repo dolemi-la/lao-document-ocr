@@ -44,14 +44,20 @@ This is why benchmark readiness uses multi-axis tags rather than forcing every s
 
 ## Real-source requirement
 
-By default, publication readiness only counts samples explicitly tagged as real optical evidence:
+By default, publication readiness only counts samples with accepted real-source evidence:
 
 ```text
-source:real-capture
 source:real-document
 ```
 
-Digital capture-pack pages and synthetic renders do **not** satisfy the release gate by themselves, even if they carry layout/capture-style tags. This prevents a synthetic-only test set from being reported as a real-world benchmark.
+or capture-pack registrations carrying both:
+
+```text
+source:real-capture
+capture:optical-evidence
+```
+
+Digital capture-pack pages and synthetic renders do **not** satisfy the release gate by themselves, even if they carry layout/capture-style tags. A `source:real-capture` tag without `capture:optical-evidence` is also excluded. This prevents synthetic/digital copies from being reported as real-world benchmark evidence.
 
 For local tooling smoke checks only, this guard can be bypassed with:
 

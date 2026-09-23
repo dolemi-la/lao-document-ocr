@@ -33,7 +33,13 @@ REAL_SOURCE_TAGS = {
 
 
 def _is_real_source(sample: DatasetSample) -> bool:
-    return bool(REAL_SOURCE_TAGS & set(sample.tags))
+    tags = set(sample.tags)
+    if "source:real-document" in tags:
+        return True
+    return (
+        "source:real-capture" in tags
+        and "capture:optical-evidence" in tags
+    )
 
 
 DEFAULT_COVERAGE_DIMENSIONS = (

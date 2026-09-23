@@ -346,7 +346,13 @@ def test_register_capture_cli(tmp_path, monkeypatch, capsys) -> None:
         dpi=96,
     )
     capture = tmp_path / "phone.jpg"
-    Image.new("RGB", (900, 1200), "white").save(capture)
+    capture_image = Image.new("RGB", (900, 1200), (225, 220, 210))
+    from PIL import ImageDraw
+
+    draw = ImageDraw.Draw(capture_image)
+    for y in range(180, 900, 80):
+        draw.rectangle((130, y, 760, y + 20), fill="black")
+    capture_image.save(capture, quality=82)
     dataset_root = tmp_path / "dataset"
     dataset_manifest = dataset_root / "manifest.jsonl"
 
@@ -1336,7 +1342,11 @@ def test_benchmark_readiness_cli_reports_ready_for_complete_dimensions(
                 "license": "CC0-1.0",
                 "provenance": "CLI readiness test",
                 "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
-                "tags": [*tags, "source:real-capture"],
+                "tags": [
+                    *tags,
+                    "capture:optical-evidence",
+                    "source:real-capture",
+                ],
             }
         )
 
