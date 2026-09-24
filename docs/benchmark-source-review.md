@@ -102,6 +102,7 @@ Verified examples include:
 - MPWT Council of Lao Architects and Engineers: one-page PDF whose native layer is effectively only the CamScanner watermark
 - NAP Laos Paris Agreement: 41-page CamScanner document with a present but noisy/segmented Lao OCR layer
 - LaoWIS Salavan groundwater plan: 64-page document containing rotated CamScanner pages whose OCR/table layer is heavily fragmented
+- LaoWIS Savannakhet groundwater plan: 55-page mixed document with embedded CamScanner lab sheets whose raster table/stamp/signature content is absent from native extraction
 
 These are valuable for understanding real OCR failure modes, but public availability does not establish redistribution/model-training rights. Project policy therefore remains:
 
@@ -111,7 +112,7 @@ These are valuable for understanding real OCR failure modes, but public availabi
 - retain authoritative URLs plus review evidence for source discovery/rights follow-up
 - promote a source only after an independent rights/license review
 
-The useful failure-mode categories discovered so far are `image-only`, `scanner-watermark-only`, `present-but-garbled-text-layer`, `present-but-noisy-ocr-layer`, and `present-but-fragmented-layout-layer`.
+The useful failure-mode categories discovered so far are `image-only`, `scanner-watermark-only`, `present-but-garbled-text-layer`, `present-but-noisy-ocr-layer`, and `present-but-fragmented-layout-layer`, and `mixed-native-and-raster-camera-pages`.
 
 Additional discovery sources:
 

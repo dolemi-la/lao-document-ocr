@@ -370,6 +370,27 @@
         "visual_observation": "Indexed rendered content includes a rotated Lao table page stamped Scanned with CamScanner; the document therefore provides a useful rotation/layout-plus-OCR-layer stress case."
       },
       "notes": "Mixed scan/OCR-layer candidate from the LaoWIS water-information repository. Especially useful for detecting unreliable pre-existing OCR/layout layers. Keep remote-only pending rights review."
+    },
+    {
+      "id": "laowis-savannakhet-groundwater-plan-2022-mixed-camscanner",
+      "name": "LaoWIS Savannakhet groundwater management plan 2022 with CamScanner appendices",
+      "url": "https://oieau-wiss.org/laowis-moae/images/pdf/ground_water_plan/ground_water_plan_savannakhet2022.pdf",
+      "license": "rights-unclear",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 55,
+        "text_layer": "mixed-native-and-raster-camera-pages",
+        "parsed_text_observation": "The report exposes extractable Lao text, but the final appendix embeds photographed/scanned laboratory sheets whose table/body content is not represented in the native extraction.",
+        "visual_observation": "The appendix page visibly contains two CamScanner laboratory-result sheets with tables, stamps, signatures, paper/scanner artifacts, and CamScanner watermarks."
+      },
+      "notes": "Useful mixed-layer case: mostly extractable report content plus embedded camera-scanned document pages that require OCR from raster content. Keep remote-only pending rights review."
     }
   ]
 }
