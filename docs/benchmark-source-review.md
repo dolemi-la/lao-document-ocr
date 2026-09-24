@@ -98,6 +98,8 @@ Verified examples include:
 - PTC CamScanner notice: three pages whose extracted text is effectively only the CamScanner watermark
 - HPC CamScanner legislation: 21 image-only pages with seals/signatures and zero extracted text lines
 - Lao National Assembly CamScanner invitation: document published directly as a scanned image
+- MAF/forestry CamScanner document: 15 raster pages, zero native text lines, handwritten metadata and scan noise
+- MPWT Council of Lao Architects and Engineers: one-page PDF whose native layer is effectively only the CamScanner watermark
 
 These are valuable for understanding real OCR failure modes, but public availability does not establish redistribution/model-training rights. Project policy therefore remains:
 

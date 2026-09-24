@@ -244,6 +244,48 @@
         "visual_observation": "The embedded source is explicitly labeled CamScanner 24-11-2023 14.22."
       },
       "notes": "Direct image-input OCR candidate rather than a PDF-layer case. The authoritative page identifies the embedded document as a CamScanner image. Keep remote-only pending rights review."
+    },
+    {
+      "id": "maf-forestry-camscanner-79-blks-343-dps-2022",
+      "name": "MAF/forestry CamScanner document 79-BLKS-343-DPS-2022",
+      "url": "https://dop.mis-mae.gov.la/pdf/79-BLKS-343-DPS-2022.pdf",
+      "license": "rights-unclear",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 15,
+        "text_layer": "absent",
+        "parsed_text_observation": "Direct PDF open exposed zero native text lines.",
+        "visual_observation": "Rendered first page is a raster Lao government document with handwritten date/number, scan specks, degraded emblem, uneven contrast, and a CamScanner footer."
+      },
+      "notes": "Strong long-form camera/scanner OCR stress candidate. Search indexing can surface OCR-derived text, but the PDF itself exposes no native text layer. Keep remote-only pending rights review."
+    },
+    {
+      "id": "mpwt-council-lao-architects-engineers-camscanner",
+      "name": "MPWT Council of Lao Architects and Engineers CamScanner document",
+      "url": "https://www.mpwt.gov.la/download_legislation?name=Council+of+Lao+Architects+and+Engineers",
+      "license": "rights-unclear; source-site-all-rights-reserved",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 1,
+        "text_layer": "scanner-watermark-only",
+        "parsed_text_observation": "Direct PDF open exposed only the word CamScanner.",
+        "visual_observation": "The authoritative MPWT legislation listing identifies the file as a Council of Lao Architects and Engineers document and the PDF content layer is scanner-watermark-only."
+      },
+      "notes": "Single-page official MPWT CamScanner candidate with no useful native document text. Keep remote-only pending rights review."
     }
   ]
 }
