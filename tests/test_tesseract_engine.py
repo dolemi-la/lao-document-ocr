@@ -131,3 +131,55 @@ def test_invalid_custom_tessdata_dir_is_rejected(tmp_path) -> None:
         assert "tessdata directory not found" in str(exc)
     else:
         raise AssertionError("expected invalid tessdata directory to be rejected")
+
+
+def test_orientation_hint_uses_tesseract_osd(tmp_path, monkeypatch) -> None:
+    directory = _traineddata_dir(tmp_path)
+    observed = {}
+
+    def fake_image_to_osd(image, *, config, output_type):
+        observed["size"] = image.size
+        observed["config"] = config
+        observed["output_type"] = output_type
+        return {
+            "rotate": "90",
+            "orientation_conf": "12.5",
+            "script": "Latin",
+            "script_conf": "7.25",
+        }
+
+    monkeypatch.setattr(
+        tesseract_module.pytesseract,
+        "image_to_osd",
+        fake_image_to_osd,
+    )
+
+    engine = TesseractEngine(tessdata_dir=directory)
+    hint = engine.orientation_hint(Image.new("RGB", (300, 160), "white"))
+
+    assert hint == {
+        "degrees_clockwise": 90,
+        "orientation_confidence": 12.5,
+        "script": "Latin",
+        "script_confidence": 7.25,
+        "source": "tesseract-osd",
+    }
+    assert observed["size"] == (300, 160)
+    assert "--tessdata-dir" in observed["config"]
+    assert observed["output_type"] == tesseract_module.Output.DICT
+
+
+def test_orientation_hint_returns_none_when_osd_fails(tmp_path, monkeypatch) -> None:
+    directory = _traineddata_dir(tmp_path)
+
+    def fail_image_to_osd(*args, **kwargs):
+        raise tesseract_module.pytesseract.TesseractError(1, "osd failed")
+
+    monkeypatch.setattr(
+        tesseract_module.pytesseract,
+        "image_to_osd",
+        fail_image_to_osd,
+    )
+
+    engine = TesseractEngine(tessdata_dir=directory)
+    assert engine.orientation_hint(Image.new("RGB", (300, 160), "white")) is None

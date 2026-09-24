@@ -444,6 +444,9 @@ def _rotation_probe(
         )
 
     append_variant(0, baseline_ocr)
+    with Image.open(page_path) as hint_source:
+        hint_image = hint_source.convert("RGB")
+    orientation_hint = engine.orientation_hint(hint_image)
 
     transpose = {
         90: Image.Transpose.ROTATE_270,
@@ -513,6 +516,24 @@ def _rotation_probe(
             (best_score / baseline_score) if baseline_score > 0 else None
         ),
         "confidence_improvement": best_confidence - baseline_confidence,
+        "engine_orientation_hint": orientation_hint,
+        "hint_matches_best": (
+            (
+                int(orientation_hint.get("degrees_clockwise", 0))
+                == int(best["degrees_clockwise"])
+            )
+            if isinstance(orientation_hint, dict)
+            else None
+        ),
+        "hint_matches_recommendation": (
+            (
+                recommended is not None
+                and int(orientation_hint.get("degrees_clockwise", 0))
+                == int(recommended)
+            )
+            if isinstance(orientation_hint, dict)
+            else None
+        ),
     }
 
 

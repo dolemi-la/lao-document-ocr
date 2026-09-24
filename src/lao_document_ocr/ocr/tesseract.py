@@ -101,6 +101,38 @@ class TesseractEngine(OcrEngine):
             },
         }
 
+    def orientation_hint(self, image: Image.Image) -> dict[str, Any] | None:
+        try:
+            data = pytesseract.image_to_osd(
+                image,
+                config=self._tessdata_config(),
+                output_type=Output.DICT,
+            )
+        except (TesseractNotFoundError, pytesseract.TesseractError):
+            return None
+
+        try:
+            rotate = int(data.get("rotate", 0)) % 360
+        except (TypeError, ValueError):
+            rotate = 0
+        try:
+            orientation_confidence = float(data.get("orientation_conf", 0.0))
+        except (TypeError, ValueError):
+            orientation_confidence = 0.0
+        try:
+            script_confidence = float(data.get("script_conf", 0.0))
+        except (TypeError, ValueError):
+            script_confidence = 0.0
+
+        script = str(data.get("script", "")).strip() or None
+        return {
+            "degrees_clockwise": rotate,
+            "orientation_confidence": orientation_confidence,
+            "script": script,
+            "script_confidence": script_confidence,
+            "source": "tesseract-osd",
+        }
+
     def _validate(self) -> None:
         available = set(self.available_languages())
         missing = sorted(set(self.languages.split("+")) - available)

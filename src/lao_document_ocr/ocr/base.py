@@ -36,6 +36,10 @@ class OcrEngine(ABC):
     def metadata(self) -> dict[str, Any]:
         return {"name": self.__class__.__name__}
 
+    def orientation_hint(self, image: Image.Image) -> dict[str, Any] | None:
+        del image
+        return None
+
     def visual_blocks(
         self,
         image: Image.Image,

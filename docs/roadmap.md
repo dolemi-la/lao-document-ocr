@@ -31,6 +31,7 @@ Status: in progress
 - [x] remote scan script-anomaly + OCR-confidence triage diagnostics
 - [x] remote PDF full-page-raster/media-layer diagnostics
 - [x] diagnostic 0/90/180/270 OCR rotation probe for selected raster pages
+- [x] Tesseract OSD orientation hint cross-check against exhaustive rotation diagnostics
 - [x] opt-in coordinate-safe right-angle auto-orientation for document conversion + remote A/B diagnostics
 - [x] bounded official HPLT Lao streaming sampler + provenance metadata
 - [x] optional reviewed layout AST labels in dataset manifests + coverage reporting

@@ -369,6 +369,16 @@ class OrientationSensitiveEngine(OcrEngine):
     def is_available(self) -> bool:
         return True
 
+    def orientation_hint(self, image: Image.Image):
+        del image
+        return {
+            "degrees_clockwise": 90,
+            "orientation_confidence": 10.0,
+            "script": "Latin",
+            "script_confidence": 5.0,
+            "source": "test-hint",
+        }
+
     def recognize(self, image: Image.Image) -> list[RecognizedLine]:
         confidence = 0.92 if image.height > image.width else 0.30
         return [
@@ -405,6 +415,9 @@ def test_rotation_probe_recommends_clear_right_angle_improvement(tmp_path) -> No
     assert probe["best_degrees_clockwise"] == 90
     assert probe["recommended_degrees_clockwise"] == 90
     assert probe["confidence_improvement"] > 0.5
+    assert probe["engine_orientation_hint"]["degrees_clockwise"] == 90
+    assert probe["hint_matches_best"] is True
+    assert probe["hint_matches_recommendation"] is True
     assert {item["degrees_clockwise"] for item in probe["variants"]} == {
         0,
         90,
