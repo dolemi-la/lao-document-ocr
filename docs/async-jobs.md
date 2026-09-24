@@ -171,3 +171,15 @@ These endpoints remain available:
 They are useful for simple scripts and small local documents.
 
 The web UI uses `/v1/jobs` by default.
+
+## Optional right-angle auto-orientation
+
+Single-job and batch submissions accept an optional multipart boolean:
+
+```text
+auto_orient_right_angles=true
+```
+
+The default is `false`. For `POST /v1/jobs/batch`, the value applies to every file in the batch. The option is stored on each `JobRecord`, survives queueing, and is exposed by job-status responses as `auto_orient_right_angles`.
+
+The same optional field is available on synchronous `POST /v1/parse` and `POST /v1/convert`.

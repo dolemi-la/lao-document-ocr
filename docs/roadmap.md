@@ -33,6 +33,7 @@ Status: in progress
 - [x] diagnostic 0/90/180/270 OCR rotation probe for selected raster pages
 - [x] Tesseract OSD orientation hint cross-check against exhaustive rotation diagnostics
 - [x] opt-in coordinate-safe right-angle auto-orientation for document conversion + remote A/B diagnostics
+- [x] opt-in right-angle auto-orientation exposed through sync API + async single/batch jobs
 - [x] Lao-dominance probe-skip optimization + auto-orientation probe-state reporting
 - [x] OCR-verified orientation-hint fast path with exhaustive fallback
 - [x] plain-OCR vs auto-orient suite performance mode with diagnostic probes independently switchable

@@ -908,3 +908,208 @@ def test_tesseract_engine_uses_configured_tessdata_dir(tmp_path, monkeypatch) ->
         "lao",
         "eng",
     }
+
+
+def _empty_document(source_name: str = "sample.png"):
+    from lao_document_ocr.models import Document, Page
+
+    return Document(
+        source_name=source_name,
+        pages=[
+            Page(
+                number=1,
+                width=100,
+                height=60,
+                blocks=[],
+            )
+        ],
+        metadata={},
+    )
+
+
+def test_parse_forwards_auto_orientation_form_flag(monkeypatch) -> None:
+    import services.api.app.main as api_main
+
+    captured = {}
+
+    def fake_process_document(path, **kwargs):
+        captured.update(kwargs)
+        return _empty_document(kwargs.get("source_name") or "sample.png")
+
+    monkeypatch.setattr(api_main, "process_document", fake_process_document)
+
+    response = client.post(
+        "/v1/parse",
+        files={"file": ("sample.png", _png_upload_bytes(), "image/png")},
+        data={"auto_orient_right_angles": "true"},
+    )
+
+    assert response.status_code == 200
+    assert captured["auto_orient_right_angles"] is True
+
+
+def test_convert_forwards_auto_orientation_form_flag(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+
+    captured = {}
+
+    def fake_process_document(path, **kwargs):
+        captured.update(kwargs)
+        return _empty_document(kwargs.get("source_name") or "sample.png")
+
+    def fake_write_outputs_archive(document, work_dir, filename):
+        del document, filename
+        archive_path = work_dir / "result.zip"
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.writestr("result.txt", "done")
+        return archive_path
+
+    monkeypatch.setattr(api_main, "process_document", fake_process_document)
+    monkeypatch.setattr(
+        api_main,
+        "_write_outputs_archive",
+        fake_write_outputs_archive,
+    )
+
+    response = client.post(
+        "/v1/convert",
+        files={"file": ("sample.png", _png_upload_bytes(), "image/png")},
+        data={"auto_orient_right_angles": "true"},
+    )
+
+    assert response.status_code == 200
+    assert captured["auto_orient_right_angles"] is True
+    assert response.headers["content-type"].startswith("application/zip")
+
+
+def test_async_job_form_flag_is_persisted_and_seen_by_runner(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+
+    observed = {}
+
+    def runner(record, cancel_event):
+        del cancel_event
+        observed["auto_orient_right_angles"] = record.auto_orient_right_angles
+        path = record.workspace / "sample-ocr.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("result.txt", "done")
+        return path
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-auto-orient-api",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    try:
+        response = client.post(
+            "/v1/jobs",
+            files={
+                "file": (
+                    "sample.png",
+                    _png_upload_bytes(),
+                    "image/png",
+                )
+            },
+            data={"auto_orient_right_angles": "true"},
+        )
+        assert response.status_code == 202
+        payload = response.json()
+        assert payload["auto_orient_right_angles"] is True
+
+        terminal = _poll_job(client, payload["id"])
+        assert terminal["auto_orient_right_angles"] is True
+        assert observed["auto_orient_right_angles"] is True
+    finally:
+        manager.shutdown()
+
+
+def test_async_batch_form_flag_applies_to_every_job(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import zipfile
+
+    import services.api.app.main as api_main
+    from services.api.app.jobs import ConversionJobManager
+
+    observed = []
+
+    def runner(record, cancel_event):
+        del cancel_event
+        observed.append(record.auto_orient_right_angles)
+        path = record.workspace / f"{record.id}.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("result.txt", "done")
+        return path
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-batch-auto-orient-api",
+        runner,
+        max_workers=2,
+        max_active_jobs=4,
+    )
+    monkeypatch.setattr(api_main, "JOB_MANAGER", manager)
+    try:
+        response = client.post(
+            "/v1/jobs/batch",
+            files=[
+                ("files", ("a.png", _png_upload_bytes(), "image/png")),
+                ("files", ("b.png", _png_upload_bytes(), "image/png")),
+            ],
+            data={"auto_orient_right_angles": "true"},
+        )
+        assert response.status_code == 202
+        payload = response.json()
+        assert payload["count"] == 2
+        assert [
+            job["auto_orient_right_angles"]
+            for job in payload["jobs"]
+        ] == [True, True]
+
+        terminals = [
+            _poll_job(client, job["id"])
+            for job in payload["jobs"]
+        ]
+        assert [
+            item["auto_orient_right_angles"]
+            for item in terminals
+        ] == [True, True]
+        assert sorted(observed) == [True, True]
+    finally:
+        manager.shutdown()
+
+
+
+def test_openapi_exposes_optional_auto_orientation_form_field() -> None:
+    schema = client.get("/openapi.json").json()
+
+    for path in [
+        "/v1/parse",
+        "/v1/convert",
+        "/v1/jobs",
+        "/v1/jobs/batch",
+    ]:
+        body = schema["paths"][path]["post"]["requestBody"]["content"][
+            "multipart/form-data"
+        ]["schema"]
+        if "$ref" in body:
+            name = body["$ref"].split("/")[-1]
+            body = schema["components"]["schemas"][name]
+
+        field = body["properties"]["auto_orient_right_angles"]
+        assert field["type"] == "boolean"
+        assert field["default"] is False
+        assert "auto_orient_right_angles" not in body.get("required", [])

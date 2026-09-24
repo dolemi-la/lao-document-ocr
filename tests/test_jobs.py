@@ -417,3 +417,62 @@ def test_job_manager_tightens_existing_root_permissions(tmp_path) -> None:
         assert manager.root_dir.stat().st_mode & 0o777 == 0o700
     finally:
         manager.shutdown()
+
+
+def test_job_manager_preserves_auto_orientation_option(tmp_path) -> None:
+    observed = {}
+
+    def runner(record, cancel_event):
+        observed["auto_orient_right_angles"] = record.auto_orient_right_angles
+        output = record.workspace / "result.zip"
+        output.write_bytes(b"zip")
+        return output
+
+    manager = ConversionJobManager(
+        tmp_path / "jobs-auto-orient",
+        runner,
+        max_workers=1,
+        max_active_jobs=2,
+    )
+    try:
+        record = manager.reserve(
+            "sample.png",
+            ".png",
+            auto_orient_right_angles=True,
+        )
+        assert record.auto_orient_right_angles is True
+        assert manager.public(record.id)["auto_orient_right_angles"] is True
+
+        record.input_path.write_bytes(b"image")
+        manager.enqueue(record.id)
+        payload = _wait_for_terminal(manager, record.id)
+
+        assert payload["status"] == "succeeded"
+        assert payload["auto_orient_right_angles"] is True
+        assert observed["auto_orient_right_angles"] is True
+    finally:
+        manager.shutdown()
+
+
+def test_reserve_many_applies_auto_orientation_to_every_record(tmp_path) -> None:
+    manager = ConversionJobManager(
+        tmp_path / "jobs-batch-auto-orient",
+        lambda record, cancel_event: record.workspace / "unused.zip",
+        max_workers=1,
+        max_active_jobs=3,
+    )
+    try:
+        records = manager.reserve_many(
+            [("a.png", ".png"), ("b.png", ".png")],
+            auto_orient_right_angles=True,
+        )
+        assert [record.auto_orient_right_angles for record in records] == [
+            True,
+            True,
+        ]
+        assert [
+            manager.public(record.id)["auto_orient_right_angles"]
+            for record in records
+        ] == [True, True]
+    finally:
+        manager.shutdown()

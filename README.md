@@ -401,3 +401,20 @@ Apache License 2.0.
 Learned layout detector: [docs/layout-model-training.md](docs/layout-model-training.md).
 
 Learned reading order: [docs/reading-order-model.md](docs/reading-order-model.md).
+
+### Optional API right-angle auto-orientation
+
+The multipart endpoints below accept an optional boolean form field:
+
+```text
+auto_orient_right_angles=true
+```
+
+Supported endpoints:
+
+- `POST /v1/parse`
+- `POST /v1/convert`
+- `POST /v1/jobs`
+- `POST /v1/jobs/batch`
+
+The default is `false`. For batch submissions, the value applies to every file in the batch. Async job status responses echo the stored value as `auto_orient_right_angles`.

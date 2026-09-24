@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 
@@ -449,6 +449,7 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
             max_page_pixels=MAX_PAGE_PIXELS,
             should_cancel=cancel_event.is_set,
             reading_order_resolver=_reading_order_resolver(),
+            auto_orient_right_angles=record.auto_orient_right_angles,
         )
     except DocumentProcessingCancelled as exc:
         raise JobCancelledError(str(exc)) from exc
@@ -553,6 +554,7 @@ def health() -> dict:
 async def parse_document(
     request: Request,
     file: Annotated[UploadFile, File(...)],
+    auto_orient_right_angles: Annotated[bool, Form()] = False,
 ) -> dict:
     filename = _safe_filename(file.filename)
     _enforce_submission_rate_limit(request)
@@ -570,6 +572,7 @@ async def parse_document(
                 max_pages=MAX_PAGES,
                 max_page_pixels=MAX_PAGE_PIXELS,
                 reading_order_resolver=_reading_order_resolver(),
+                auto_orient_right_angles=auto_orient_right_angles,
             )
         except DocumentProcessingError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -580,6 +583,7 @@ async def parse_document(
 async def convert_document(
     request: Request,
     file: Annotated[UploadFile, File(...)],
+    auto_orient_right_angles: Annotated[bool, Form()] = False,
 ) -> StreamingResponse:
     filename = _safe_filename(file.filename)
     _enforce_submission_rate_limit(request)
@@ -599,6 +603,7 @@ async def convert_document(
                 max_pages=MAX_PAGES,
                 max_page_pixels=MAX_PAGE_PIXELS,
                 reading_order_resolver=_reading_order_resolver(),
+                auto_orient_right_angles=auto_orient_right_angles,
             )
         except DocumentProcessingError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -615,12 +620,17 @@ async def convert_document(
 async def create_conversion_job(
     request: Request,
     file: Annotated[UploadFile, File(...)],
+    auto_orient_right_angles: Annotated[bool, Form()] = False,
 ) -> dict:
     filename = _safe_filename(file.filename)
     _enforce_submission_rate_limit(request)
     suffix = _validate_suffix(filename)
     try:
-        record = JOB_MANAGER.reserve(filename, suffix)
+        record = JOB_MANAGER.reserve(
+            filename,
+            suffix,
+            auto_orient_right_angles=auto_orient_right_angles,
+        )
     except JobCapacityError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
 
@@ -638,6 +648,7 @@ async def create_conversion_job(
 async def create_conversion_batch(
     request: Request,
     files: Annotated[list[UploadFile], File(...)],
+    auto_orient_right_angles: Annotated[bool, Form()] = False,
 ) -> dict:
     if not files:
         raise HTTPException(status_code=422, detail="At least one file is required.")
@@ -657,7 +668,8 @@ async def create_conversion_batch(
 
     try:
         records = JOB_MANAGER.reserve_many(
-            [(filename, suffix) for _, filename, suffix in prepared]
+            [(filename, suffix) for _, filename, suffix in prepared],
+            auto_orient_right_angles=auto_orient_right_angles,
         )
     except JobCapacityError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc

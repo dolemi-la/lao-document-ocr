@@ -55,6 +55,7 @@ class JobRecord:
     filename: str
     workspace: Path
     input_path: Path
+    auto_orient_right_angles: bool = False
     status: JobStatus = JobStatus.UPLOADING
     output_path: Path | None = None
     output_artifact: StoredArtifact | None = None
@@ -130,6 +131,8 @@ class ConversionJobManager:
     def reserve_many(
         self,
         files: list[tuple[str, str]],
+        *,
+        auto_orient_right_angles: bool = False,
     ) -> list[JobRecord]:
         if not files:
             raise ValueError("At least one job reservation is required")
@@ -155,6 +158,7 @@ class ConversionJobManager:
                         filename=filename,
                         workspace=workspace,
                         input_path=input_path,
+                        auto_orient_right_angles=auto_orient_right_angles,
                     )
                     self._jobs[job_id] = record
                     records.append(record)
@@ -165,8 +169,17 @@ class ConversionJobManager:
                 raise
             return records
 
-    def reserve(self, filename: str, suffix: str) -> JobRecord:
-        return self.reserve_many([(filename, suffix)])[0]
+    def reserve(
+        self,
+        filename: str,
+        suffix: str,
+        *,
+        auto_orient_right_angles: bool = False,
+    ) -> JobRecord:
+        return self.reserve_many(
+            [(filename, suffix)],
+            auto_orient_right_angles=auto_orient_right_angles,
+        )[0]
 
     def discard(self, job_id: str) -> None:
         with self._lock:
@@ -270,6 +283,7 @@ class ConversionJobManager:
         return {
             "id": record.id,
             "filename": record.filename,
+            "auto_orient_right_angles": record.auto_orient_right_angles,
             "status": record.status.value,
             "created_at": record.created_at.isoformat(),
             "started_at": (
