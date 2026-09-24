@@ -391,6 +391,27 @@
         "visual_observation": "The appendix page visibly contains two CamScanner laboratory-result sheets with tables, stamps, signatures, paper/scanner artifacts, and CamScanner watermarks."
       },
       "notes": "Useful mixed-layer case: mostly extractable report content plus embedded camera-scanned document pages that require OCR from raster content. Keep remote-only pending rights review."
+    },
+    {
+      "id": "stbank-q4-2024-camscanner-financial-report",
+      "name": "ST Bank Laos Q4/2024 CamScanner financial report",
+      "url": "https://www.stbanklaos.la/upload/quarter/20250123150232.pdf",
+      "license": "rights-unclear; official-bank-publication",
+      "status": "remote-evaluation-candidate-unverified",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": null,
+        "text_layer": "unverified",
+        "parsed_text_observation": "Search indexing exposes dense Lao financial-table content and the explicit footer text 'Scanned with CS CamScanner'; direct PDF fetch timed out during verification.",
+        "visual_observation": "Not independently page-rendered because the authoritative PDF endpoint timed out. The bank's official financial-report archive lists the corresponding Q4/2024 quarterly report."
+      },
+      "notes": "Promising table/numeric camera-scan stress candidate from ST Bank Laos. Keep unverified until the original PDF can be fetched and page/text-layer behavior inspected directly."
     }
   ]
 }

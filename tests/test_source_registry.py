@@ -76,7 +76,7 @@ def test_remote_scan_candidates_stay_non_ingestable() -> None:
         if source["status"].startswith("remote-evaluation-")
     ]
 
-    assert len(candidates) >= 15
+    assert len(candidates) >= 16
     for source in candidates:
         assert source["allowed_uses"] == []
         assert "public-benchmark-redistribution" in source["disallowed_uses"]
