@@ -1,3 +1,5 @@
+import io
+
 from PIL import Image
 
 from lao_document_ocr.models import BoundingBox
@@ -428,9 +430,19 @@ def test_embedded_asset_bbox_rotates_with_page() -> None:
     from lao_document_ocr.embedded_images import EmbeddedImageAsset
     from lao_document_ocr.pipeline import _rotate_embedded_assets
 
+    source = Image.new("RGB", (2, 3), "black")
+    source.putpixel((0, 0), (255, 0, 0))
+    source.putpixel((1, 0), (0, 255, 0))
+    source.putpixel((0, 1), (0, 0, 255))
+    source.putpixel((1, 1), (255, 255, 0))
+    source.putpixel((0, 2), (255, 0, 255))
+    source.putpixel((1, 2), (0, 255, 255))
+    payload = io.BytesIO()
+    source.save(payload, format="PNG")
+
     asset = EmbeddedImageAsset(
         bbox=BoundingBox(x=10, y=20, width=30, height=40),
-        png_bytes=b"png",
+        png_bytes=payload.getvalue(),
         width_ratio=0.15,
         xref=7,
     )
@@ -446,6 +458,10 @@ def test_embedded_asset_bbox_rotates_with_page() -> None:
     assert rotated[0].bbox == BoundingBox(x=40, y=10, width=40, height=30)
     assert rotated[0].width_ratio == 0.4
     assert rotated[0].xref == 7
+    with Image.open(io.BytesIO(rotated[0].png_bytes)) as rotated_image:
+        assert rotated_image.size == (3, 2)
+        assert rotated_image.getpixel((0, 0)) == (255, 0, 255)
+        assert rotated_image.getpixel((2, 0)) == (255, 0, 0)
 
 
 def test_auto_orientation_skips_probe_for_strong_lao_baseline(tmp_path) -> None:

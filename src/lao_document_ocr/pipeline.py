@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -142,6 +143,17 @@ def _rotate_image_clockwise(image: Image.Image, degrees: int) -> Image.Image:
     return image.transpose(operation)
 
 
+def _rotate_png_bytes_clockwise(data: bytes, degrees: int) -> bytes:
+    normalized = degrees % 360
+    if normalized == 0:
+        return data
+    with Image.open(io.BytesIO(data)) as source:
+        rotated = _rotate_image_clockwise(source, normalized)
+        output = io.BytesIO()
+        rotated.save(output, format="PNG", optimize=True)
+        return output.getvalue()
+
+
 def _rotate_bbox_clockwise(
     bbox,
     *,
@@ -201,7 +213,7 @@ def _rotate_embedded_assets(
         output.append(
             EmbeddedImageAsset(
                 bbox=bbox,
-                png_bytes=asset.png_bytes,
+                png_bytes=_rotate_png_bytes_clockwise(asset.png_bytes, normalized),
                 width_ratio=bbox.width / max(1, rotated_page_width),
                 xref=asset.xref,
             )
