@@ -208,6 +208,7 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     rotation_recommendations: Counter[str] = Counter()
     applied_orientations: Counter[str] = Counter()
     auto_orientation_probe_states: Counter[str] = Counter()
+    auto_orientation_strategies: Counter[str] = Counter()
     page_count = 0
     ocr_lao_characters = 0
     native_lao_characters = 0
@@ -253,6 +254,10 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
                     else:
                         reason = "probed"
                     auto_orientation_probe_states[reason] += 1
+                    strategy = str(
+                        diagnostics.get("probe_strategy") or "unknown"
+                    )
+                    auto_orientation_strategies[strategy] += 1
             native = page.get("native_text")
             if isinstance(native, dict):
                 native_lao_characters += int(native.get("lao_characters", 0))
@@ -283,6 +288,9 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         "applied_auto_orientations": dict(sorted(applied_orientations.items())),
         "auto_orientation_probe_states": dict(
             sorted(auto_orientation_probe_states.items())
+        ),
+        "auto_orientation_strategies": dict(
+            sorted(auto_orientation_strategies.items())
         ),
         "registry_text_layers": dict(sorted(registry_layers.items())),
         "source_statuses": dict(sorted(source_statuses.items())),

@@ -235,12 +235,30 @@ def _orientation_line_stats(lines) -> tuple[float, int, float, float]:
     return mean_confidence, recognized_characters, score, lao_ratio
 
 
+def _orientation_candidate_is_acceptable(
+    *,
+    degrees: int,
+    confidence: float,
+    characters: int,
+    score: float,
+    baseline_confidence: float,
+    baseline_characters: int,
+    baseline_score: float,
+) -> bool:
+    return (
+        degrees != 0
+        and score >= max(0.01, baseline_score * 1.15)
+        and confidence >= baseline_confidence + 0.08
+        and characters >= max(20, int(baseline_characters * 0.5))
+    )
+
+
 def _recognize_with_right_angle_orientation(
     image: Image.Image,
     *,
     engine: OcrEngine,
     should_cancel: Callable[[], bool] | None = None,
-) -> tuple[Image.Image, list, int, dict[str, float | int | str | None]]:
+) -> tuple[Image.Image, list, int, dict[str, object]]:
     baseline_lines = engine.recognize(image)
     (
         baseline_confidence,
@@ -259,34 +277,46 @@ def _recognize_with_right_angle_orientation(
     ):
         probe_skip_reason = "lao-dominant-baseline"
 
+    base_diagnostics: dict[str, object] = {
+        "baseline_confidence": baseline_confidence,
+        "baseline_characters": baseline_characters,
+        "baseline_score": baseline_score,
+        "baseline_lao_ratio": baseline_lao_ratio,
+        "probe_below_confidence": DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE,
+        "lao_dominant_min_confidence": (
+            DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
+        ),
+        "lao_dominant_min_characters": (
+            DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
+        ),
+        "lao_dominant_ratio": DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO,
+    }
+
     if probe_skip_reason is not None:
         return (
             image,
             baseline_lines,
             0,
             {
-                "baseline_confidence": baseline_confidence,
+                **base_diagnostics,
                 "selected_confidence": baseline_confidence,
-                "baseline_characters": baseline_characters,
                 "selected_characters": baseline_characters,
-                "baseline_score": baseline_score,
                 "selected_score": baseline_score,
-                "baseline_lao_ratio": baseline_lao_ratio,
                 "selected_lao_ratio": baseline_lao_ratio,
                 "probe_skipped": True,
                 "probe_skip_reason": probe_skip_reason,
-                "probe_below_confidence": (
-                    DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE
-                ),
-                "lao_dominant_min_confidence": (
-                    DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
-                ),
-                "lao_dominant_min_characters": (
-                    DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
-                ),
-                "lao_dominant_ratio": DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO,
+                "probe_strategy": "skipped",
+                "probed_degrees": [],
+                "engine_orientation_hint": None,
             },
         )
+
+    hint: dict[str, object] | None
+    try:
+        raw_hint = engine.orientation_hint(image)
+    except OcrEngineError:
+        raw_hint = None
+    hint = raw_hint if isinstance(raw_hint, dict) else None
 
     candidates = [
         (
@@ -299,26 +329,79 @@ def _recognize_with_right_angle_orientation(
             baseline_lao_ratio,
         )
     ]
+    probed_degrees: list[int] = []
 
-    for degrees in (90, 180, 270):
+    def probe(degrees: int):
         _raise_if_cancelled(should_cancel)
         rotated = _rotate_image_clockwise(image, degrees)
         try:
             lines = engine.recognize(rotated)
         except OcrEngineError:
-            continue
+            return None
         confidence, characters, score, lao_ratio = _orientation_line_stats(lines)
-        candidates.append(
+        candidate = (
+            degrees,
+            rotated,
+            lines,
+            confidence,
+            characters,
+            score,
+            lao_ratio,
+        )
+        candidates.append(candidate)
+        probed_degrees.append(degrees)
+        return candidate
+
+    hinted_degrees = 0
+    if hint is not None:
+        try:
+            hinted_degrees = int(hint.get("degrees_clockwise", 0)) % 360
+        except (TypeError, ValueError):
+            hinted_degrees = 0
+
+    if hinted_degrees in {90, 180, 270}:
+        hinted = probe(hinted_degrees)
+        if hinted is not None:
             (
                 degrees,
-                rotated,
-                lines,
+                hinted_image,
+                hinted_lines,
                 confidence,
                 characters,
                 score,
                 lao_ratio,
-            )
-        )
+            ) = hinted
+            if _orientation_candidate_is_acceptable(
+                degrees=degrees,
+                confidence=confidence,
+                characters=characters,
+                score=score,
+                baseline_confidence=baseline_confidence,
+                baseline_characters=baseline_characters,
+                baseline_score=baseline_score,
+            ):
+                return (
+                    hinted_image,
+                    hinted_lines,
+                    degrees,
+                    {
+                        **base_diagnostics,
+                        "selected_confidence": confidence,
+                        "selected_characters": characters,
+                        "selected_score": score,
+                        "selected_lao_ratio": lao_ratio,
+                        "probe_skipped": False,
+                        "probe_skip_reason": None,
+                        "probe_strategy": "hint-accepted",
+                        "probed_degrees": list(probed_degrees),
+                        "engine_orientation_hint": hint,
+                    },
+                )
+
+    for degrees in (90, 180, 270):
+        if degrees in probed_degrees:
+            continue
+        probe(degrees)
 
     best = max(
         candidates,
@@ -334,11 +417,14 @@ def _recognize_with_right_angle_orientation(
         best_lao_ratio,
     ) = best
 
-    use_best = (
-        best_degrees != 0
-        and best_score >= max(0.01, baseline_score * 1.15)
-        and best_confidence >= baseline_confidence + 0.08
-        and best_characters >= max(20, int(baseline_characters * 0.5))
+    use_best = _orientation_candidate_is_acceptable(
+        degrees=best_degrees,
+        confidence=best_confidence,
+        characters=best_characters,
+        score=best_score,
+        baseline_confidence=baseline_confidence,
+        baseline_characters=baseline_characters,
+        baseline_score=baseline_score,
     )
 
     if not use_best:
@@ -355,24 +441,20 @@ def _recognize_with_right_angle_orientation(
         best_lines,
         int(best_degrees),
         {
-            "baseline_confidence": baseline_confidence,
+            **base_diagnostics,
             "selected_confidence": best_confidence,
-            "baseline_characters": baseline_characters,
             "selected_characters": best_characters,
-            "baseline_score": baseline_score,
             "selected_score": best_score,
-            "baseline_lao_ratio": baseline_lao_ratio,
             "selected_lao_ratio": best_lao_ratio,
             "probe_skipped": False,
             "probe_skip_reason": None,
-            "probe_below_confidence": DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE,
-            "lao_dominant_min_confidence": (
-                DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
+            "probe_strategy": (
+                "exhaustive-after-hint"
+                if hinted_degrees in {90, 180, 270}
+                else "exhaustive"
             ),
-            "lao_dominant_min_characters": (
-                DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
-            ),
-            "lao_dominant_ratio": DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO,
+            "probed_degrees": list(probed_degrees),
+            "engine_orientation_hint": hint,
         },
     )
 
@@ -408,7 +490,7 @@ def process_document(
         source_image = loaded_page.image
         embedded_images = loaded_page.embedded_images
         orientation_degrees = 0
-        orientation_diagnostics: dict[str, float | int | str | None] | None = None
+        orientation_diagnostics: dict[str, object] | None = None
         try:
             if auto_orient_right_angles:
                 (

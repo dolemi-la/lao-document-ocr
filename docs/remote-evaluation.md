@@ -103,6 +103,8 @@ OCR engines may also provide a diagnostic `orientation_hint`. `TesseractEngine` 
 
 Current curated evidence keeps OSD diagnostic-only: on the three verified KPMG problem pages it matched the exhaustive recommendation on only one page. Low OSD confidence was associated with the two mismatches, so production auto-orientation continues to use OCR evidence rather than trusting OSD directly.
 
+Production auto-orientation may still use an engine orientation hint as a **first candidate**. The hinted angle is immediately OCR-verified with the same score/confidence/character acceptance thresholds. If it passes, the remaining angles are skipped; if it fails, the pipeline falls back to the exhaustive remaining right-angle probes. This preserves OCR verification while reducing cost when a hint is useful.
+
 The curated suite enables the diagnostic rotation probe only for the verified World Bank/KPMG raster-overlay pages. The main OCR pipeline also has an opt-in `--auto-orient-right-angles` mode for `convert-document` and `evaluate-remote-suite`. It uses the same conservative score/confidence/character thresholds and keeps 0° when improvement is not clear. The feature remains off by default while real-suite A/B evidence is collected.
 
 To limit cost, the opt-in production path first runs baseline OCR and skips the 90°/180°/270° probes when mean baseline line confidence is already at least 0.65. It also skips probing when baseline confidence is at least 0.45, at least 200 non-space characters were recognized, and at least 75% of those characters fall in the Lao Unicode block. This preserves the full probe for ambiguous low-confidence pages while avoiding extra work on already Lao-dominant upright scans.
