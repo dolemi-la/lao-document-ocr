@@ -206,6 +206,9 @@ def test_remote_suite_runs_per_source_pages_and_aggregates(tmp_path) -> None:
     assert report["summary"]["sampled_pages"] == 3
     assert report["summary"]["ocr_lao_characters"] > 0
     assert report["summary"]["ocr_confidence_bands"] == {"high": 3}
+    assert report["summary"]["page_media_classifications"] == {
+        "no-large-raster-layer": 3
+    }
     assert report["sources"][0]["suite_pages"] == [1]
     assert report["sources"][1]["suite_pages"] == [1, 3]
     assert report["sources"][0]["suite_note"] == "empty layer"
@@ -267,6 +270,12 @@ def test_repo_remote_diagnostic_suite_validates_current_registry() -> None:
 
     assert suite.suite_id == "real-world-scan-diagnostic-v1"
     assert len(suite.entries) == 6
+    worldbank = next(
+        entry
+        for entry in suite.entries
+        if entry.source_id == "worldbank-p172774-kpmg-lao-2024-rotated-raster-pages"
+    )
+    assert worldbank.pages == (8, 15, 21)
 
 
 def test_remote_suite_detects_registry_text_layer_drift(tmp_path) -> None:

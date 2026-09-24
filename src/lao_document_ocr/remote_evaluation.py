@@ -447,6 +447,45 @@ def _sample_page_numbers(
     return sorted(output[:max_pages_per_source])
 
 
+def _pdf_page_media_diagnostics(
+    page,
+    native_text: dict[str, int | float],
+) -> dict[str, Any]:
+    page_area = float(page.rect.width * page.rect.height) or 1.0
+    coverages: list[float] = []
+    images = page.get_images(full=True)
+    for image in images:
+        xref = image[0]
+        try:
+            rects = page.get_image_rects(xref)
+        except Exception:
+            rects = []
+        for rect in rects:
+            coverage = float(rect.width * rect.height) / page_area
+            coverages.append(max(0.0, min(1.0, coverage)))
+
+    max_coverage = max(coverages) if coverages else 0.0
+    native_nonspace = int(native_text["nonspace_characters"])
+    if max_coverage >= 0.90:
+        if native_nonspace == 0:
+            classification = "full-page-raster-no-text-layer"
+        elif native_nonspace <= 32:
+            classification = "full-page-raster-sparse-text-layer"
+        else:
+            classification = "full-page-raster-with-text-overlay"
+    elif max_coverage >= 0.20:
+        classification = "partial-raster-content"
+    else:
+        classification = "no-large-raster-layer"
+
+    return {
+        "classification": classification,
+        "image_count": len(images),
+        "max_image_coverage_ratio": max_coverage,
+        "full_page_raster": max_coverage >= 0.90,
+    }
+
+
 def _render_pdf_page(
     pdf,
     page_number: int,
@@ -462,6 +501,8 @@ def _render_pdf_page(
             f"PDF page {page_number} exceeds rendered pixel limit."
         )
 
+    native_text = _text_stats(page.get_text("text"))
+    page_media = _pdf_page_media_diagnostics(page, native_text)
     pixmap = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
     mode = "RGB" if pixmap.n < 4 else "RGBA"
     image = Image.frombytes(mode, (pixmap.width, pixmap.height), pixmap.samples)
@@ -469,7 +510,8 @@ def _render_pdf_page(
     return destination, {
         "number": page_number,
         "rotation_degrees": int(page.rotation),
-        "native_text": _text_stats(page.get_text("text")),
+        "native_text": native_text,
+        "page_media": page_media,
         "render_width": pixmap.width,
         "render_height": pixmap.height,
     }
@@ -561,6 +603,12 @@ def _evaluate_image(
             "number": 1,
             "rotation_degrees": 0,
             "native_text": _text_stats(""),
+            "page_media": {
+                "classification": "direct-raster-image",
+                "image_count": 1,
+                "max_image_coverage_ratio": 1.0,
+                "full_page_raster": True,
+            },
             "render_width": image.width,
             "render_height": image.height,
         }

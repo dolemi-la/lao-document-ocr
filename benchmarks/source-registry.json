@@ -555,10 +555,10 @@
         "reviewed_on": "2026-09-24",
         "pages": 22,
         "text_layer": "rotated-raster-with-garbled-text-layer",
-        "parsed_text_observation": "Pages 0-6 expose readable native/extracted audit text, but later financial-statement pages collapse into garbage/Cyrillic-like characters and broken tokens.",
-        "visual_observation": "Direct page rendering verifies rotated 90-degree financial-statement pages with red official stamps and blue handwritten signatures; the raster page remains visually legible while the extracted text is unusable."
+        "parsed_text_observation": "Direct metadata audit of all 22 pages shows every page is backed by a full-page raster image. Pages 8-10 and 15-21 have a garbled native text overlay with 51-73% non-Latin/non-Lao letters, while other pages expose mostly Latin audit text.",
+        "visual_observation": "Direct page rendering verifies scanned financial/audit pages with official stamps/signatures. The PDF page rotation metadata is 0 degrees; the scan orientation is embedded in the raster content rather than PDF rotation."
       },
-      "notes": "Strong verified mixed-layer financial OCR candidate: born-digital audit pages transition into rotated scanned financial-statement pages with stamps/signatures and a broken native text layer. Keep remote-only pending rights review."
+      "notes": "Verified full-page-raster financial OCR candidate with mixed clean and garbled text overlays. The curated diagnostic suite pins pages 8, 15, and 21 because those pages are confirmed script-anomaly cases. Keep remote-only pending rights review."
     }
   ]
 }

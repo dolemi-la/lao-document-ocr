@@ -86,6 +86,17 @@ The classifier is a triage signal, not ground truth. It helps prioritize pages f
 
 Each page also includes an `ocr_quality.band` derived from mean OCR block confidence: `low` below 0.60, `medium` from 0.60 to below 0.80, `high` from 0.80 upward, and `no-confidence` when the engine reports no block confidence. The curated suite aggregates these bands so low-confidence real scans are easy to prioritize.
 
+PDF pages also include `page_media` diagnostics based on embedded-image coverage:
+
+- `full-page-raster-no-text-layer`: a raster image covers at least 90% of the page and the PDF exposes no native text;
+- `full-page-raster-sparse-text-layer`: a full-page raster exists with only a tiny native layer;
+- `full-page-raster-with-text-overlay`: a full-page raster exists together with a substantial text overlay;
+- `partial-raster-content`: a significant embedded raster exists but does not cover the full page;
+- `no-large-raster-layer`: no large embedded raster layer was detected;
+- `direct-raster-image`: direct PNG/JPEG/TIFF/WebP input.
+
+The suite aggregates these categories as `page_media_classifications`. This helps distinguish born-digital pages from scanned pages that merely happen to carry an OCR overlay.
+
 ## Not benchmark accuracy
 
 A remote diagnostic report has:

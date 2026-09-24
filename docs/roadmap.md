@@ -29,6 +29,7 @@ Status: in progress
 - [x] bounded remote-source OCR diagnostic runner with temporary downloads and metadata-only reports
 - [x] curated page-pinned remote scan diagnostic suite + manual Tesseract CI workflow
 - [x] remote scan script-anomaly + OCR-confidence triage diagnostics
+- [x] remote PDF full-page-raster/media-layer diagnostics
 - [x] bounded official HPLT Lao streaming sampler + provenance metadata
 - [x] optional reviewed layout AST labels in dataset manifests + coverage reporting
 - [x] reproducible layout-training manifest from reviewed AST labels

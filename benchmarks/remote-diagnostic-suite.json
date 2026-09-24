@@ -58,12 +58,12 @@
     {
       "id": "worldbank-p172774-kpmg-lao-2024-rotated-raster-pages",
       "pages": [
-        1,
-        11,
-        22
+        8,
+        15,
+        21
       ],
       "max_source_mb": 15,
-      "note": "Audited financial statement mixing native pages with rotated raster financial pages and a broken text layer.",
+      "note": "Full-page raster audit/financial pages with known garbled non-Latin OCR-overlay text.",
       "expected_text_layer": "rotated-raster-with-garbled-text-layer"
     }
   ]

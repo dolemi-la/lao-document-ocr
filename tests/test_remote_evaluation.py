@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import shutil
 from pathlib import Path
@@ -16,6 +17,7 @@ from lao_document_ocr.remote_evaluation import (
     RemoteEvaluationError,
     _confidence_diagnostics,
     _layer_gap_diagnostics,
+    _pdf_page_media_diagnostics,
     _text_stats,
     evaluate_remote_sources,
     load_remote_registry_sources,
@@ -323,4 +325,40 @@ def test_layer_gap_detects_native_script_anomaly() -> None:
 )
 def test_confidence_diagnostics_bands(confidence, band) -> None:
     assert _confidence_diagnostics(confidence)["band"] == band
+
+
+def test_pdf_page_media_detects_full_page_raster_with_text_overlay() -> None:
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=200, height=100)
+    buffer = io.BytesIO()
+    Image.new("RGB", (200, 100), "white").save(buffer, format="PNG")
+    page.insert_image(page.rect, stream=buffer.getvalue())
+    page.insert_text(
+        (10, 20),
+        "hello native layer repeated enough for overlay classification",
+        fontsize=10,
+    )
+
+    native = _text_stats(page.get_text("text"))
+    media = _pdf_page_media_diagnostics(page, native)
+    pdf.close()
+
+    assert media["classification"] == "full-page-raster-with-text-overlay"
+    assert media["image_count"] == 1
+    assert media["full_page_raster"] is True
+    assert media["max_image_coverage_ratio"] == pytest.approx(1.0)
+
+
+def test_pdf_page_media_detects_full_page_raster_without_text() -> None:
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=200, height=100)
+    buffer = io.BytesIO()
+    Image.new("RGB", (200, 100), "white").save(buffer, format="PNG")
+    page.insert_image(page.rect, stream=buffer.getvalue())
+
+    media = _pdf_page_media_diagnostics(page, _text_stats(""))
+    pdf.close()
+
+    assert media["classification"] == "full-page-raster-no-text-layer"
+    assert media["full_page_raster"] is True
 
