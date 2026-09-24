@@ -538,6 +538,27 @@
         "visual_observation": "Indexed document text identifies KPMG Lao Co., Ltd. as auditor, Vientiane as the audit location, and Lao MoES/MoLSW as implementing agencies, but page rendering could not be completed because of file size."
       },
       "notes": "High-value institutional financial-document lead for numeric/table OCR and scan artifacts. Kept unverified until direct page rendering succeeds; no public ingestion or derived ground truth without rights review."
+    },
+    {
+      "id": "worldbank-p172774-kpmg-lao-2024-rotated-raster-pages",
+      "name": "World Bank Lao PSG 2024 audited financial statements with rotated raster pages",
+      "url": "https://documents1.worldbank.org/curated/en/099090525045519534/pdf/P172774-541a8e9e-e74f-4890-88e3-b6c6a037e69d.pdf",
+      "license": "rights-unclear-for-derived-benchmark-use; World-Bank-hosted-project-document",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 22,
+        "text_layer": "rotated-raster-with-garbled-text-layer",
+        "parsed_text_observation": "Pages 0-6 expose readable native/extracted audit text, but later financial-statement pages collapse into garbage/Cyrillic-like characters and broken tokens.",
+        "visual_observation": "Direct page rendering verifies rotated 90-degree financial-statement pages with red official stamps and blue handwritten signatures; the raster page remains visually legible while the extracted text is unusable."
+      },
+      "notes": "Strong verified mixed-layer financial OCR candidate: born-digital audit pages transition into rotated scanned financial-statement pages with stamps/signatures and a broken native text layer. Keep remote-only pending rights review."
     }
   ]
 }

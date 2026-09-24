@@ -76,7 +76,7 @@ def test_remote_scan_candidates_stay_non_ingestable() -> None:
         if source["status"].startswith("remote-evaluation-")
     ]
 
-    assert len(candidates) >= 22
+    assert len(candidates) >= 23
     for source in candidates:
         assert source["allowed_uses"] == []
         assert "public-benchmark-redistribution" in source["disallowed_uses"]
@@ -95,4 +95,5 @@ def test_remote_scan_candidates_stay_non_ingestable() -> None:
             "present-but-fragmented-layout-layer",
             "mixed-native-and-raster-camera-pages",
             "present-but-severely-garbled-ocr-layer",
+            "rotated-raster-with-garbled-text-layer",
         }

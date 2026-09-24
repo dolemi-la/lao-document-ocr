@@ -112,7 +112,7 @@ These are valuable for understanding real OCR failure modes, but public availabi
 - retain authoritative URLs plus review evidence for source discovery/rights follow-up
 - promote a source only after an independent rights/license review
 
-The useful failure-mode categories discovered so far are `image-only`, `scanner-watermark-only`, `present-but-garbled-text-layer`, `present-but-noisy-ocr-layer`, and `present-but-fragmented-layout-layer`, and `mixed-native-and-raster-camera-pages`, and `present-but-severely-garbled-ocr-layer`.
+The useful failure-mode categories discovered so far are `image-only`, `scanner-watermark-only`, `present-but-garbled-text-layer`, `present-but-noisy-ocr-layer`, and `present-but-fragmented-layout-layer`, and `mixed-native-and-raster-camera-pages`, and `present-but-severely-garbled-ocr-layer`, and `rotated-raster-with-garbled-text-layer`.
 
 ### Third-party mirror examples — discovery only
 
@@ -132,6 +132,7 @@ Additional discovery sources:
 - MAF Forestry Strategy to 2035 / Vision 2050 is search-indexed with heavily corrupted Lao text plus a CamScanner marker, but remains unverified because the official PDF fetch timed out during direct rendering
 - World Bank Lao PDR disaster-risk-management ESMP includes a Lao project attachment indexed with tables, red stamp, handwritten signatures, and a `Scanned with CamScanner` marker; it remains unverified because the PDF exceeds the verifier's size limit
 - World Bank Lao PDR Priority Skills for Growth audited financial statement identifies KPMG Lao and Vientiane and includes a CamScanner-indexed audit page; it remains unverified because the original PDF also exceeds the verifier's size limit
+- A second World Bank Lao PSG 2024 audit PDF is directly renderable: 22 pages where later financial statements are rotated raster pages with red stamps/signatures while native extraction collapses into garbage text
 
 ## Preferred real-benchmark acquisition
 
