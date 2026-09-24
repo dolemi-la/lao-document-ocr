@@ -130,6 +130,7 @@ Additional discovery sources:
 - the Lao Official Gazette states that authoritative legislation is distributed as image-form PDF; treat it as a collection-level discovery source and review individual files separately
 - ST Bank Laos Q4/2024 is search-indexed with a `Scanned with CS CamScanner` footer and dense Lao financial tables, but remains unverified because the original PDF endpoint timed out during direct inspection
 - MAF Forestry Strategy to 2035 / Vision 2050 is search-indexed with heavily corrupted Lao text plus a CamScanner marker, but remains unverified because the official PDF fetch timed out during direct rendering
+- World Bank Lao PDR disaster-risk-management ESMP includes a Lao project attachment indexed with tables, red stamp, handwritten signatures, and a `Scanned with CamScanner` marker; it remains unverified because the PDF exceeds the verifier's size limit
 
 ## Preferred real-benchmark acquisition
 

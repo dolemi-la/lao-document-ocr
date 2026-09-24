@@ -496,6 +496,27 @@
         "visual_observation": "Direct PDF fetch from the official MAF endpoint timed out during verification, so page rendering could not be independently inspected."
       },
       "notes": "Official Ministry of Agriculture and Forestry source with strong scan-derived indexing signals, but intentionally kept unverified until the original PDF can be rendered directly and its page/text-layer behavior confirmed."
+    },
+    {
+      "id": "worldbank-p160930-oudomxay-esmp-camscanner-attachment",
+      "name": "World Bank Lao PDR DRM Oudomxay ESMP with CamScanner Lao attachment",
+      "url": "https://documents1.worldbank.org/curated/en/099850005312236485/pdf/P1609300d39ea304096d0053c2f86a3d7a.pdf",
+      "license": "rights-unclear-for-derived-benchmark-use; World-Bank-hosted-project-document",
+      "status": "remote-evaluation-candidate-unverified",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": null,
+        "text_layer": "unverified",
+        "parsed_text_observation": "World Bank search indexing exposes Lao table content from an ESMP attachment together with an explicit 'Scanned with CamScanner' marker; direct PDF open exceeded the verifier's 10 MB content limit.",
+        "visual_observation": "Indexed visual/document description identifies a Lao attachment page with a red official stamp and handwritten signatures in the Lao PDR South East Asia Disaster Risk Management Project document."
+      },
+      "notes": "Institutionally hosted Lao project document with strong mixed-report/camera-scan signals, but intentionally kept unverified because the original PDF could not be rendered in the page verifier due to size. Keep remote-only pending direct page inspection and rights review."
     }
   ]
 }
