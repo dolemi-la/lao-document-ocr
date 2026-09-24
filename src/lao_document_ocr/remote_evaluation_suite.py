@@ -24,6 +24,7 @@ class RemoteSuiteEntry:
     source_id: str
     pages: tuple[int, ...]
     expected_text_layer: str
+    rotation_probe: bool = False
     max_source_mb: float | None = None
     note: str | None = None
 
@@ -99,6 +100,12 @@ def load_remote_diagnostic_suite(path: str | Path) -> RemoteDiagnosticSuite:
                 f"Remote diagnostic suite source requires expected_text_layer: {source_id}"
             )
 
+        rotation_probe = raw.get("rotation_probe", False)
+        if not isinstance(rotation_probe, bool):
+            raise RemoteEvaluationError(
+                f"Remote diagnostic suite rotation_probe must be boolean: {source_id}"
+            )
+
         max_source_mb = raw.get("max_source_mb")
         if max_source_mb is not None:
             if isinstance(max_source_mb, bool) or not isinstance(max_source_mb, (int, float)):
@@ -117,6 +124,7 @@ def load_remote_diagnostic_suite(path: str | Path) -> RemoteDiagnosticSuite:
                 source_id=source_id,
                 pages=tuple(pages),
                 expected_text_layer=expected_text_layer,
+                rotation_probe=rotation_probe,
                 max_source_mb=max_source_mb,
                 note=str(note).strip() if note is not None else None,
             )
@@ -197,6 +205,7 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     source_statuses: Counter[str] = Counter()
     confidence_bands: Counter[str] = Counter()
     page_media: Counter[str] = Counter()
+    rotation_recommendations: Counter[str] = Counter()
     page_count = 0
     ocr_lao_characters = 0
     native_lao_characters = 0
@@ -224,6 +233,11 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             media = page.get("page_media")
             if isinstance(media, dict):
                 page_media[str(media.get("classification", "unknown"))] += 1
+            rotation_probe = page.get("rotation_probe")
+            if isinstance(rotation_probe, dict):
+                recommended = rotation_probe.get("recommended_degrees_clockwise")
+                key = "none" if recommended is None else str(int(recommended))
+                rotation_recommendations[key] += 1
             native = page.get("native_text")
             if isinstance(native, dict):
                 native_lao_characters += int(native.get("lao_characters", 0))
@@ -250,6 +264,7 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         "layer_gap_classifications": dict(sorted(layer_gaps.items())),
         "ocr_confidence_bands": dict(sorted(confidence_bands.items())),
         "page_media_classifications": dict(sorted(page_media.items())),
+        "rotation_recommendations": dict(sorted(rotation_recommendations.items())),
         "registry_text_layers": dict(sorted(registry_layers.items())),
         "source_statuses": dict(sorted(source_statuses.items())),
     }
@@ -286,6 +301,7 @@ def evaluate_remote_diagnostic_suite(
             max_page_pixels=suite.max_page_pixels,
             timeout_seconds=suite.timeout_seconds,
             reading_order_resolver=reading_order_resolver,
+            probe_right_angle_rotations=entry.rotation_probe,
             fetcher=fetcher,
         )
         result = report["sources"][0]
@@ -298,6 +314,7 @@ def evaluate_remote_diagnostic_suite(
                 "id": entry.source_id,
                 "pages": list(entry.pages),
                 "expected_text_layer": entry.expected_text_layer,
+                "rotation_probe": entry.rotation_probe,
                 "max_source_mb": max_source_mb,
             }
         )

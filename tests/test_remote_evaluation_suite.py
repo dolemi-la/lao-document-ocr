@@ -98,6 +98,7 @@ def _suite(tmp_path: Path) -> Path:
                         "id": "scan-b",
                         "pages": [1, 3],
                         "expected_text_layer": "scanner-watermark-only",
+                        "rotation_probe": True,
                     },
                 ],
             }
@@ -129,6 +130,7 @@ def test_load_remote_diagnostic_suite_parses_defaults_and_entries(tmp_path) -> N
     assert suite.entries[0].expected_text_layer == "absent"
     assert suite.entries[0].max_source_mb == 2
     assert suite.entries[1].pages == (1, 3)
+    assert suite.entries[1].rotation_probe is True
 
 
 def test_remote_suite_rejects_duplicate_source_ids(tmp_path) -> None:
@@ -209,6 +211,7 @@ def test_remote_suite_runs_per_source_pages_and_aggregates(tmp_path) -> None:
     assert report["summary"]["page_media_classifications"] == {
         "no-large-raster-layer": 3
     }
+    assert report["summary"]["rotation_recommendations"] == {"none": 2}
     assert report["sources"][0]["suite_pages"] == [1]
     assert report["sources"][1]["suite_pages"] == [1, 3]
     assert report["sources"][0]["suite_note"] == "empty layer"
@@ -276,6 +279,7 @@ def test_repo_remote_diagnostic_suite_validates_current_registry() -> None:
         if entry.source_id == "worldbank-p172774-kpmg-lao-2024-rotated-raster-pages"
     )
     assert worldbank.pages == (8, 15, 21)
+    assert worldbank.rotation_probe is True
 
 
 def test_remote_suite_detects_registry_text_layer_drift(tmp_path) -> None:

@@ -97,6 +97,10 @@ PDF pages also include `page_media` diagnostics based on embedded-image coverage
 
 The suite aggregates these categories as `page_media_classifications`. This helps distinguish born-digital pages from scanned pages that merely happen to carry an OCR overlay.
 
+For selected suite entries, `rotation_probe: true` runs diagnostic OCR at 0°, 90°, 180°, and 270° clockwise. The report stores only per-rotation confidence/text statistics and a conservative recommendation; it never stores rotated page images or OCR text. A non-zero orientation is recommended only when its composite confidence/letter score improves by at least 15%, mean block confidence improves by at least 0.08, and the rotated result retains enough recognized letters.
+
+The curated suite currently enables this probe only for the verified World Bank/KPMG raster-overlay pages. This is diagnostic evidence for a later production orientation decision, not automatic rotation in the main OCR pipeline.
+
 ## Not benchmark accuracy
 
 A remote diagnostic report has:

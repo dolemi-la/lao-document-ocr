@@ -16,7 +16,8 @@
       ],
       "max_source_mb": 12,
       "note": "Image-only official Lao scan with an empty native PDF text layer.",
-      "expected_text_layer": "absent"
+      "expected_text_layer": "absent",
+      "rotation_probe": false
     },
     {
       "id": "ptc-camscanner-2024-02-15",
@@ -25,7 +26,8 @@
       ],
       "max_source_mb": 12,
       "note": "CamScanner PDF whose native layer is effectively only the scanner watermark.",
-      "expected_text_layer": "scanner-watermark-only"
+      "expected_text_layer": "scanner-watermark-only",
+      "rotation_probe": false
     },
     {
       "id": "maf-forestry-camscanner-79-blks-343-dps-2022",
@@ -35,7 +37,8 @@
       ],
       "max_source_mb": 20,
       "note": "Long-form official Lao CamScanner document; first and signed/stamped closing pages.",
-      "expected_text_layer": "absent"
+      "expected_text_layer": "absent",
+      "rotation_probe": false
     },
     {
       "id": "laocensus-id-card-home-delivery-2026",
@@ -44,7 +47,8 @@
       ],
       "expected_text_layer": "present-but-garbled",
       "max_source_mb": 12,
-      "note": "Official Lao scan with a present but garbled/non-Lao PDF text layer."
+      "note": "Official Lao scan with a present but garbled/non-Lao PDF text layer.",
+      "rotation_probe": false
     },
     {
       "id": "laowis-savannakhet-groundwater-plan-2022-mixed-camscanner",
@@ -53,7 +57,8 @@
       ],
       "max_source_mb": 25,
       "note": "Mixed report with embedded CamScanner laboratory-result sheets in the appendix.",
-      "expected_text_layer": "mixed-native-and-raster-camera-pages"
+      "expected_text_layer": "mixed-native-and-raster-camera-pages",
+      "rotation_probe": false
     },
     {
       "id": "worldbank-p172774-kpmg-lao-2024-rotated-raster-pages",
@@ -64,7 +69,8 @@
       ],
       "max_source_mb": 15,
       "note": "Full-page raster audit/financial pages with known garbled non-Latin OCR-overlay text.",
-      "expected_text_layer": "rotated-raster-with-garbled-text-layer"
+      "expected_text_layer": "rotated-raster-with-garbled-text-layer",
+      "rotation_probe": true
     }
   ]
 }

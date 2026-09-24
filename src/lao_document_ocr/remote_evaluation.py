@@ -412,6 +412,110 @@ def _ocr_document_stats(document) -> dict[str, Any]:
     }
 
 
+def _rotation_probe_score(ocr_stats: dict[str, Any]) -> float:
+    confidence = ocr_stats.get("mean_block_confidence")
+    confidence_value = float(confidence) if confidence is not None else 0.0
+    text_stats = ocr_stats.get("text") or {}
+    letters = max(0, int(text_stats.get("letter_characters", 0)))
+    return confidence_value * math.log1p(letters)
+
+
+def _rotation_probe(
+    page_path: Path,
+    *,
+    baseline_ocr: dict[str, Any],
+    engine: OcrEngine,
+    max_page_pixels: int,
+    reading_order_resolver: ReadingOrderResolver | None,
+) -> dict[str, Any]:
+    variants: list[dict[str, Any]] = []
+
+    def append_variant(degrees_clockwise: int, ocr_stats: dict[str, Any]) -> None:
+        variants.append(
+            {
+                "degrees_clockwise": degrees_clockwise,
+                "score": _rotation_probe_score(ocr_stats),
+                "mean_block_confidence": ocr_stats.get("mean_block_confidence"),
+                "confidence_band": _confidence_diagnostics(
+                    ocr_stats.get("mean_block_confidence")
+                )["band"],
+                "text": dict(ocr_stats.get("text") or {}),
+            }
+        )
+
+    append_variant(0, baseline_ocr)
+
+    transpose = {
+        90: Image.Transpose.ROTATE_270,
+        180: Image.Transpose.ROTATE_180,
+        270: Image.Transpose.ROTATE_90,
+    }
+    with Image.open(page_path) as source:
+        source_rgb = source.convert("RGB")
+        for degrees_clockwise, operation in transpose.items():
+            rotated = source_rgb.transpose(operation)
+            if rotated.width * rotated.height > max_page_pixels:
+                continue
+            rotated_path = page_path.with_name(
+                f"{page_path.stem}-rot{degrees_clockwise}.png"
+            )
+            rotated.save(rotated_path, format="PNG")
+            try:
+                document = process_document(
+                    rotated_path,
+                    source_name=rotated_path.name,
+                    engine=engine,
+                    max_pages=1,
+                    max_page_pixels=max_page_pixels,
+                    reading_order_resolver=reading_order_resolver,
+                )
+                append_variant(
+                    degrees_clockwise,
+                    _ocr_document_stats(document),
+                )
+            finally:
+                rotated_path.unlink(missing_ok=True)
+
+    ranked = sorted(
+        variants,
+        key=lambda item: (
+            float(item["score"]),
+            float(item["mean_block_confidence"] or 0.0),
+            int(item["text"].get("letter_characters", 0)),
+        ),
+        reverse=True,
+    )
+    best = ranked[0]
+    baseline = next(item for item in variants if item["degrees_clockwise"] == 0)
+    baseline_score = float(baseline["score"])
+    best_score = float(best["score"])
+    baseline_confidence = float(baseline["mean_block_confidence"] or 0.0)
+    best_confidence = float(best["mean_block_confidence"] or 0.0)
+    baseline_letters = int(baseline["text"].get("letter_characters", 0))
+    best_letters = int(best["text"].get("letter_characters", 0))
+
+    recommended = None
+    if (
+        best["degrees_clockwise"] != 0
+        and best_score >= max(0.01, baseline_score * 1.15)
+        and best_confidence >= baseline_confidence + 0.08
+        and best_letters >= max(20, int(baseline_letters * 0.5))
+    ):
+        recommended = int(best["degrees_clockwise"])
+
+    return {
+        "variants": variants,
+        "best_degrees_clockwise": int(best["degrees_clockwise"]),
+        "recommended_degrees_clockwise": recommended,
+        "baseline_score": baseline_score,
+        "best_score": best_score,
+        "score_improvement_ratio": (
+            (best_score / baseline_score) if baseline_score > 0 else None
+        ),
+        "confidence_improvement": best_confidence - baseline_confidence,
+    }
+
+
 def _sample_page_numbers(
     page_count: int,
     requested_pages: Iterable[int] | None,
@@ -527,6 +631,7 @@ def _evaluate_pdf(
     max_page_pixels: int,
     work_dir: Path,
     reading_order_resolver: ReadingOrderResolver | None,
+    probe_right_angle_rotations: bool,
 ) -> dict[str, Any]:
     try:
         pdf = pymupdf.open(path)
@@ -571,6 +676,14 @@ def _evaluate_pdf(
             diagnostics["ocr_quality"] = _confidence_diagnostics(
                 diagnostics["ocr"]["mean_block_confidence"]
             )
+            if probe_right_angle_rotations:
+                diagnostics["rotation_probe"] = _rotation_probe(
+                    page_path,
+                    baseline_ocr=diagnostics["ocr"],
+                    engine=engine,
+                    max_page_pixels=max_page_pixels,
+                    reading_order_resolver=reading_order_resolver,
+                )
             diagnostics["elapsed_seconds"] = time.perf_counter() - started
             page_results.append(diagnostics)
 
@@ -660,6 +773,7 @@ def evaluate_remote_sources(
     max_page_pixels: int = DEFAULT_MAX_PAGE_PIXELS,
     timeout_seconds: float = 20.0,
     reading_order_resolver: ReadingOrderResolver | None = None,
+    probe_right_angle_rotations: bool = False,
     fetcher: RemoteFetcher = download_remote_source,
 ) -> dict[str, Any]:
     if max_document_pages < 1:
@@ -717,6 +831,7 @@ def evaluate_remote_sources(
                         max_page_pixels=max_page_pixels,
                         work_dir=source_dir,
                         reading_order_resolver=reading_order_resolver,
+                        probe_right_angle_rotations=probe_right_angle_rotations,
                     )
                 else:
                     result["document"] = _evaluate_image(
@@ -755,6 +870,7 @@ def evaluate_remote_sources(
             "max_source_bytes": max_source_bytes,
             "max_document_pages": max_document_pages,
             "max_page_pixels": max_page_pixels,
+            "probe_right_angle_rotations": probe_right_angle_rotations,
         },
         "summary": {
             "sources": len(results),

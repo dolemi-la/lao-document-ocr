@@ -12,12 +12,14 @@ from PIL import Image
 
 from lao_document_ocr.models import BoundingBox
 from lao_document_ocr.ocr.base import OcrEngine, RecognizedLine
+from lao_document_ocr.pipeline import process_document
 from lao_document_ocr.remote_evaluation import (
     DownloadedRemote,
     RemoteEvaluationError,
     _confidence_diagnostics,
     _layer_gap_diagnostics,
     _pdf_page_media_diagnostics,
+    _rotation_probe,
     _text_stats,
     evaluate_remote_sources,
     load_remote_registry_sources,
@@ -361,4 +363,52 @@ def test_pdf_page_media_detects_full_page_raster_without_text() -> None:
 
     assert media["classification"] == "full-page-raster-no-text-layer"
     assert media["full_page_raster"] is True
+
+
+class OrientationSensitiveEngine(OcrEngine):
+    def is_available(self) -> bool:
+        return True
+
+    def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+        confidence = 0.92 if image.height > image.width else 0.30
+        return [
+            RecognizedLine(
+                text="orientation probe text with enough letters",
+                bbox=BoundingBox(x=5, y=5, width=100, height=20),
+                confidence=confidence,
+                block_id=1,
+                paragraph_id=1,
+                line_id=1,
+            )
+        ]
+
+
+def test_rotation_probe_recommends_clear_right_angle_improvement(tmp_path) -> None:
+    page_path = tmp_path / "landscape.png"
+    Image.new("RGB", (300, 160), "white").save(page_path)
+
+    baseline_document = process_document(
+        page_path,
+        engine=OrientationSensitiveEngine(),
+        max_pages=1,
+    )
+    from lao_document_ocr.remote_evaluation import _ocr_document_stats
+
+    probe = _rotation_probe(
+        page_path,
+        baseline_ocr=_ocr_document_stats(baseline_document),
+        engine=OrientationSensitiveEngine(),
+        max_page_pixels=1_000_000,
+        reading_order_resolver=None,
+    )
+
+    assert probe["best_degrees_clockwise"] == 90
+    assert probe["recommended_degrees_clockwise"] == 90
+    assert probe["confidence_improvement"] > 0.5
+    assert {item["degrees_clockwise"] for item in probe["variants"]} == {
+        0,
+        90,
+        180,
+        270,
+    }
 
