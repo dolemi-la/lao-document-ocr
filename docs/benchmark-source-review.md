@@ -112,7 +112,16 @@ These are valuable for understanding real OCR failure modes, but public availabi
 - retain authoritative URLs plus review evidence for source discovery/rights follow-up
 - promote a source only after an independent rights/license review
 
-The useful failure-mode categories discovered so far are `image-only`, `scanner-watermark-only`, `present-but-garbled-text-layer`, `present-but-noisy-ocr-layer`, and `present-but-fragmented-layout-layer`, and `mixed-native-and-raster-camera-pages`.
+The useful failure-mode categories discovered so far are `image-only`, `scanner-watermark-only`, `present-but-garbled-text-layer`, `present-but-noisy-ocr-layer`, and `present-but-fragmented-layout-layer`, and `mixed-native-and-raster-camera-pages`, and `present-but-severely-garbled-ocr-layer`.
+
+### Third-party mirror examples — discovery only
+
+Two especially useful scan-failure examples were also found on non-authoritative mirrors:
+
+- Savannakhet DPWT five-year plan (AnyFlip): 44 pages with repeated CamScanner markers and severely garbled Lao extraction
+- Xaythany groundwater-quality thesis (PubHTML5): 124 CamScanner-derived pages with a noisy Lao OCR layer and broken spacing/combining marks
+
+These are recorded with the stricter status `remote-evaluation-candidate-third-party-mirror-not-approved`. They are useful for understanding failure modes, but the mirror is not proof of provenance or redistribution rights. Do not download them into the public dataset, generate public ground truth from them, or use them as training data without locating and clearing an authoritative source.
 
 Additional discovery sources:
 

@@ -412,6 +412,48 @@
         "visual_observation": "Not independently page-rendered because the authoritative PDF endpoint timed out. The bank's official financial-report archive lists the corresponding Q4/2024 quarterly report."
       },
       "notes": "Promising table/numeric camera-scan stress candidate from ST Bank Laos. Keep unverified until the original PDF can be fetched and page/text-layer behavior inspected directly."
+    },
+    {
+      "id": "anyflip-savannakhet-dpwt-five-year-plan-2021-2025",
+      "name": "Savannakhet DPWT five-year plan 2021-2025 (AnyFlip mirror)",
+      "url": "https://anyflip.com/xlcbe/zuee/basic",
+      "license": "rights-unclear; non-authoritative-third-party-mirror",
+      "status": "remote-evaluation-candidate-third-party-mirror-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 44,
+        "text_layer": "present-but-severely-garbled-ocr-layer",
+        "parsed_text_observation": "AnyFlip exposes a text transcription, but Lao characters are extensively corrupted/substituted and page text is not a trustworthy representation of the visible document.",
+        "visual_observation": "The mirrored 44-page Savannakhet Department of Public Works and Transport plan contains repeated CamScanner markers in later pages and appears scan-derived."
+      },
+      "notes": "High-value real-world failure example, but AnyFlip is a third-party mirror uploaded by an individual account rather than an authoritative government distribution source. Keep discovery/evaluation metadata only; do not ingest bytes or derived ground truth."
+    },
+    {
+      "id": "pubhtml5-xaythany-groundwater-thesis-camscanner",
+      "name": "Xaythany groundwater-quality thesis CamScanner mirror (PubHTML5)",
+      "url": "https://pubhtml5.com/dqhi/abwg/basic/",
+      "license": "rights-unclear; non-authoritative-third-party-mirror",
+      "status": "remote-evaluation-candidate-third-party-mirror-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 124,
+        "text_layer": "present-but-noisy-ocr-layer",
+        "parsed_text_observation": "PubHTML5 exposes Lao text, but spacing and combining-mark segmentation are visibly broken throughout the extracted transcription.",
+        "visual_observation": "The mirrored thesis identifies its pages as Scanned by CamScanner and spans 124 pages."
+      },
+      "notes": "Large CamScanner-derived Lao academic document useful for failure-mode discovery, but PubHTML5 is a third-party mirror. Keep remote metadata only and do not treat it as an authoritative or redistributable source."
     }
   ]
 }
