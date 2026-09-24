@@ -286,6 +286,48 @@
         "visual_observation": "The authoritative MPWT legislation listing identifies the file as a Council of Lao Architects and Engineers document and the PDF content layer is scanner-watermark-only."
       },
       "notes": "Single-page official MPWT CamScanner candidate with no useful native document text. Keep remote-only pending rights review."
+    },
+    {
+      "id": "maf-camscanner-30-maf-bk-225-2022",
+      "name": "MAF/forestry CamScanner document 30-MAF-BK-225",
+      "url": "https://dop.mis-mae.gov.la/pdf/30-MAF-BK-225.pdf",
+      "license": "rights-unclear",
+      "status": "remote-evaluation-candidate-unverified",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": null,
+        "text_layer": "unverified",
+        "parsed_text_observation": "Search indexing identifies the source as CamScanner 08-22-2022 13.28, but direct PDF inspection was blocked by the host verification page.",
+        "visual_observation": "Not independently inspected; do not promote to verified candidate without a successful direct PDF/page review."
+      },
+      "notes": "Likely high-value CamScanner Lao document, but intentionally kept unverified because the authoritative host blocks direct inspection. No ingestion or redistribution."
+    },
+    {
+      "id": "lao-official-gazette-image-pdf-collection",
+      "name": "Lao Official Gazette authoritative image-form PDF collection",
+      "url": "https://www.laoofficialgazette.gov.la/",
+      "license": "rights-unclear; official-government-publication",
+      "status": "remote-evaluation-source-collection-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": null,
+        "text_layer": "image-form-source-collection",
+        "parsed_text_observation": "The official Gazette states that authoritative legislation is provided in image-form PDF, while searchable text/Word representations are informational.",
+        "visual_observation": "Collection-level discovery source only; individual PDFs still require page/text-layer verification before being promoted to a verified candidate."
+      },
+      "notes": "High-yield discovery source for official image-form Lao legal documents with weak/absent native text layers. This collection is not asserted to be camera-captured; use it to discover individual scan candidates and review each separately."
     }
   ]
 }

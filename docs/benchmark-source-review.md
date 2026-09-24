@@ -111,6 +111,11 @@ These are valuable for understanding real OCR failure modes, but public availabi
 
 The useful failure-mode categories discovered so far are `image-only`, `scanner-watermark-only`, and `present-but-garbled-text-layer`.
 
+Additional discovery sources:
+
+- a second MAF/forestry PDF is search-indexed as CamScanner 08-22-2022 13.28, but remains unverified because direct inspection is blocked by the host
+- the Lao Official Gazette states that authoritative legislation is distributed as image-form PDF; treat it as a collection-level discovery source and review individual files separately
+
 ## Preferred real-benchmark acquisition
 
 Use the project capture-pack workflow:

@@ -73,19 +73,22 @@ def test_remote_scan_candidates_stay_non_ingestable() -> None:
     candidates = [
         source
         for source in payload["sources"]
-        if source["status"] == "remote-evaluation-candidate-not-approved"
+        if source["status"].startswith("remote-evaluation-")
     ]
 
-    assert len(candidates) >= 6
+    assert len(candidates) >= 12
     for source in candidates:
         assert source["allowed_uses"] == []
         assert "public-benchmark-redistribution" in source["disallowed_uses"]
         assert "training-data-ingestion" in source["disallowed_uses"]
         assert "public-ground-truth" in source["disallowed_uses"]
-        assert source["evidence"]["pages"] >= 1
+        pages = source["evidence"]["pages"]
+        assert pages is None or pages >= 1
         assert source["evidence"]["text_layer"] in {
             "absent",
             "effectively-absent",
             "present-but-garbled",
             "scanner-watermark-only",
+            "unverified",
+            "image-form-source-collection",
         }
