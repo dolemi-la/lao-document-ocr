@@ -3,7 +3,7 @@ import io
 from PIL import Image
 
 from lao_document_ocr.models import BoundingBox
-from lao_document_ocr.ocr.base import OcrEngine, RecognizedLine
+from lao_document_ocr.ocr.base import OcrEngine, OcrEngineError, RecognizedLine
 from lao_document_ocr.pipeline import process_document
 
 
@@ -523,10 +523,10 @@ def test_auto_orientation_skips_probe_for_strong_lao_baseline(tmp_path) -> None:
     assert state["calls"] == 1
 
 
-def test_auto_orientation_accepts_verified_engine_hint_without_full_probe(
+def test_auto_orientation_ignores_engine_hint_and_selects_best_exhaustive_candidate(
     tmp_path,
 ) -> None:
-    state = {"calls": 0}
+    state = {"recognize_calls": 0, "hint_calls": 0}
 
     class HintedEngine(OcrEngine):
         def is_available(self) -> bool:
@@ -534,18 +534,26 @@ def test_auto_orientation_accepts_verified_engine_hint_without_full_probe(
 
         def orientation_hint(self, image: Image.Image):
             del image
+            state["hint_calls"] += 1
             return {
                 "degrees_clockwise": 90,
-                "orientation_confidence": 9.0,
+                "orientation_confidence": 20.0,
                 "source": "test-hint",
             }
 
         def recognize(self, image: Image.Image) -> list[RecognizedLine]:
-            state["calls"] += 1
-            confidence = 0.95 if image.height > image.width else 0.30
+            del image
+            state["recognize_calls"] += 1
+            confidence_by_call = {
+                1: 0.30,  # baseline
+                2: 0.82,  # 90°: acceptable, but not best
+                3: 0.95,  # 180°: best
+                4: 0.40,  # 270°
+            }
+            confidence = confidence_by_call[state["recognize_calls"]]
             return [
                 RecognizedLine(
-                    text="hinted orientation text with enough characters",
+                    text="exhaustive orientation text with enough characters",
                     bbox=BoundingBox(x=10, y=10, width=100, height=20),
                     confidence=confidence,
                     block_id=1,
@@ -564,37 +572,35 @@ def test_auto_orientation_accepts_verified_engine_hint_without_full_probe(
     )
 
     orientation = document.metadata["auto_orientation"]["pages"][0]
-    assert orientation["degrees_clockwise"] == 90
+    assert orientation["degrees_clockwise"] == 180
     diagnostics = orientation["diagnostics"]
-    assert diagnostics["probe_strategy"] == "hint-accepted"
-    assert diagnostics["probed_degrees"] == [90]
-    assert diagnostics["engine_orientation_hint"]["degrees_clockwise"] == 90
-    assert state["calls"] == 2
+    assert diagnostics["probe_strategy"] == "exhaustive"
+    assert diagnostics["probed_degrees"] == [90, 180, 270]
+    assert diagnostics["engine_orientation_hint"] is None
+    assert state["hint_calls"] == 0
+    assert state["recognize_calls"] == 4
 
 
-def test_auto_orientation_falls_back_when_engine_hint_fails_verification(
+def test_auto_orientation_exhaustive_probe_continues_after_candidate_error(
     tmp_path,
 ) -> None:
     state = {"calls": 0}
 
-    class BadHintEngine(OcrEngine):
+    class PartialFailureEngine(OcrEngine):
         def is_available(self) -> bool:
             return True
 
-        def orientation_hint(self, image: Image.Image):
-            del image
-            return {
-                "degrees_clockwise": 180,
-                "orientation_confidence": 10.0,
-                "source": "bad-test-hint",
-            }
-
         def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            del image
             state["calls"] += 1
-            if image.height > image.width:
-                confidence = 0.95
-            else:
-                confidence = 0.30
+            if state["calls"] == 2:
+                raise OcrEngineError("90-degree probe failed")
+            confidence_by_call = {
+                1: 0.30,  # baseline
+                3: 0.95,  # 180°
+                4: 0.40,  # 270°
+            }
+            confidence = confidence_by_call[state["calls"]]
             return [
                 RecognizedLine(
                     text="fallback orientation text with enough characters",
@@ -606,18 +612,18 @@ def test_auto_orientation_falls_back_when_engine_hint_fails_verification(
                 )
             ]
 
-    image_path = tmp_path / "bad-hint.png"
+    image_path = tmp_path / "partial-probe-failure.png"
     Image.new("RGB", (320, 180), "white").save(image_path)
 
     document = process_document(
         image_path,
-        engine=BadHintEngine(),
+        engine=PartialFailureEngine(),
         auto_orient_right_angles=True,
     )
 
     orientation = document.metadata["auto_orientation"]["pages"][0]
-    assert orientation["degrees_clockwise"] == 90
+    assert orientation["degrees_clockwise"] == 180
     diagnostics = orientation["diagnostics"]
-    assert diagnostics["probe_strategy"] == "exhaustive-after-hint"
-    assert diagnostics["probed_degrees"] == [180, 90, 270]
+    assert diagnostics["probe_strategy"] == "exhaustive"
+    assert diagnostics["probed_degrees"] == [180, 270]
     assert state["calls"] == 4

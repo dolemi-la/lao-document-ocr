@@ -323,13 +323,6 @@ def _recognize_with_right_angle_orientation(
             },
         )
 
-    hint: dict[str, object] | None
-    try:
-        raw_hint = engine.orientation_hint(image)
-    except OcrEngineError:
-        raw_hint = None
-    hint = raw_hint if isinstance(raw_hint, dict) else None
-
     candidates = [
         (
             0,
@@ -364,55 +357,7 @@ def _recognize_with_right_angle_orientation(
         probed_degrees.append(degrees)
         return candidate
 
-    hinted_degrees = 0
-    if hint is not None:
-        try:
-            hinted_degrees = int(hint.get("degrees_clockwise", 0)) % 360
-        except (TypeError, ValueError):
-            hinted_degrees = 0
-
-    if hinted_degrees in {90, 180, 270}:
-        hinted = probe(hinted_degrees)
-        if hinted is not None:
-            (
-                degrees,
-                hinted_image,
-                hinted_lines,
-                confidence,
-                characters,
-                score,
-                lao_ratio,
-            ) = hinted
-            if _orientation_candidate_is_acceptable(
-                degrees=degrees,
-                confidence=confidence,
-                characters=characters,
-                score=score,
-                baseline_confidence=baseline_confidence,
-                baseline_characters=baseline_characters,
-                baseline_score=baseline_score,
-            ):
-                return (
-                    hinted_image,
-                    hinted_lines,
-                    degrees,
-                    {
-                        **base_diagnostics,
-                        "selected_confidence": confidence,
-                        "selected_characters": characters,
-                        "selected_score": score,
-                        "selected_lao_ratio": lao_ratio,
-                        "probe_skipped": False,
-                        "probe_skip_reason": None,
-                        "probe_strategy": "hint-accepted",
-                        "probed_degrees": list(probed_degrees),
-                        "engine_orientation_hint": hint,
-                    },
-                )
-
     for degrees in (90, 180, 270):
-        if degrees in probed_degrees:
-            continue
         probe(degrees)
 
     best = max(
@@ -460,13 +405,9 @@ def _recognize_with_right_angle_orientation(
             "selected_lao_ratio": best_lao_ratio,
             "probe_skipped": False,
             "probe_skip_reason": None,
-            "probe_strategy": (
-                "exhaustive-after-hint"
-                if hinted_degrees in {90, 180, 270}
-                else "exhaustive"
-            ),
+            "probe_strategy": "exhaustive",
             "probed_degrees": list(probed_degrees),
-            "engine_orientation_hint": hint,
+            "engine_orientation_hint": None,
         },
     )
 

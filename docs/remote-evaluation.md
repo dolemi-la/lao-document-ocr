@@ -107,9 +107,9 @@ For selected suite entries, `rotation_probe: true` runs diagnostic OCR at 0°, 9
 
 OCR engines may also provide a diagnostic `orientation_hint`. `TesseractEngine` uses Tesseract OSD when `osd` traineddata is available and records only the suggested clockwise angle, orientation confidence, script name, and script confidence. The hint does not choose the production angle yet; the exhaustive rotation probe remains the reference so OSD agreement can be measured first.
 
-Current curated evidence keeps OSD diagnostic-only: on the three verified KPMG problem pages it matched the exhaustive recommendation on only one page. Low OSD confidence was associated with the two mismatches, so production auto-orientation continues to use OCR evidence rather than trusting OSD directly.
+Current curated evidence keeps OSD diagnostic-only: on the three verified KPMG problem pages it matched the production-equivalent exhaustive recommendation on only one page. The mismatching page-8 hint also exceeded Tesseract's default orientation-margin threshold, so OSD confidence alone is not enough evidence for production selection.
 
-Production auto-orientation may still use an engine orientation hint as a **first candidate**. The hinted angle is immediately OCR-verified with the same score/confidence/character acceptance thresholds. If it passes, the remaining angles are skipped; if it fails, the pipeline falls back to the exhaustive remaining right-angle probes. This preserves OCR verification while reducing cost when a hint is useful.
+Production auto-orientation no longer uses the engine orientation hint as an early-exit candidate. After the existing high-confidence and Lao-dominant skip checks, it OCR-probes 90°, 180°, and 270° and selects the highest production score that passes the same score/confidence/recognized-character thresholds. OSD remains available only in remote diagnostics for comparison.
 
 When a page is rotated, preserved partial embedded-PDF image payloads rotate with their bounding boxes so exported DOCX figures/photos stay aligned with the corrected page orientation.
 

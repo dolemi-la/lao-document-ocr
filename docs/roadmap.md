@@ -40,7 +40,7 @@ Status: in progress
 - [x] align remote rotation-probe scoring with production weighted OCR-line metrics
 - [x] bilingual web UI opt-in control for right-angle auto-orientation
 - [x] Lao-dominance probe-skip optimization + auto-orientation probe-state reporting
-- [x] OCR-verified orientation-hint fast path with exhaustive fallback
+- [x] retire production orientation-hint early exit after production-equivalent remote comparison
 - [x] plain-OCR vs auto-orient suite performance mode with diagnostic probes independently switchable
 - [x] bounded official HPLT Lao streaming sampler + provenance metadata
 - [x] optional reviewed layout AST labels in dataset manifests + coverage reporting
