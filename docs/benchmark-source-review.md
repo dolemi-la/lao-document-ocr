@@ -120,6 +120,7 @@ Two especially useful scan-failure examples were also found on non-authoritative
 
 - Savannakhet DPWT five-year plan (AnyFlip): 44 pages with repeated CamScanner markers and severely garbled Lao extraction
 - Xaythany groundwater-quality thesis (PubHTML5): 124 CamScanner-derived pages with a noisy Lao OCR layer and broken spacing/combining marks
+- Lao44 2019 official Lao letter: one directly verified CamScanner page whose native PDF layer contains only the scanner watermark while the raster page contains the complete Lao letter, stamp, signature, and handwriting
 
 These are recorded with the stricter status `remote-evaluation-candidate-third-party-mirror-not-approved`. They are useful for understanding failure modes, but the mirror is not proof of provenance or redistribution rights. Do not download them into the public dataset, generate public ground truth from them, or use them as training data without locating and clearing an authoritative source.
 

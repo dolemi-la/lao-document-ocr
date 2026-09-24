@@ -454,6 +454,27 @@
         "visual_observation": "The mirrored thesis identifies its pages as Scanned by CamScanner and spans 124 pages."
       },
       "notes": "Large CamScanner-derived Lao academic document useful for failure-mode discovery, but PubHTML5 is a third-party mirror. Keep remote metadata only and do not treat it as an authoritative or redistributable source."
+    },
+    {
+      "id": "lao44-camscanner-official-letter-2019-06-24",
+      "name": "Lao44 CamScanner official Lao letter (2019-06-24)",
+      "url": "https://www.lao44.org/downloadfile/jZQzdlcCZVwWTFK3",
+      "license": "rights-unclear; repository-hosted-contributed-document",
+      "status": "remote-evaluation-candidate-third-party-library-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 1,
+        "text_layer": "scanner-watermark-only",
+        "parsed_text_observation": "Direct PDF extraction exposes only 'Scanned with CamScanner' and none of the visible Lao letter body.",
+        "visual_observation": "Rendered page is a full Lao official letter with handwritten date/document number, handwritten check mark, red official stamp, signature, paper/raster noise, and a visible Scanned with CamScanner footer."
+      },
+      "notes": "Strong direct image-only OCR failure case hosted by Lao44, an open Lao document library operated by CLICK. The repository is not the issuing authority, so keep it remote-only until source provenance and redistribution rights are independently established."
     }
   ]
 }
