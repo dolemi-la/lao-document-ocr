@@ -36,6 +36,7 @@ Status: in progress
 - [x] rotate preserved embedded-image payloads with auto-oriented PDF page geometry
 - [x] opt-in right-angle auto-orientation exposed through sync API + async single/batch jobs
 - [x] opt-in right-angle auto-orientation exposed for focused remote-source CLI/workflow diagnostics
+- [x] focused exhaustive rotation probes exposed for selected remote PDF/image diagnostics
 - [x] bilingual web UI opt-in control for right-angle auto-orientation
 - [x] Lao-dominance probe-skip optimization + auto-orientation probe-state reporting
 - [x] OCR-verified orientation-hint fast path with exhaustive fallback

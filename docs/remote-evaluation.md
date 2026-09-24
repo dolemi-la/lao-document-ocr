@@ -31,6 +31,8 @@ Without `--page`, PDFs sample representative pages (first, middle, last by defau
 
 For focused auto-orientation A/B work, `evaluate-remote-sources` also accepts `--auto-orient-right-angles`. It is off by default and only changes OCR processing for the selected remote diagnostic source/pages; the report remains metadata-only and `not_benchmark_accuracy: true`.
 
+Use `--rotation-probes` to opt into exhaustive 0°/90°/180°/270° diagnostic OCR for the selected PDF pages or direct image source. This is off by default because it is expensive. When auto-orientation is enabled, the separate exhaustive diagnostic probe is suppressed to avoid duplicating orientation OCR work; the report still records both requested selection flags.
+
 ## GitHub Actions
 
 For an environment with real Tesseract Lao/English installed, run the manual **Remote Scan Diagnostic** workflow.
@@ -40,7 +42,8 @@ Inputs:
 - `source_id`: one `remote-evaluation-*` registry ID;
 - `page`: optional 1-based page number;
 - `max_source_mb`: bounded download limit, default 25 MiB;
-- `auto_orient_right_angles`: optional conservative production auto-orientation, default `false`.
+- `auto_orient_right_angles`: optional conservative production auto-orientation, default `false`;
+- `diagnostic_rotation_probes`: optional exhaustive 0°/90°/180°/270° diagnostic probes, default `false`.
 
 The workflow is manual-only, has read-only repository permissions, installs `tesseract-ocr-lao` and `tesseract-ocr-eng`, validates the report privacy boundary, and uploads only the JSON diagnostic report for 14 days.
 

@@ -31,9 +31,13 @@ def test_remote_evaluation_workflow_exposes_opt_in_auto_orientation() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
     assert "auto_orient_right_angles:" in text
+    assert "diagnostic_rotation_probes:" in text
     assert "AUTO_ORIENT: ${{ inputs.auto_orient_right_angles }}" in text
+    assert "ROTATION_PROBES: ${{ inputs.diagnostic_rotation_probes }}" in text
     assert "args+=(--auto-orient-right-angles)" in text
+    assert "args+=(--rotation-probes)" in text
     assert 'payload["selection"]["auto_orient_right_angles"]' in text
+    assert 'payload["selection"]["probe_right_angle_rotations"]' in text
 
 
 

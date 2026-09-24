@@ -735,6 +735,7 @@ def _evaluate_image(
     engine: OcrEngine,
     max_page_pixels: int,
     reading_order_resolver: ReadingOrderResolver | None,
+    probe_right_angle_rotations: bool,
     auto_orient_right_angles: bool,
 ) -> dict[str, Any]:
     with Image.open(path) as image:
@@ -786,6 +787,14 @@ def _evaluate_image(
     dimensions["ocr_quality"] = _confidence_diagnostics(
         dimensions["ocr"]["mean_block_confidence"]
     )
+    if probe_right_angle_rotations and not auto_orient_right_angles:
+        dimensions["rotation_probe"] = _rotation_probe(
+            path,
+            baseline_ocr=dimensions["ocr"],
+            engine=engine,
+            max_page_pixels=max_page_pixels,
+            reading_order_resolver=reading_order_resolver,
+        )
     dimensions["elapsed_seconds"] = time.perf_counter() - started
     return {
         "page_count": 1,
@@ -876,6 +885,7 @@ def evaluate_remote_sources(
                         engine=engine,
                         max_page_pixels=max_page_pixels,
                         reading_order_resolver=reading_order_resolver,
+                        probe_right_angle_rotations=probe_right_angle_rotations,
                         auto_orient_right_angles=auto_orient_right_angles,
                     )
                 result["status"] = "ok"

@@ -457,6 +457,7 @@ def test_remote_evaluation_reports_applied_auto_orientation(tmp_path) -> None:
         engine=OrientationSensitiveEngine(),
         source_ids=["remote-scan"],
         requested_pages=[1],
+        probe_right_angle_rotations=True,
         auto_orient_right_angles=True,
         fetcher=fetcher,
     )
@@ -467,4 +468,43 @@ def test_remote_evaluation_reports_applied_auto_orientation(tmp_path) -> None:
         "selected_confidence"
     ] > 0.9
     assert report["selection"]["auto_orient_right_angles"] is True
+    assert report["selection"]["probe_right_angle_rotations"] is True
+    assert "rotation_probe" not in page_report
+
+
+def test_remote_evaluation_can_probe_direct_image_orientation(tmp_path) -> None:
+    registry = _registry(tmp_path)
+    source_image = tmp_path / "landscape.png"
+    Image.new("RGB", (300, 160), "white").save(source_image)
+
+    def fetcher(url, destination_base, *, max_bytes, timeout_seconds):
+        del url, max_bytes, timeout_seconds
+        destination = Path(destination_base).with_suffix(".png")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_image, destination)
+        data = destination.read_bytes()
+        return DownloadedRemote(
+            path=destination,
+            final_url="https://example.com/document.png",
+            sha256=hashlib.sha256(data).hexdigest(),
+            size_bytes=len(data),
+            content_type="image/png",
+            etag=None,
+            last_modified=None,
+            format="png",
+        )
+
+    report = evaluate_remote_sources(
+        registry,
+        engine=OrientationSensitiveEngine(),
+        source_ids=["remote-scan"],
+        probe_right_angle_rotations=True,
+        fetcher=fetcher,
+    )
+
+    page_report = report["sources"][0]["document"]["pages"][0]
+    assert page_report["rotation_probe"]["recommended_degrees_clockwise"] == 90
+    assert report["selection"]["probe_right_angle_rotations"] is True
+    serialized = json.dumps(report, ensure_ascii=False)
+    assert "orientation probe text with enough letters" not in serialized
 

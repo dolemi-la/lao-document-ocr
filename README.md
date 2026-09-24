@@ -292,6 +292,8 @@ lao-ocr evaluate-remote-sources --source-id ptc-camscanner-2024-02-15 --output r
 
 # Optional focused A/B using the same conservative production auto-orientation path
 lao-ocr evaluate-remote-sources --source-id worldbank-p172774-kpmg-lao-2024-rotated-raster-pages --page 8 --auto-orient-right-angles --output reports/remote-kpmg-page-8-auto-orient.json
+# Optional exhaustive right-angle diagnostics for one selected source/page
+lao-ocr evaluate-remote-sources --source-id worldbank-p172774-kpmg-lao-2024-rotated-raster-pages --page 8 --rotation-probes --output reports/remote-kpmg-page-8-rotation-probe.json
 lao-ocr evaluate-remote-suite --suite benchmarks/remote-diagnostic-suite.json --output reports/remote-suite.json
 # Optional: add --tessdata-dir /path/to/tessdata for hashed custom weights
 lao-ocr compare-benchmarks --baseline baseline.json --candidate candidate.json --output comparison.json

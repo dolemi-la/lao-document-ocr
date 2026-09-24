@@ -484,6 +484,14 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     remote_eval.add_argument(
+        "--rotation-probes",
+        action="store_true",
+        help=(
+            "Run exhaustive 0/90/180/270 diagnostic OCR probes for selected "
+            "remote pages/images. Suppressed when auto-orientation is enabled."
+        ),
+    )
+    remote_eval.add_argument(
         "--engine",
         choices=["tesseract", "owned"],
         default="tesseract",
@@ -1540,6 +1548,7 @@ def _evaluate_remote_sources(args: argparse.Namespace) -> int:
         max_page_pixels=args.max_page_pixels,
         timeout_seconds=args.timeout_seconds,
         reading_order_resolver=reading_order_resolver,
+        probe_right_angle_rotations=args.rotation_probes,
         auto_orient_right_angles=args.auto_orient_right_angles,
     )
     output = write_remote_evaluation_report(report, args.output)
