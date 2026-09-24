@@ -1,0 +1,134 @@
+name: Remote Scan Diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_id:
+        description: "Remote source-registry ID to evaluate"
+        required: true
+        type: string
+      page:
+        description: "Optional 1-based page number; leave blank for representative sampling"
+        required: false
+        type: string
+      max_source_mb:
+        description: "Maximum remote download size in MiB"
+        required: true
+        default: "25"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  remote-diagnostic:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Tesseract Lao/English
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             tesseract-ocr             tesseract-ocr-lao             tesseract-ocr-eng
+          tesseract --list-langs
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Run remote diagnostic
+        id: diagnostic
+        env:
+          SOURCE_ID: ${{ inputs.source_id }}
+          PAGE: ${{ inputs.page }}
+          MAX_SOURCE_MB: ${{ inputs.max_source_mb }}
+          REPORT: ${{ runner.temp }}/remote-source-diagnostic.json
+        run: |
+          set -euo pipefail
+          args=(
+            lao-ocr evaluate-remote-sources
+            --registry benchmarks/source-registry.json
+            --source-id "$SOURCE_ID"
+            --max-pages-per-source 3
+            --max-source-mb "$MAX_SOURCE_MB"
+            --output "$REPORT"
+          )
+          if [ -n "$PAGE" ]; then
+            case "$PAGE" in
+              *[!0-9]*|'')
+                echo "page input must be a positive integer" >&2
+                exit 2
+                ;;
+            esac
+            if [ "$PAGE" -lt 1 ]; then
+              echo "page input must be at least 1" >&2
+              exit 2
+            fi
+            args+=(--page "$PAGE")
+          fi
+          set +e
+          "${args[@]}"
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Verify report privacy boundary
+        env:
+          REPORT: ${{ runner.temp }}/remote-source-diagnostic.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT"])
+          payload = json.loads(path.read_text(encoding="utf-8"))
+
+          assert payload["report_type"] == "remote-source-diagnostic"
+          assert payload["not_benchmark_accuracy"] is True
+          assert payload["summary"]["sources"] == 1
+
+          forbidden = {
+              "reference",
+              "hypothesis",
+              "ground_truth",
+              "ocr_text",
+              "native_text_content",
+          }
+
+          def walk(value):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      assert key not in forbidden, key
+                      walk(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      walk(item)
+
+          walk(payload)
+          print(json.dumps(payload["summary"], indent=2))
+          PY
+
+      - name: Upload diagnostic report
+        uses: actions/upload-artifact@v7
+        with:
+          name: remote-source-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/remote-source-diagnostic.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail when diagnostic source failed
+        if: steps.diagnostic.outputs.exit_code != '0'
+        env:
+          EXIT_CODE: ${{ steps.diagnostic.outputs.exit_code }}
+        run: |
+          echo "Remote diagnostic command exited with $EXIT_CODE" >&2
+          exit "$EXIT_CODE"
+

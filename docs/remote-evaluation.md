@@ -29,6 +29,20 @@ lao-ocr evaluate-remote-sources \
 
 Without `--page`, PDFs sample representative pages (first, middle, last by default). Use `--all-remote` only when intentionally probing every `remote-evaluation-*` registry entry; collection pages, blocked hosts, and unverified entries may fail and are reported individually.
 
+## GitHub Actions
+
+For an environment with real Tesseract Lao/English installed, run the manual **Remote Scan Diagnostic** workflow.
+
+Inputs:
+
+- `source_id`: one `remote-evaluation-*` registry ID;
+- `page`: optional 1-based page number;
+- `max_source_mb`: bounded download limit, default 25 MiB.
+
+The workflow is manual-only, has read-only repository permissions, installs `tesseract-ocr-lao` and `tesseract-ocr-eng`, validates the report privacy boundary, and uploads only the JSON diagnostic report for 14 days.
+
+If the selected remote source fails, the workflow still uploads the report containing the source error and then marks the job failed.
+
 ## Safety and storage boundaries
 
 The runner is intentionally bounded:
