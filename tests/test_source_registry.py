@@ -66,3 +66,26 @@ def test_project_authored_corpus_is_approved_for_public_capture_source() -> None
         "claiming-digital-pages-as-real-optical-evidence"
         in source["disallowed_uses"]
     )
+
+
+def test_remote_scan_candidates_stay_non_ingestable() -> None:
+    payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    candidates = [
+        source
+        for source in payload["sources"]
+        if source["status"] == "remote-evaluation-candidate-not-approved"
+    ]
+
+    assert len(candidates) >= 6
+    for source in candidates:
+        assert source["allowed_uses"] == []
+        assert "public-benchmark-redistribution" in source["disallowed_uses"]
+        assert "training-data-ingestion" in source["disallowed_uses"]
+        assert "public-ground-truth" in source["disallowed_uses"]
+        assert source["evidence"]["pages"] >= 1
+        assert source["evidence"]["text_layer"] in {
+            "absent",
+            "effectively-absent",
+            "present-but-garbled",
+            "scanner-watermark-only",
+        }

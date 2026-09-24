@@ -85,6 +85,28 @@ Project policy:
 - do not make it a default training dependency
 - prefer permissive sources compatible with downstream open/commercial use
 
+## Remote real-world scanned-document candidates — not approved for ingestion
+
+On 2026-09-24, several official/publicly hosted Lao PDFs were reviewed specifically for real camera/scanner failure modes. They are recorded in `benchmarks/source-registry.json` as `remote-evaluation-candidate-not-approved`.
+
+Verified examples include:
+
+- Lao Census CamScanner notice: three raster pages; useful PDF text is effectively absent
+- Lao Census ID-card delivery notice: visible Lao scan with a present but garbled/non-Lao text layer
+- Lao Census registration guidance: four pages with zero extracted text lines
+- Lao Census household-book notices: image-only pages with handwriting, stamps/signatures, and scan noise
+- PTC CamScanner notice: three pages whose extracted text is effectively only the CamScanner watermark
+
+These are valuable for understanding real OCR failure modes, but public availability does not establish redistribution/model-training rights. Project policy therefore remains:
+
+- do not vendor the PDF/image bytes
+- do not add derived ground truth to the public benchmark
+- do not use the documents as default training data
+- retain authoritative URLs plus review evidence for source discovery/rights follow-up
+- promote a source only after an independent rights/license review
+
+The useful failure-mode categories discovered so far are `image-only`, `scanner-watermark-only`, and `present-but-garbled-text-layer`.
+
 ## Preferred real-benchmark acquisition
 
 Use the project capture-pack workflow:

@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "reviewed_at": "2026-09-23",
+  "reviewed_at": "2026-09-24",
   "sources": [
     {
       "id": "project-authored-lao-v1",
@@ -76,6 +76,132 @@
         "default-training-source"
       ],
       "notes": "Large synthetic multilingual OCR corpus, but its noncommercial terms do not match this project's permissive/commercial-friendly data policy. The published configs also do not provide a Lao-specific dataset path for our target."
+    },
+    {
+      "id": "laocensus-camscanner-household-registration-2026-03",
+      "name": "Lao Census CamScanner household-registration notice (2026-03)",
+      "url": "https://laocensus.gov.la/pdf/CamScanner%2010-03-2026%2011.11%20(1).pdf",
+      "license": "rights-unclear; source-site-copyright-notice",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 3,
+        "text_layer": "effectively-absent",
+        "parsed_text_observation": "PDF extraction exposed only the source URL, not the Lao page text.",
+        "visual_observation": "Rendered page is a raster Lao government scan with handwritten date/number marks, scan noise, and a CamScanner footer."
+      },
+      "notes": "High-value real-world OCR stress candidate because the visible Lao text is raster-only while the PDF text layer is effectively absent. Keep remote-only until redistribution/evaluation rights are independently cleared."
+    },
+    {
+      "id": "laocensus-id-card-home-delivery-2026",
+      "name": "Lao Census digital ID-card home-delivery notice (2026)",
+      "url": "https://laocensus.gov.la/pdf/%20%E0%BA%9A%E0%BB%8D%E0%BA%A5%E0%BA%B4%E0%BA%81%E0%BA%B2%E0%BA%99%E0%BA%88%E0%BA%B1%E0%BA%94%E0%BA%AA%E0%BA%BB%E0%BB%88%E0%BA%87%E0%BA%9A%E0%BA%B1%E0%BA%94%E0%BB%80%E0%BA%96%E0%BA%B4%E0%BA%87%E0%BB%80%E0%BA%AE%E0%BA%B7%E0%BA%AD%E0%BA%99.pdf",
+      "license": "rights-unclear; source-site-copyright-notice",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 2,
+        "text_layer": "present-but-garbled",
+        "parsed_text_observation": "Parser returns Latin-like garbage rather than the visible Lao text.",
+        "visual_observation": "Rendered page is a readable scanned Lao notice with handwritten document number/date and normal optical scan artifacts."
+      },
+      "notes": "Useful bad-text-layer case: a PDF layer exists but is not a trustworthy transcription of the visible Lao page. Keep remote-only until rights are clarified."
+    },
+    {
+      "id": "laocensus-registration-guidance-2026",
+      "name": "Lao Census registration/ID guidance scan (2026)",
+      "url": "https://laocensus.gov.la/pdf/%20%E0%BA%9B%E0%BA%B1%E0%BA%9A%E0%BA%9B%E0%BA%B8%E0%BA%87%E0%BA%A5%E0%BB%88%E0%BA%B2%E0%BA%AA%E0%BA%B8%E0%BA%94.pdf",
+      "license": "rights-unclear; source-site-copyright-notice",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 4,
+        "text_layer": "absent",
+        "parsed_text_observation": "PDF parser returned zero extracted text lines.",
+        "visual_observation": "Rendered pages contain Lao body text and handwritten document-number/date marks with light raster/scan degradation."
+      },
+      "notes": "Multi-page image-only Lao scan suitable as a remote OCR robustness candidate, but not approved for ingestion or redistribution."
+    },
+    {
+      "id": "laocensus-stop-household-book-notice-2026",
+      "name": "Lao Census stop-household-book notice scan (2026)",
+      "url": "https://laocensus.gov.la/pdf/%20%E0%BB%81%E0%BA%88%E0%BB%89%E0%BA%87%E0%BA%81%E0%BA%B2%E0%BA%99%E0%BA%A2%E0%BA%B8%E0%BA%94%E0%BA%9E%E0%BA%B4%E0%BA%A1%E0%BA%9E%E0%BA%B4%E0%BA%A1%E0%BA%9B%E0%BA%B7%E0%BB%89%E0%BA%A1%E0%BA%AA%E0%BA%B3%E0%BA%A1%E0%BA%B0%E0%BB%82%E0%BA%99%E0%BA%84%E0%BA%BB%E0%BA%A7.pdf",
+      "license": "rights-unclear; source-site-copyright-notice",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 1,
+        "text_layer": "absent",
+        "parsed_text_observation": "PDF parser returned zero extracted text lines.",
+        "visual_observation": "Rendered page contains Lao text, handwritten annotations, signature/stamp, uneven raster quality, and scan noise."
+      },
+      "notes": "Strong single-page scan-quality stress candidate with handwriting/stamp overlays. Rights remain unclear, so keep remote-only."
+    },
+    {
+      "id": "laocensus-police-household-book-notice-2026",
+      "name": "Lao Census police household-book notice scan (2026)",
+      "url": "https://laocensus.gov.la/pdf/%20%E0%BA%9B%E0%BA%81%E0%BA%AA%20%E0%BB%81%E0%BA%88%E0%BB%89%E0%BA%87%E0%BA%81%E0%BA%B2%E0%BA%99%E0%BA%A2%E0%BA%B8%E0%BA%94%E0%BA%9E%E0%BA%B4%E0%BA%A1%E0%BA%9E%E0%BA%B4%E0%BA%A1%E0%BA%9B%E0%BA%B7%E0%BB%89%E0%BA%A1%E0%BA%AA%E0%BA%B3%E0%BA%A1%E0%BA%B0%E0%BB%82%E0%BA%99%E0%BA%84%E0%BA%BB%E0%BA%A7.pdf",
+      "license": "rights-unclear; source-site-copyright-notice",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 2,
+        "text_layer": "absent",
+        "parsed_text_observation": "PDF parser returned zero extracted text lines.",
+        "visual_observation": "Rendered page is a scanned Lao government notice with handwritten date/number and optical noise."
+      },
+      "notes": "Image-only multi-page government scan candidate. Do not ingest into public benchmark/training data without rights clearance."
+    },
+    {
+      "id": "ptc-camscanner-2024-02-15",
+      "name": "PTC CamScanner Lao notice (2024-02-15)",
+      "url": "https://ptc.gov.la/wp-content/uploads/2024/02/CamScanner-02-15-2024-10.44.pdf",
+      "license": "rights-unclear",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 3,
+        "text_layer": "scanner-watermark-only",
+        "parsed_text_observation": "Extracted PDF text is effectively only the repeated word CamScanner.",
+        "visual_observation": "Rendered page contains full Lao text, handwritten date marks, scan specks/noise, low-resolution emblem, and CamScanner footer."
+      },
+      "notes": "Excellent real-world image-only OCR candidate because visible Lao content is not represented by the useful text layer. Keep remote-only pending rights review."
     }
   ]
 }
