@@ -105,3 +105,30 @@ The CLI exits:
 - `1` when one or more selected sources fail, while still writing the diagnostic report.
 
 This is useful for source-health checks without silently treating a partial run as complete.
+
+## Curated diagnostic suite
+
+The repository includes:
+
+`benchmarks/remote-diagnostic-suite.json`
+
+This is a page-pinned diagnostic manifest, not a benchmark dataset. It uses verified institutional sources only and intentionally excludes unverified sources, collection-level discovery records, and third-party mirrors/libraries.
+
+Each suite entry pins the source-registry ID, explicit 1-based page numbers, the expected registry text-layer classification, an optional per-source download-size bound, and a short explanation of the failure mode.
+
+Run it locally:
+
+```bash
+lao-ocr evaluate-remote-suite \
+  --suite benchmarks/remote-diagnostic-suite.json \
+  --registry benchmarks/source-registry.json \
+  --output reports/remote-suite.json
+```
+
+Before any download, the suite validates that every source still has verified `remote-evaluation-candidate-not-approved` status, a verified page count, an in-range pinned page selection, and the expected text-layer classification. Registry drift therefore fails fast instead of silently changing the diagnostic population.
+
+The suite report aggregates source success/error counts, sampled-page count, native vs OCR Lao-character totals, layer-gap classifications, registry text-layer categories, and OCR elapsed time.
+
+It stores no document/OCR text and remains explicitly marked `not_benchmark_accuracy: true`.
+
+The manual **Remote Scan Diagnostic Suite** workflow runs this fixed manifest with Tesseract Lao/English, validates it against the registry before downloading anything, verifies the same privacy boundary, uploads only the suite JSON for 14 days, and preserves partial reports before failing when one or more sources are unavailable.

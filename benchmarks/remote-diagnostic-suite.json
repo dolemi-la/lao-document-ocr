@@ -1,0 +1,70 @@
+{
+  "schema_version": "1",
+  "id": "real-world-scan-diagnostic-v1",
+  "description": "Curated rights-unclear remote Lao scan diagnostics covering image-only, scanner-watermark, noisy OCR-layer, mixed raster/native, and rotated-raster failure modes. Diagnostic only; not benchmark accuracy.",
+  "defaults": {
+    "max_source_mb": 25,
+    "timeout_seconds": 20,
+    "max_document_pages": 500,
+    "max_page_pixels": 40000000
+  },
+  "sources": [
+    {
+      "id": "laocensus-registration-guidance-2026",
+      "pages": [
+        1
+      ],
+      "max_source_mb": 12,
+      "note": "Image-only official Lao scan with an empty native PDF text layer.",
+      "expected_text_layer": "absent"
+    },
+    {
+      "id": "ptc-camscanner-2024-02-15",
+      "pages": [
+        1
+      ],
+      "max_source_mb": 12,
+      "note": "CamScanner PDF whose native layer is effectively only the scanner watermark.",
+      "expected_text_layer": "scanner-watermark-only"
+    },
+    {
+      "id": "maf-forestry-camscanner-79-blks-343-dps-2022",
+      "pages": [
+        1,
+        15
+      ],
+      "max_source_mb": 20,
+      "note": "Long-form official Lao CamScanner document; first and signed/stamped closing pages.",
+      "expected_text_layer": "absent"
+    },
+    {
+      "id": "laocensus-id-card-home-delivery-2026",
+      "pages": [
+        1
+      ],
+      "expected_text_layer": "present-but-garbled",
+      "max_source_mb": 12,
+      "note": "Official Lao scan with a present but garbled/non-Lao PDF text layer."
+    },
+    {
+      "id": "laowis-savannakhet-groundwater-plan-2022-mixed-camscanner",
+      "pages": [
+        55
+      ],
+      "max_source_mb": 25,
+      "note": "Mixed report with embedded CamScanner laboratory-result sheets in the appendix.",
+      "expected_text_layer": "mixed-native-and-raster-camera-pages"
+    },
+    {
+      "id": "worldbank-p172774-kpmg-lao-2024-rotated-raster-pages",
+      "pages": [
+        1,
+        11,
+        22
+      ],
+      "max_source_mb": 15,
+      "note": "Audited financial statement mixing native pages with rotated raster financial pages and a broken text layer.",
+      "expected_text_layer": "rotated-raster-with-garbled-text-layer"
+    }
+  ]
+}

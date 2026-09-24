@@ -289,6 +289,7 @@ lao-ocr train-reading-order --training-manifest training/layout.jsonl --dataset-
 lao-ocr export-reading-order --checkpoint training/layout/runs/reading-order-v1/reading-order.pt --output training/layout/runs/reading-order-v1/reading-order.pt2
 lao-ocr benchmark --manifest <manifest.jsonl> --dataset-root <dataset> --output report.json
 lao-ocr evaluate-remote-sources --source-id ptc-camscanner-2024-02-15 --output reports/remote-ptc.json
+lao-ocr evaluate-remote-suite --suite benchmarks/remote-diagnostic-suite.json --output reports/remote-suite.json
 # Optional: add --tessdata-dir /path/to/tessdata for hashed custom weights
 lao-ocr compare-benchmarks --baseline baseline.json --candidate candidate.json --output comparison.json
 lao-ocr benchmark-layout --reference reference.json --prediction prediction.json --output layout-report.json

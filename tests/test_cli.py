@@ -2424,3 +2424,147 @@ def test_evaluate_remote_sources_cli_returns_nonzero_on_source_error(
     )
 
     assert cli.main() == 1
+
+
+
+def test_evaluate_remote_suite_cli_forwards_paths_and_writes_report(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import lao_document_ocr.cli as cli
+    import lao_document_ocr.remote_evaluation_suite as remote_suite
+
+    captured = {}
+
+    class Engine:
+        def metadata(self):
+            return {"name": "test-engine"}
+
+    class Resolver:
+        def metadata(self):
+            return {"name": "test-resolver"}
+
+    def fake_evaluate_remote_diagnostic_suite(
+        suite_path,
+        registry_path,
+        **kwargs,
+    ):
+        captured["suite_path"] = suite_path
+        captured["registry_path"] = registry_path
+        captured.update(kwargs)
+        return {
+            "schema_version": "1",
+            "report_type": "remote-source-diagnostic-suite",
+            "not_benchmark_accuracy": True,
+            "suite": {"id": "suite-v1", "description": "test", "path": str(suite_path)},
+            "summary": {
+                "sources": 2,
+                "ok": 2,
+                "errors": 0,
+                "sampled_pages": 3,
+                "native_lao_characters": 0,
+                "ocr_lao_characters": 100,
+                "ocr_minus_native_lao_characters": 100,
+                "ocr_elapsed_seconds": 1.0,
+                "layer_gap_classifications": {"native-layer-empty": 3},
+                "registry_text_layers": {"absent": 2},
+                "source_statuses": {"ok": 2},
+            },
+            "sources": [],
+        }
+
+    monkeypatch.setattr(cli, "_build_ocr_engine", lambda args: Engine())
+    monkeypatch.setattr(
+        cli,
+        "_build_reading_order_resolver",
+        lambda args: Resolver(),
+    )
+    monkeypatch.setattr(
+        remote_suite,
+        "evaluate_remote_diagnostic_suite",
+        fake_evaluate_remote_diagnostic_suite,
+    )
+
+    suite = tmp_path / "suite.json"
+    suite.write_text("{}", encoding="utf-8")
+    registry = tmp_path / "registry.json"
+    registry.write_text("{}", encoding="utf-8")
+    output = tmp_path / "suite-report.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "evaluate-remote-suite",
+            "--suite",
+            str(suite),
+            "--registry",
+            str(registry),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert cli.main() == 0
+    assert captured["suite_path"] == suite
+    assert captured["registry_path"] == registry
+    assert captured["engine"].metadata()["name"] == "test-engine"
+    assert captured["reading_order_resolver"].metadata()["name"] == "test-resolver"
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["report_type"] == "remote-source-diagnostic-suite"
+    rendered = capsys.readouterr().out
+    assert "Suite: suite-v1" in rendered
+    assert "Sampled pages: 3" in rendered
+    assert "OCR - native Lao chars: 100" in rendered
+
+
+def test_evaluate_remote_suite_cli_returns_nonzero_on_partial_failure(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import lao_document_ocr.cli as cli
+    import lao_document_ocr.remote_evaluation_suite as remote_suite
+
+    monkeypatch.setattr(cli, "_build_ocr_engine", lambda args: object())
+    monkeypatch.setattr(cli, "_build_reading_order_resolver", lambda args: None)
+    monkeypatch.setattr(
+        remote_suite,
+        "evaluate_remote_diagnostic_suite",
+        lambda *args, **kwargs: {
+            "schema_version": "1",
+            "report_type": "remote-source-diagnostic-suite",
+            "not_benchmark_accuracy": True,
+            "suite": {"id": "suite-v1", "description": "", "path": "suite.json"},
+            "summary": {
+                "sources": 2,
+                "ok": 1,
+                "errors": 1,
+                "sampled_pages": 1,
+                "native_lao_characters": 0,
+                "ocr_lao_characters": 0,
+                "ocr_minus_native_lao_characters": 0,
+                "ocr_elapsed_seconds": 0.0,
+                "layer_gap_classifications": {},
+                "registry_text_layers": {},
+                "source_statuses": {"ok": 1, "error": 1},
+            },
+            "sources": [],
+        },
+    )
+
+    output = tmp_path / "suite-report.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "evaluate-remote-suite",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert cli.main() == 1

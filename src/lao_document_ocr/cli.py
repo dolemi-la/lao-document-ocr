@@ -34,6 +34,45 @@ def _add_language_model_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--language-model-token-bonus", type=float, default=0.0)
 
 
+def _add_remote_suite_engine_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--engine",
+        choices=["tesseract", "owned"],
+        default="tesseract",
+    )
+    parser.add_argument("--languages", default="lao+eng")
+    parser.add_argument("--psm", type=int, default=3)
+    parser.add_argument("--tessdata-dir", type=Path)
+    parser.add_argument("--model", type=Path)
+    parser.add_argument("--calibration", type=Path)
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="cpu",
+    )
+    parser.add_argument(
+        "--decoder",
+        choices=["greedy", "beam"],
+        default="greedy",
+    )
+    parser.add_argument("--beam-width", type=int, default=10)
+    _add_language_model_arguments(parser)
+    parser.add_argument(
+        "--layout-detector",
+        choices=["morphology", "learned"],
+        default="morphology",
+    )
+    parser.add_argument("--layout-model", type=Path)
+    parser.add_argument("--layout-confidence", type=float, default=0.55)
+    parser.add_argument(
+        "--reading-order",
+        choices=["deterministic", "learned"],
+        default="deterministic",
+    )
+    parser.add_argument("--reading-order-model", type=Path)
+    parser.add_argument("--reading-order-max-blocks", type=int, default=256)
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="lao-ocr",
@@ -472,6 +511,26 @@ def _parser() -> argparse.ArgumentParser:
         type=int,
         default=256,
     )
+
+    remote_suite = subparsers.add_parser(
+        "evaluate-remote-suite",
+        help=(
+            "Run a curated, page-pinned remote diagnostic suite without "
+            "persisting source document bytes."
+        ),
+    )
+    remote_suite.add_argument(
+        "--suite",
+        type=Path,
+        default=Path("benchmarks/remote-diagnostic-suite.json"),
+    )
+    remote_suite.add_argument(
+        "--registry",
+        type=Path,
+        default=Path("benchmarks/source-registry.json"),
+    )
+    remote_suite.add_argument("--output", required=True, type=Path)
+    _add_remote_suite_engine_arguments(remote_suite)
 
     capture_suite_qa = subparsers.add_parser(
         "benchmark-capture-suite",
@@ -1459,6 +1518,36 @@ def _evaluate_remote_sources(args: argparse.Namespace) -> int:
     return 0 if summary["errors"] == 0 else 1
 
 
+def _evaluate_remote_suite(args: argparse.Namespace) -> int:
+    from lao_document_ocr.remote_evaluation import write_remote_evaluation_report
+    from lao_document_ocr.remote_evaluation_suite import (
+        evaluate_remote_diagnostic_suite,
+    )
+
+    engine = _build_ocr_engine(args)
+    reading_order_resolver = _build_reading_order_resolver(args)
+    report = evaluate_remote_diagnostic_suite(
+        args.suite,
+        args.registry,
+        engine=engine,
+        reading_order_resolver=reading_order_resolver,
+    )
+    output = write_remote_evaluation_report(report, args.output)
+    summary = report["summary"]
+    print(f"Report: {output}")
+    print(f"Suite: {report['suite']['id']}")
+    print("Mode: diagnostic only (not benchmark accuracy)")
+    print(f"Sources: {summary['sources']}")
+    print(f"OK: {summary['ok']}")
+    print(f"Errors: {summary['errors']}")
+    print(f"Sampled pages: {summary['sampled_pages']}")
+    print(
+        "OCR - native Lao chars: "
+        f"{summary['ocr_minus_native_lao_characters']}"
+    )
+    return 0 if summary["errors"] == 0 else 1
+
+
 def _benchmark_capture_suite(args: argparse.Namespace) -> int:
     from lao_document_ocr.capture_suite_qa import benchmark_capture_suite
 
@@ -2105,6 +2194,8 @@ def main() -> int:
             return _benchmark(args)
         if args.command == "evaluate-remote-sources":
             return _evaluate_remote_sources(args)
+        if args.command == "evaluate-remote-suite":
+            return _evaluate_remote_suite(args)
         if args.command == "benchmark-capture-suite":
             return _benchmark_capture_suite(args)
         if args.command == "sample-hplt-lao":

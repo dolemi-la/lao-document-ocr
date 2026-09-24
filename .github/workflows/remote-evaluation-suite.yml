@@ -1,0 +1,114 @@
+name: Remote Scan Diagnostic Suite
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remote-suite:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Tesseract Lao/English
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             tesseract-ocr             tesseract-ocr-lao             tesseract-ocr-eng
+          tesseract --list-langs
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Validate curated suite manifest
+        run: |
+          python - <<'PY'
+          from lao_document_ocr.remote_evaluation_suite import (
+              load_remote_diagnostic_suite,
+              validate_suite_against_registry,
+          )
+
+          suite = load_remote_diagnostic_suite(
+              "benchmarks/remote-diagnostic-suite.json"
+          )
+          validate_suite_against_registry(
+              suite,
+              "benchmarks/source-registry.json",
+          )
+          print(suite.suite_id)
+          print(f"sources={len(suite.entries)}")
+          PY
+
+      - name: Run curated remote diagnostic suite
+        id: diagnostic
+        env:
+          REPORT: ${{ runner.temp }}/remote-diagnostic-suite.json
+        run: |
+          set +e
+          lao-ocr evaluate-remote-suite             --suite benchmarks/remote-diagnostic-suite.json             --registry benchmarks/source-registry.json             --output "$REPORT"
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Verify suite report privacy boundary
+        env:
+          REPORT: ${{ runner.temp }}/remote-diagnostic-suite.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT"])
+          payload = json.loads(path.read_text(encoding="utf-8"))
+
+          assert payload["report_type"] == "remote-source-diagnostic-suite"
+          assert payload["not_benchmark_accuracy"] is True
+          assert payload["suite"]["id"] == "real-world-scan-diagnostic-v1"
+          assert payload["summary"]["sources"] == 6
+
+          forbidden = {
+              "reference",
+              "hypothesis",
+              "ground_truth",
+              "ocr_text",
+              "native_text_content",
+          }
+
+          def walk(value):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      assert key not in forbidden, key
+                      walk(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      walk(item)
+
+          walk(payload)
+          print(json.dumps(payload["summary"], indent=2))
+          PY
+
+      - name: Upload suite diagnostic report
+        uses: actions/upload-artifact@v7
+        with:
+          name: remote-diagnostic-suite-${{ github.run_id }}
+          path: ${{ runner.temp }}/remote-diagnostic-suite.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail when suite has source errors
+        if: steps.diagnostic.outputs.exit_code != '0'
+        env:
+          EXIT_CODE: ${{ steps.diagnostic.outputs.exit_code }}
+        run: |
+          echo "Remote diagnostic suite exited with $EXIT_CODE" >&2
+          exit "$EXIT_CODE"
