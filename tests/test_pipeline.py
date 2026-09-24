@@ -309,6 +309,7 @@ def test_auto_orientation_rotates_page_and_records_metadata(tmp_path) -> None:
     assert orientation["degrees_clockwise"] == 90
     assert orientation["diagnostics"]["selected_confidence"] > 0.9
     assert orientation["diagnostics"]["baseline_confidence"] < 0.4
+    assert orientation["diagnostics"]["probe_skipped"] is False
 
 
 def test_auto_orientation_is_disabled_by_default(tmp_path) -> None:
@@ -326,11 +327,14 @@ def test_auto_orientation_is_disabled_by_default(tmp_path) -> None:
 
 
 def test_auto_orientation_keeps_baseline_without_clear_improvement(tmp_path) -> None:
+    state = {"calls": 0}
+
     class StableEngine(OcrEngine):
         def is_available(self) -> bool:
             return True
 
         def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            state["calls"] += 1
             return [
                 RecognizedLine(
                     text="stable orientation recognition text",
@@ -355,6 +359,10 @@ def test_auto_orientation_keeps_baseline_without_clear_improvement(tmp_path) -> 
     assert document.metadata["auto_orientation"]["pages"][0][
         "degrees_clockwise"
     ] == 0
+    diagnostics = document.metadata["auto_orientation"]["pages"][0]["diagnostics"]
+    assert diagnostics["probe_skipped"] is True
+    assert diagnostics["probe_below_confidence"] == 0.65
+    assert state["calls"] == 1
 
 
 def test_auto_orientation_honors_cancellation_between_probes(tmp_path) -> None:

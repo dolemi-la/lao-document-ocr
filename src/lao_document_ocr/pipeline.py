@@ -25,6 +25,7 @@ from lao_document_ocr.structure import build_page_blocks
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}
 SUPPORTED_SUFFIXES = SUPPORTED_IMAGE_SUFFIXES | {".pdf"}
 DEFAULT_MAX_PAGE_PIXELS = 40_000_000
+DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE = 0.65
 
 
 class DocumentProcessingError(RuntimeError):
@@ -231,6 +232,25 @@ def _recognize_with_right_angle_orientation(
     baseline_confidence, baseline_characters, baseline_score = _orientation_line_stats(
         baseline_lines
     )
+    if baseline_confidence >= DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE:
+        return (
+            image,
+            baseline_lines,
+            0,
+            {
+                "baseline_confidence": baseline_confidence,
+                "selected_confidence": baseline_confidence,
+                "baseline_characters": baseline_characters,
+                "selected_characters": baseline_characters,
+                "baseline_score": baseline_score,
+                "selected_score": baseline_score,
+                "probe_skipped": True,
+                "probe_below_confidence": (
+                    DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE
+                ),
+            },
+        )
+
     candidates = [
         (
             0,
@@ -286,6 +306,10 @@ def _recognize_with_right_angle_orientation(
             "selected_characters": best_characters,
             "baseline_score": baseline_score,
             "selected_score": best_score,
+            "probe_skipped": False,
+            "probe_below_confidence": (
+                DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE
+            ),
         },
     )
 
@@ -448,6 +472,9 @@ def process_document(
             "page_count": len(output_pages),
             "auto_orientation": {
                 "enabled": auto_orient_right_angles,
+                "probe_below_confidence": (
+                    DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE
+                ),
                 "pages": orientation_pages,
             },
         },

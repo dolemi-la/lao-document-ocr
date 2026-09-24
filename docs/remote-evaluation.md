@@ -101,6 +101,8 @@ For selected suite entries, `rotation_probe: true` runs diagnostic OCR at 0°, 9
 
 The curated suite enables the diagnostic rotation probe only for the verified World Bank/KPMG raster-overlay pages. The main OCR pipeline also has an opt-in `--auto-orient-right-angles` mode for `convert-document` and `evaluate-remote-suite`. It uses the same conservative score/confidence/character thresholds and keeps 0° when improvement is not clear. The feature remains off by default while real-suite A/B evidence is collected.
 
+To limit cost, the opt-in production path first runs baseline OCR and skips the 90°/180°/270° probes when mean baseline line confidence is already at least 0.65. Low-confidence pages still receive the full right-angle probe.
+
 ## Not benchmark accuracy
 
 A remote diagnostic report has:
