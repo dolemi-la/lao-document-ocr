@@ -33,6 +33,26 @@ def test_process_image_with_fake_engine(tmp_path) -> None:
     assert len(document.pages) == 1
     assert document.pages[0].blocks[0].text == "Hello OCR"
     assert document.metadata["engine"]["name"] == "FakeEngine"
+    assert "ocr_line_stats" not in document.metadata
+
+
+def test_process_document_can_include_safe_ocr_line_stats(tmp_path) -> None:
+    image_path = tmp_path / "sample-line-stats.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    document = process_document(
+        image_path,
+        engine=FakeEngine(),
+        include_ocr_line_stats=True,
+    )
+
+    stats = document.metadata["ocr_line_stats"]["pages"][0]
+    assert stats["page"] == 1
+    assert stats["mean_confidence"] == 0.99
+    assert stats["recognized_characters"] == 8
+    assert stats["score"] > 0
+    assert stats["lao_ratio"] == 0.0
+    assert "text" not in stats
 
 
 def test_processing_can_be_cancelled_before_start(tmp_path) -> None:

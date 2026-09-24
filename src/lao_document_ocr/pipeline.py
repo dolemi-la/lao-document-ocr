@@ -480,6 +480,7 @@ def process_document(
     should_cancel: Callable[[], bool] | None = None,
     reading_order_resolver: ReadingOrderResolver | None = None,
     auto_orient_right_angles: bool = False,
+    include_ocr_line_stats: bool = False,
 ) -> Document:
     path = Path(path)
     engine = engine or TesseractEngine()
@@ -496,6 +497,7 @@ def process_document(
 
     output_pages: list[Page] = []
     orientation_pages: list[dict[str, object]] = []
+    ocr_line_stats_pages: list[dict[str, object]] = []
     for page_number, loaded_page in enumerate(pages, start=1):
         _raise_if_cancelled(should_cancel)
         cleaned = preprocess_image(loaded_page.image)
@@ -540,6 +542,22 @@ def process_document(
                 "diagnostics": orientation_diagnostics,
             }
         )
+        if include_ocr_line_stats:
+            (
+                line_mean_confidence,
+                line_recognized_characters,
+                line_score,
+                line_lao_ratio,
+            ) = _orientation_line_stats(lines)
+            ocr_line_stats_pages.append(
+                {
+                    "page": page_number,
+                    "mean_confidence": line_mean_confidence,
+                    "recognized_characters": line_recognized_characters,
+                    "score": line_score,
+                    "lao_ratio": line_lao_ratio,
+                }
+            )
 
         semantic_blocks = build_page_blocks(lines, cleaned)
         table_boxes = [
@@ -619,26 +637,28 @@ def process_document(
     _raise_if_cancelled(should_cancel)
     mark_repeated_headers_footers(output_pages)
 
+    metadata: dict[str, object] = {
+        "engine": engine.metadata(),
+        "reading_order": resolver.metadata(),
+        "page_count": len(output_pages),
+        "auto_orientation": {
+            "enabled": auto_orient_right_angles,
+            "probe_below_confidence": DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE,
+            "lao_dominant_min_confidence": (
+                DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
+            ),
+            "lao_dominant_min_characters": (
+                DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
+            ),
+            "lao_dominant_ratio": DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO,
+            "pages": orientation_pages,
+        },
+    }
+    if include_ocr_line_stats:
+        metadata["ocr_line_stats"] = {"pages": ocr_line_stats_pages}
+
     return Document(
         source_name=source_name or path.name,
         pages=output_pages,
-        metadata={
-            "engine": engine.metadata(),
-            "reading_order": resolver.metadata(),
-            "page_count": len(output_pages),
-            "auto_orientation": {
-                "enabled": auto_orient_right_angles,
-                "probe_below_confidence": (
-                    DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE
-                ),
-                "lao_dominant_min_confidence": (
-                    DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
-                ),
-                "lao_dominant_min_characters": (
-                    DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
-                ),
-                "lao_dominant_ratio": DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO,
-                "pages": orientation_pages,
-            },
-        },
+        metadata=metadata,
     )

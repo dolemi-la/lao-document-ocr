@@ -157,6 +157,7 @@ def test_remote_evaluation_reports_stats_without_text_or_persisted_bytes(tmp_pat
     assert result["document"]["selected_pages"] == [1, 2]
     assert result["document"]["pages"][0]["native_text"]["characters"] > 0
     assert result["document"]["pages"][0]["ocr"]["text"]["lao_characters"] > 0
+    assert "line_stats" not in result["document"]["pages"][0]["ocr"]
 
     serialized = json.dumps(report, ensure_ascii=False)
     assert "SECRET_NATIVE_CONTENT" not in serialized
@@ -401,6 +402,7 @@ def test_rotation_probe_recommends_clear_right_angle_improvement(tmp_path) -> No
         page_path,
         engine=OrientationSensitiveEngine(),
         max_pages=1,
+        include_ocr_line_stats=True,
     )
     from lao_document_ocr.remote_evaluation import _ocr_document_stats
 
@@ -412,6 +414,7 @@ def test_rotation_probe_recommends_clear_right_angle_improvement(tmp_path) -> No
         reading_order_resolver=None,
     )
 
+    assert probe["scoring_basis"] == "production-line-stats"
     assert probe["best_degrees_clockwise"] == 90
     assert probe["recommended_degrees_clockwise"] == 90
     assert probe["confidence_improvement"] > 0.5
@@ -503,7 +506,10 @@ def test_remote_evaluation_can_probe_direct_image_orientation(tmp_path) -> None:
     )
 
     page_report = report["sources"][0]["document"]["pages"][0]
+    assert page_report["rotation_probe"]["scoring_basis"] == "production-line-stats"
     assert page_report["rotation_probe"]["recommended_degrees_clockwise"] == 90
+    assert page_report["ocr"]["line_stats"]["recognized_characters"] > 0
+    assert "text" not in page_report["ocr"]["line_stats"]
     assert report["selection"]["probe_right_angle_rotations"] is True
     serialized = json.dumps(report, ensure_ascii=False)
     assert "orientation probe text with enough letters" not in serialized

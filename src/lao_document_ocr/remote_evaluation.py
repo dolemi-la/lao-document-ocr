@@ -397,7 +397,14 @@ def _ocr_document_stats(document) -> dict[str, Any]:
             if block.confidence is not None:
                 confidences.append(float(block.confidence))
 
-    return {
+    line_stats = None
+    line_stats_payload = document.metadata.get("ocr_line_stats")
+    if isinstance(line_stats_payload, dict):
+        pages = line_stats_payload.get("pages")
+        if isinstance(pages, list) and len(pages) == 1 and isinstance(pages[0], dict):
+            line_stats = dict(pages[0])
+
+    stats = {
         "text": _text_stats(document.plain_text),
         "blocks": {
             block_type.value: block_counts.get(block_type.value, 0)
@@ -410,14 +417,27 @@ def _ocr_document_stats(document) -> dict[str, Any]:
         ),
         "confidence_samples": len(confidences),
     }
+    if line_stats is not None:
+        stats["line_stats"] = line_stats
+    return stats
 
 
-def _rotation_probe_score(ocr_stats: dict[str, Any]) -> float:
-    confidence = ocr_stats.get("mean_block_confidence")
-    confidence_value = float(confidence) if confidence is not None else 0.0
+def _rotation_probe_metrics(
+    ocr_stats: dict[str, Any],
+) -> tuple[float, int, float]:
+    line_stats = ocr_stats.get("line_stats")
+    if isinstance(line_stats, dict):
+        confidence = float(line_stats.get("mean_confidence", 0.0))
+        characters = max(0, int(line_stats.get("recognized_characters", 0)))
+        score = float(line_stats.get("score", 0.0))
+        return confidence, characters, score
+
+    confidence_raw = ocr_stats.get("mean_block_confidence")
+    confidence = float(confidence_raw) if confidence_raw is not None else 0.0
     text_stats = ocr_stats.get("text") or {}
-    letters = max(0, int(text_stats.get("letter_characters", 0)))
-    return confidence_value * math.log1p(letters)
+    characters = max(0, int(text_stats.get("letter_characters", 0)))
+    score = confidence * math.log1p(characters)
+    return confidence, characters, score
 
 
 def _rotation_probe(
@@ -429,12 +449,18 @@ def _rotation_probe(
     reading_order_resolver: ReadingOrderResolver | None,
 ) -> dict[str, Any]:
     variants: list[dict[str, Any]] = []
+    use_line_stats = isinstance(baseline_ocr.get("line_stats"), dict)
 
     def append_variant(degrees_clockwise: int, ocr_stats: dict[str, Any]) -> None:
+        orientation_confidence, recognized_characters, score = (
+            _rotation_probe_metrics(ocr_stats)
+        )
         variants.append(
             {
                 "degrees_clockwise": degrees_clockwise,
-                "score": _rotation_probe_score(ocr_stats),
+                "score": score,
+                "orientation_confidence": orientation_confidence,
+                "recognized_characters": recognized_characters,
                 "mean_block_confidence": ocr_stats.get("mean_block_confidence"),
                 "confidence_band": _confidence_diagnostics(
                     ocr_stats.get("mean_block_confidence")
@@ -471,6 +497,7 @@ def _rotation_probe(
                     max_pages=1,
                     max_page_pixels=max_page_pixels,
                     reading_order_resolver=reading_order_resolver,
+                    include_ocr_line_stats=use_line_stats,
                 )
                 append_variant(
                     degrees_clockwise,
@@ -483,8 +510,8 @@ def _rotation_probe(
         variants,
         key=lambda item: (
             float(item["score"]),
-            float(item["mean_block_confidence"] or 0.0),
-            int(item["text"].get("letter_characters", 0)),
+            float(item["orientation_confidence"]),
+            int(item["recognized_characters"]),
         ),
         reverse=True,
     )
@@ -492,21 +519,24 @@ def _rotation_probe(
     baseline = next(item for item in variants if item["degrees_clockwise"] == 0)
     baseline_score = float(baseline["score"])
     best_score = float(best["score"])
-    baseline_confidence = float(baseline["mean_block_confidence"] or 0.0)
-    best_confidence = float(best["mean_block_confidence"] or 0.0)
-    baseline_letters = int(baseline["text"].get("letter_characters", 0))
-    best_letters = int(best["text"].get("letter_characters", 0))
+    baseline_confidence = float(baseline["orientation_confidence"])
+    best_confidence = float(best["orientation_confidence"])
+    baseline_characters = int(baseline["recognized_characters"])
+    best_characters = int(best["recognized_characters"])
 
     recommended = None
     if (
         best["degrees_clockwise"] != 0
         and best_score >= max(0.01, baseline_score * 1.15)
         and best_confidence >= baseline_confidence + 0.08
-        and best_letters >= max(20, int(baseline_letters * 0.5))
+        and best_characters >= max(20, int(baseline_characters * 0.5))
     ):
         recommended = int(best["degrees_clockwise"])
 
     return {
+        "scoring_basis": (
+            "production-line-stats" if use_line_stats else "block-letter-fallback"
+        ),
         "variants": variants,
         "best_degrees_clockwise": int(best["degrees_clockwise"]),
         "recommended_degrees_clockwise": recommended,
@@ -690,6 +720,9 @@ def _evaluate_pdf(
                 max_page_pixels=max_page_pixels,
                 reading_order_resolver=reading_order_resolver,
                 auto_orient_right_angles=auto_orient_right_angles,
+                include_ocr_line_stats=(
+                    probe_right_angle_rotations and not auto_orient_right_angles
+                ),
             )
             diagnostics["ocr"] = _ocr_document_stats(document)
             if auto_orient_right_angles:
@@ -766,6 +799,9 @@ def _evaluate_image(
         max_page_pixels=max_page_pixels,
         reading_order_resolver=reading_order_resolver,
         auto_orient_right_angles=auto_orient_right_angles,
+        include_ocr_line_stats=(
+            probe_right_angle_rotations and not auto_orient_right_angles
+        ),
     )
     dimensions["ocr"] = _ocr_document_stats(document)
     if auto_orient_right_angles:
