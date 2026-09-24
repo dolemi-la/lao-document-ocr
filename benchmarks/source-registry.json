@@ -517,6 +517,27 @@
         "visual_observation": "Indexed visual/document description identifies a Lao attachment page with a red official stamp and handwritten signatures in the Lao PDR South East Asia Disaster Risk Management Project document."
       },
       "notes": "Institutionally hosted Lao project document with strong mixed-report/camera-scan signals, but intentionally kept unverified because the original PDF could not be rendered in the page verifier due to size. Keep remote-only pending direct page inspection and rights review."
+    },
+    {
+      "id": "worldbank-p172774-kpmg-lao-audited-financial-statement-camscanner",
+      "name": "World Bank Lao PSG audited financial statement (KPMG Lao, CamScanner-indexed)",
+      "url": "https://documents1.worldbank.org/curated/en/099040125063560969/pdf/P172774-151d74fe-8b07-41a2-972a-18f67ca560db.pdf",
+      "license": "rights-unclear-for-derived-benchmark-use; World-Bank-hosted-project-document",
+      "status": "remote-evaluation-candidate-unverified",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": null,
+        "text_layer": "unverified",
+        "parsed_text_observation": "World Bank indexing identifies the Lao PDR Priority Skills for Growth audited financial statement and exposes an audit page ending with a CamScanner marker; direct PDF open exceeded the verifier's 10 MB content limit.",
+        "visual_observation": "Indexed document text identifies KPMG Lao Co., Ltd. as auditor, Vientiane as the audit location, and Lao MoES/MoLSW as implementing agencies, but page rendering could not be completed because of file size."
+      },
+      "notes": "High-value institutional financial-document lead for numeric/table OCR and scan artifacts. Kept unverified until direct page rendering succeeds; no public ingestion or derived ground truth without rights review."
     }
   ]
 }
