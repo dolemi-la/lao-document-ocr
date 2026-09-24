@@ -13,8 +13,8 @@ def test_remote_suite_workflow_is_manual_and_read_only() -> None:
 
     assert "workflow_dispatch:" in text
     assert "auto_orient_right_angles:" in text
-    assert "type: boolean" in text
-    assert "default: false" in text
+    assert "diagnostic_rotation_probes:" in text
+    assert text.count("type: boolean") >= 2
     assert "contents: read" in text
     assert "push:" not in text
     assert "pull_request:" not in text
@@ -29,8 +29,9 @@ def test_remote_suite_workflow_uses_curated_manifest_and_tesseract() -> None:
     assert "tesseract-ocr-eng" in text
     assert "lao-ocr evaluate-remote-suite" in text
     assert "args+=(--auto-orient-right-angles)" in text
+    assert "args+=(--no-rotation-probes)" in text
     assert "AUTO_ORIENT:" in text
-    assert "inputs.auto_orient_right_angles" in text
+    assert "ROTATION_PROBES:" in text
 
 
 def test_remote_suite_workflow_preserves_privacy_and_partial_report() -> None:
@@ -39,6 +40,7 @@ def test_remote_suite_workflow_preserves_privacy_and_partial_report() -> None:
     assert '"remote-source-diagnostic-suite"' in text
     assert '"not_benchmark_accuracy"' in text
     assert 'payload["selection"]["auto_orient_right_angles"]' in text
+    assert 'payload["selection"]["rotation_probes_enabled"]' in text
     assert '"ground_truth"' in text
     assert '"hypothesis"' in text
     assert "actions/upload-artifact@v7" in text

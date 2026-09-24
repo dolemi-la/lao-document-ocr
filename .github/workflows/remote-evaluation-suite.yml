@@ -8,6 +8,11 @@ on:
         required: true
         default: false
         type: boolean
+      diagnostic_rotation_probes:
+        description: "Run exhaustive diagnostic rotation probes for opted-in suite sources"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -61,6 +66,7 @@ jobs:
         env:
           REPORT: ${{ runner.temp }}/remote-diagnostic-suite.json
           AUTO_ORIENT: ${{ inputs.auto_orient_right_angles }}
+          ROTATION_PROBES: ${{ inputs.diagnostic_rotation_probes }}
         run: |
           args=(
             lao-ocr evaluate-remote-suite
@@ -70,6 +76,9 @@ jobs:
           )
           if [ "$AUTO_ORIENT" = "true" ]; then
             args+=(--auto-orient-right-angles)
+          fi
+          if [ "$ROTATION_PROBES" != "true" ]; then
+            args+=(--no-rotation-probes)
           fi
 
           set +e
@@ -83,6 +92,7 @@ jobs:
         env:
           REPORT: ${{ runner.temp }}/remote-diagnostic-suite.json
           AUTO_ORIENT: ${{ inputs.auto_orient_right_angles }}
+          ROTATION_PROBES: ${{ inputs.diagnostic_rotation_probes }}
         run: |
           python - <<'PY'
           import json
@@ -96,11 +106,12 @@ jobs:
           assert payload["not_benchmark_accuracy"] is True
           assert payload["suite"]["id"] == "real-world-scan-diagnostic-v1"
           assert payload["summary"]["sources"] == 6
+
           expected_auto = os.environ["AUTO_ORIENT"].lower() == "true"
-          assert (
-              payload["selection"]["auto_orient_right_angles"]
-              is expected_auto
-          )
+          assert payload["selection"]["auto_orient_right_angles"] is expected_auto
+
+          expected_probes = os.environ["ROTATION_PROBES"].lower() == "true"
+          assert payload["selection"]["rotation_probes_enabled"] is expected_probes
 
           forbidden = {
               "reference",

@@ -296,6 +296,7 @@ def evaluate_remote_diagnostic_suite(
     engine: OcrEngine,
     reading_order_resolver: ReadingOrderResolver | None = None,
     auto_orient_right_angles: bool = False,
+    enable_rotation_probes: bool = True,
     fetcher: RemoteFetcher = download_remote_source,
 ) -> dict[str, Any]:
     suite = load_remote_diagnostic_suite(suite_path)
@@ -322,7 +323,9 @@ def evaluate_remote_diagnostic_suite(
             timeout_seconds=suite.timeout_seconds,
             reading_order_resolver=reading_order_resolver,
             probe_right_angle_rotations=(
-                entry.rotation_probe and not auto_orient_right_angles
+                enable_rotation_probes
+                and entry.rotation_probe
+                and not auto_orient_right_angles
             ),
             auto_orient_right_angles=auto_orient_right_angles,
             fetcher=fetcher,
@@ -368,6 +371,7 @@ def evaluate_remote_diagnostic_suite(
             "max_document_pages": suite.max_document_pages,
             "max_page_pixels": suite.max_page_pixels,
             "auto_orient_right_angles": auto_orient_right_angles,
+            "rotation_probes_enabled": enable_rotation_probes,
         },
         "summary": _aggregate_suite_results(source_results),
         "sources": source_results,

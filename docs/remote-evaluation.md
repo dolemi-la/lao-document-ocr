@@ -156,3 +156,10 @@ The suite report aggregates source success/error counts, sampled-page count, nat
 It stores no document/OCR text and remains explicitly marked `not_benchmark_accuracy: true`.
 
 The manual **Remote Scan Diagnostic Suite** workflow runs this fixed manifest with Tesseract Lao/English, validates it against the registry before downloading anything, verifies the same privacy boundary, uploads only the suite JSON for 14 days, and preserves partial reports before failing when one or more sources are unavailable.
+
+The suite CLI also accepts `--no-rotation-probes`. That disables only the extra diagnostic 0°/90°/180°/270° comparison passes from `rotation_probe: true` entries; it does not enable auto-orientation or change OCR output. This is useful for a true plain-OCR performance baseline.
+
+The GitHub workflow exposes the same control as `diagnostic_rotation_probes` (default `true`). For a fair performance A/B, compare:
+
+- baseline: `auto_orient_right_angles=false`, `diagnostic_rotation_probes=false`;
+- auto-orient: `auto_orient_right_angles=true`, `diagnostic_rotation_probes=false`.

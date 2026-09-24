@@ -202,6 +202,7 @@ def test_remote_suite_runs_per_source_pages_and_aggregates(tmp_path) -> None:
     assert report["report_type"] == "remote-source-diagnostic-suite"
     assert report["not_benchmark_accuracy"] is True
     assert report["suite"]["id"] == "suite-v1"
+    assert report["selection"]["rotation_probes_enabled"] is True
     assert report["summary"]["sources"] == 2
     assert report["summary"]["ok"] == 2
     assert report["summary"]["errors"] == 0
@@ -358,4 +359,45 @@ def test_remote_suite_can_apply_auto_orientation(tmp_path) -> None:
     page = report["sources"][0]["document"]["pages"][0]
     assert page["auto_orientation"]["degrees_clockwise"] == 90
     assert "rotation_probe" not in page
+
+
+def test_remote_suite_can_disable_diagnostic_rotation_probes(tmp_path) -> None:
+    registry = _registry(tmp_path)
+    suite_path = _suite(tmp_path)
+    payload = json.loads(suite_path.read_text(encoding="utf-8"))
+    payload["sources"] = [payload["sources"][1]]
+    suite_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    source = _pdf(tmp_path / "b.pdf", 3)
+
+    def fetcher(url, destination_base, *, max_bytes, timeout_seconds):
+        del url, max_bytes, timeout_seconds
+        destination = Path(destination_base).with_suffix(".pdf")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        data = destination.read_bytes()
+        return DownloadedRemote(
+            path=destination,
+            final_url="https://example.com/b.pdf",
+            sha256=hashlib.sha256(data).hexdigest(),
+            size_bytes=len(data),
+            content_type="application/pdf",
+            etag=None,
+            last_modified=None,
+            format="pdf",
+        )
+
+    report = evaluate_remote_diagnostic_suite(
+        suite_path,
+        registry,
+        engine=FixedEngine(),
+        enable_rotation_probes=False,
+        fetcher=fetcher,
+    )
+
+    assert report["selection"]["rotation_probes_enabled"] is False
+    pages = report["sources"][0]["document"]["pages"]
+    assert [page["number"] for page in pages] == [1, 3]
+    assert all("rotation_probe" not in page for page in pages)
+    assert report["summary"]["rotation_recommendations"] == {}
 

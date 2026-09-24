@@ -546,6 +546,14 @@ def _parser() -> argparse.ArgumentParser:
             "running the curated diagnostic suite."
         ),
     )
+    remote_suite.add_argument(
+        "--no-rotation-probes",
+        action="store_true",
+        help=(
+            "Disable suite diagnostic 0/90/180/270 probes. Useful for "
+            "plain-OCR performance baselines."
+        ),
+    )
     _add_remote_suite_engine_arguments(remote_suite)
 
     capture_suite_qa = subparsers.add_parser(
@@ -1549,6 +1557,7 @@ def _evaluate_remote_suite(args: argparse.Namespace) -> int:
         engine=engine,
         reading_order_resolver=reading_order_resolver,
         auto_orient_right_angles=args.auto_orient_right_angles,
+        enable_rotation_probes=not args.no_rotation_probes,
     )
     output = write_remote_evaluation_report(report, args.output)
     summary = report["summary"]

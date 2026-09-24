@@ -34,6 +34,7 @@ Status: in progress
 - [x] Tesseract OSD orientation hint cross-check against exhaustive rotation diagnostics
 - [x] opt-in coordinate-safe right-angle auto-orientation for document conversion + remote A/B diagnostics
 - [x] Lao-dominance probe-skip optimization + auto-orientation probe-state reporting
+- [x] plain-OCR vs auto-orient suite performance mode with diagnostic probes independently switchable
 - [x] bounded official HPLT Lao streaming sampler + provenance metadata
 - [x] optional reviewed layout AST labels in dataset manifests + coverage reporting
 - [x] reproducible layout-training manifest from reviewed AST labels

@@ -2559,6 +2559,7 @@ def test_evaluate_remote_suite_cli_forwards_paths_and_writes_report(
             "--registry",
             str(registry),
             "--auto-orient-right-angles",
+            "--no-rotation-probes",
             "--output",
             str(output),
         ],
@@ -2570,6 +2571,7 @@ def test_evaluate_remote_suite_cli_forwards_paths_and_writes_report(
     assert captured["engine"].metadata()["name"] == "test-engine"
     assert captured["reading_order_resolver"].metadata()["name"] == "test-resolver"
     assert captured["auto_orient_right_angles"] is True
+    assert captured["enable_rotation_probes"] is False
 
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["report_type"] == "remote-source-diagnostic-suite"
