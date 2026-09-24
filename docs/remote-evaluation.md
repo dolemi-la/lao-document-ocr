@@ -101,9 +101,11 @@ For selected suite entries, `rotation_probe: true` runs diagnostic OCR at 0°, 9
 
 OCR engines may also provide a diagnostic `orientation_hint`. `TesseractEngine` uses Tesseract OSD when `osd` traineddata is available and records only the suggested clockwise angle, orientation confidence, script name, and script confidence. The hint does not choose the production angle yet; the exhaustive rotation probe remains the reference so OSD agreement can be measured first.
 
+Current curated evidence keeps OSD diagnostic-only: on the three verified KPMG problem pages it matched the exhaustive recommendation on only one page. Low OSD confidence was associated with the two mismatches, so production auto-orientation continues to use OCR evidence rather than trusting OSD directly.
+
 The curated suite enables the diagnostic rotation probe only for the verified World Bank/KPMG raster-overlay pages. The main OCR pipeline also has an opt-in `--auto-orient-right-angles` mode for `convert-document` and `evaluate-remote-suite`. It uses the same conservative score/confidence/character thresholds and keeps 0° when improvement is not clear. The feature remains off by default while real-suite A/B evidence is collected.
 
-To limit cost, the opt-in production path first runs baseline OCR and skips the 90°/180°/270° probes when mean baseline line confidence is already at least 0.65. Low-confidence pages still receive the full right-angle probe.
+To limit cost, the opt-in production path first runs baseline OCR and skips the 90°/180°/270° probes when mean baseline line confidence is already at least 0.65. It also skips probing when baseline confidence is at least 0.45, at least 200 non-space characters were recognized, and at least 75% of those characters fall in the Lao Unicode block. This preserves the full probe for ambiguous low-confidence pages while avoiding extra work on already Lao-dominant upright scans.
 
 ## Not benchmark accuracy
 

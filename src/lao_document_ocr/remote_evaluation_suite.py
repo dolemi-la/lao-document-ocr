@@ -207,6 +207,7 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     page_media: Counter[str] = Counter()
     rotation_recommendations: Counter[str] = Counter()
     applied_orientations: Counter[str] = Counter()
+    auto_orientation_probe_states: Counter[str] = Counter()
     page_count = 0
     ocr_lao_characters = 0
     native_lao_characters = 0
@@ -243,6 +244,15 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             if isinstance(auto_orientation, dict):
                 applied = int(auto_orientation.get("degrees_clockwise", 0))
                 applied_orientations[str(applied)] += 1
+                diagnostics = auto_orientation.get("diagnostics")
+                if isinstance(diagnostics, dict):
+                    if diagnostics.get("probe_skipped"):
+                        reason = str(
+                            diagnostics.get("probe_skip_reason") or "skipped"
+                        )
+                    else:
+                        reason = "probed"
+                    auto_orientation_probe_states[reason] += 1
             native = page.get("native_text")
             if isinstance(native, dict):
                 native_lao_characters += int(native.get("lao_characters", 0))
@@ -271,6 +281,9 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         "page_media_classifications": dict(sorted(page_media.items())),
         "rotation_recommendations": dict(sorted(rotation_recommendations.items())),
         "applied_auto_orientations": dict(sorted(applied_orientations.items())),
+        "auto_orientation_probe_states": dict(
+            sorted(auto_orientation_probe_states.items())
+        ),
         "registry_text_layers": dict(sorted(registry_layers.items())),
         "source_statuses": dict(sorted(source_statuses.items())),
     }

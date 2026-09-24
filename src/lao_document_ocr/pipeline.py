@@ -26,6 +26,9 @@ SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}
 SUPPORTED_SUFFIXES = SUPPORTED_IMAGE_SUFFIXES | {".pdf"}
 DEFAULT_MAX_PAGE_PIXELS = 40_000_000
 DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE = 0.65
+DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE = 0.45
+DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS = 200
+DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO = 0.75
 
 
 class DocumentProcessingError(RuntimeError):
@@ -206,20 +209,30 @@ def _rotate_embedded_assets(
     return tuple(sorted(output, key=lambda asset: (asset.bbox.y, asset.bbox.x)))
 
 
-def _orientation_line_stats(lines) -> tuple[float, int, float]:
+def _orientation_line_stats(lines) -> tuple[float, int, float, float]:
     total_weight = 0
     weighted_confidence = 0.0
     recognized_characters = 0
+    lao_characters = 0
     for line in lines:
-        weight = max(1, len([char for char in line.text if not char.isspace()]))
+        nonspace = [char for char in line.text if not char.isspace()]
+        weight = max(1, len(nonspace))
         total_weight += weight
         recognized_characters += weight
+        lao_characters += sum(
+            1 for char in nonspace if "\u0e80" <= char <= "\u0eff"
+        )
         weighted_confidence += float(line.confidence) * weight
     mean_confidence = (
         weighted_confidence / total_weight if total_weight else 0.0
     )
+    lao_ratio = (
+        lao_characters / recognized_characters
+        if recognized_characters
+        else 0.0
+    )
     score = mean_confidence * math.log1p(recognized_characters)
-    return mean_confidence, recognized_characters, score
+    return mean_confidence, recognized_characters, score, lao_ratio
 
 
 def _recognize_with_right_angle_orientation(
@@ -227,12 +240,26 @@ def _recognize_with_right_angle_orientation(
     *,
     engine: OcrEngine,
     should_cancel: Callable[[], bool] | None = None,
-) -> tuple[Image.Image, list, int, dict[str, float | int | None]]:
+) -> tuple[Image.Image, list, int, dict[str, float | int | str | None]]:
     baseline_lines = engine.recognize(image)
-    baseline_confidence, baseline_characters, baseline_score = _orientation_line_stats(
-        baseline_lines
-    )
+    (
+        baseline_confidence,
+        baseline_characters,
+        baseline_score,
+        baseline_lao_ratio,
+    ) = _orientation_line_stats(baseline_lines)
+
+    probe_skip_reason = None
     if baseline_confidence >= DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE:
+        probe_skip_reason = "high-confidence"
+    elif (
+        baseline_confidence >= DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
+        and baseline_characters >= DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
+        and baseline_lao_ratio >= DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO
+    ):
+        probe_skip_reason = "lao-dominant-baseline"
+
+    if probe_skip_reason is not None:
         return (
             image,
             baseline_lines,
@@ -244,10 +271,20 @@ def _recognize_with_right_angle_orientation(
                 "selected_characters": baseline_characters,
                 "baseline_score": baseline_score,
                 "selected_score": baseline_score,
+                "baseline_lao_ratio": baseline_lao_ratio,
+                "selected_lao_ratio": baseline_lao_ratio,
                 "probe_skipped": True,
+                "probe_skip_reason": probe_skip_reason,
                 "probe_below_confidence": (
                     DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE
                 ),
+                "lao_dominant_min_confidence": (
+                    DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
+                ),
+                "lao_dominant_min_characters": (
+                    DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
+                ),
+                "lao_dominant_ratio": DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO,
             },
         )
 
@@ -259,6 +296,7 @@ def _recognize_with_right_angle_orientation(
             baseline_confidence,
             baseline_characters,
             baseline_score,
+            baseline_lao_ratio,
         )
     ]
 
@@ -269,16 +307,32 @@ def _recognize_with_right_angle_orientation(
             lines = engine.recognize(rotated)
         except OcrEngineError:
             continue
-        confidence, characters, score = _orientation_line_stats(lines)
+        confidence, characters, score, lao_ratio = _orientation_line_stats(lines)
         candidates.append(
-            (degrees, rotated, lines, confidence, characters, score)
+            (
+                degrees,
+                rotated,
+                lines,
+                confidence,
+                characters,
+                score,
+                lao_ratio,
+            )
         )
 
     best = max(
         candidates,
         key=lambda item: (item[5], item[3], item[4]),
     )
-    best_degrees, best_image, best_lines, best_confidence, best_characters, best_score = best
+    (
+        best_degrees,
+        best_image,
+        best_lines,
+        best_confidence,
+        best_characters,
+        best_score,
+        best_lao_ratio,
+    ) = best
 
     use_best = (
         best_degrees != 0
@@ -294,6 +348,7 @@ def _recognize_with_right_angle_orientation(
         best_confidence = baseline_confidence
         best_characters = baseline_characters
         best_score = baseline_score
+        best_lao_ratio = baseline_lao_ratio
 
     return (
         best_image,
@@ -306,13 +361,20 @@ def _recognize_with_right_angle_orientation(
             "selected_characters": best_characters,
             "baseline_score": baseline_score,
             "selected_score": best_score,
+            "baseline_lao_ratio": baseline_lao_ratio,
+            "selected_lao_ratio": best_lao_ratio,
             "probe_skipped": False,
-            "probe_below_confidence": (
-                DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE
+            "probe_skip_reason": None,
+            "probe_below_confidence": DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE,
+            "lao_dominant_min_confidence": (
+                DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
             ),
+            "lao_dominant_min_characters": (
+                DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
+            ),
+            "lao_dominant_ratio": DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO,
         },
     )
-
 
 def process_document(
     path: str | Path,
@@ -346,7 +408,7 @@ def process_document(
         source_image = loaded_page.image
         embedded_images = loaded_page.embedded_images
         orientation_degrees = 0
-        orientation_diagnostics: dict[str, float | int | None] | None = None
+        orientation_diagnostics: dict[str, float | int | str | None] | None = None
         try:
             if auto_orient_right_angles:
                 (
@@ -475,6 +537,13 @@ def process_document(
                 "probe_below_confidence": (
                     DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE
                 ),
+                "lao_dominant_min_confidence": (
+                    DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE
+                ),
+                "lao_dominant_min_characters": (
+                    DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS
+                ),
+                "lao_dominant_ratio": DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO,
                 "pages": orientation_pages,
             },
         },

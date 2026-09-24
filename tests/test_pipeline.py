@@ -446,3 +446,42 @@ def test_embedded_asset_bbox_rotates_with_page() -> None:
     assert rotated[0].bbox == BoundingBox(x=40, y=10, width=40, height=30)
     assert rotated[0].width_ratio == 0.4
     assert rotated[0].xref == 7
+
+
+def test_auto_orientation_skips_probe_for_strong_lao_baseline(tmp_path) -> None:
+    state = {"calls": 0}
+
+    class LaoDominantEngine(OcrEngine):
+        def is_available(self) -> bool:
+            return True
+
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            state["calls"] += 1
+            return [
+                RecognizedLine(
+                    text="ສະບາຍດີ" * 40,
+                    bbox=BoundingBox(x=10, y=10, width=200, height=30),
+                    confidence=0.50,
+                    block_id=1,
+                    paragraph_id=1,
+                    line_id=1,
+                )
+            ]
+
+    image_path = tmp_path / "lao-dominant.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    document = process_document(
+        image_path,
+        engine=LaoDominantEngine(),
+        auto_orient_right_angles=True,
+    )
+
+    orientation = document.metadata["auto_orientation"]["pages"][0]
+    assert orientation["degrees_clockwise"] == 0
+    assert orientation["diagnostics"]["probe_skipped"] is True
+    assert orientation["diagnostics"]["probe_skip_reason"] == (
+        "lao-dominant-baseline"
+    )
+    assert orientation["diagnostics"]["baseline_lao_ratio"] >= 0.75
+    assert state["calls"] == 1
