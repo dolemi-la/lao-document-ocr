@@ -27,6 +27,16 @@ def test_remote_evaluation_workflow_installs_real_tesseract_languages() -> None:
     assert "--source-id \"$SOURCE_ID\"" in text
 
 
+def test_remote_evaluation_workflow_exposes_opt_in_auto_orientation() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "auto_orient_right_angles:" in text
+    assert "AUTO_ORIENT: ${{ inputs.auto_orient_right_angles }}" in text
+    assert "args+=(--auto-orient-right-angles)" in text
+    assert 'payload["selection"]["auto_orient_right_angles"]' in text
+
+
+
 def test_remote_evaluation_workflow_preserves_privacy_boundary() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 

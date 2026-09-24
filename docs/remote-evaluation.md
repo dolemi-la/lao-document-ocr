@@ -29,6 +29,8 @@ lao-ocr evaluate-remote-sources \
 
 Without `--page`, PDFs sample representative pages (first, middle, last by default). Use `--all-remote` only when intentionally probing every `remote-evaluation-*` registry entry; collection pages, blocked hosts, and unverified entries may fail and are reported individually.
 
+For focused auto-orientation A/B work, `evaluate-remote-sources` also accepts `--auto-orient-right-angles`. It is off by default and only changes OCR processing for the selected remote diagnostic source/pages; the report remains metadata-only and `not_benchmark_accuracy: true`.
+
 ## GitHub Actions
 
 For an environment with real Tesseract Lao/English installed, run the manual **Remote Scan Diagnostic** workflow.
@@ -37,7 +39,8 @@ Inputs:
 
 - `source_id`: one `remote-evaluation-*` registry ID;
 - `page`: optional 1-based page number;
-- `max_source_mb`: bounded download limit, default 25 MiB.
+- `max_source_mb`: bounded download limit, default 25 MiB;
+- `auto_orient_right_angles`: optional conservative production auto-orientation, default `false`.
 
 The workflow is manual-only, has read-only repository permissions, installs `tesseract-ocr-lao` and `tesseract-ocr-eng`, validates the report privacy boundary, and uploads only the JSON diagnostic report for 14 days.
 
@@ -105,7 +108,7 @@ Current curated evidence keeps OSD diagnostic-only: on the three verified KPMG p
 
 Production auto-orientation may still use an engine orientation hint as a **first candidate**. The hinted angle is immediately OCR-verified with the same score/confidence/character acceptance thresholds. If it passes, the remaining angles are skipped; if it fails, the pipeline falls back to the exhaustive remaining right-angle probes. This preserves OCR verification while reducing cost when a hint is useful.
 
-The curated suite enables the diagnostic rotation probe only for the verified World Bank/KPMG raster-overlay pages. The main OCR pipeline also has an opt-in `--auto-orient-right-angles` mode for `convert-document` and `evaluate-remote-suite`. It uses the same conservative score/confidence/character thresholds and keeps 0° when improvement is not clear. The feature remains off by default while real-suite A/B evidence is collected.
+The curated suite enables the diagnostic rotation probe only for the verified World Bank/KPMG raster-overlay pages. The main OCR pipeline also has an opt-in `--auto-orient-right-angles` mode for `convert-document`, `evaluate-remote-sources`, and `evaluate-remote-suite`. It uses the same conservative score/confidence/character thresholds and keeps 0° when improvement is not clear. The feature remains off by default while real-suite A/B evidence is collected.
 
 To limit cost, the opt-in production path first runs baseline OCR and skips the 90°/180°/270° probes when mean baseline line confidence is already at least 0.65. It also skips probing when baseline confidence is at least 0.45, at least 200 non-space characters were recognized, and at least 75% of those characters fall in the Lao Unicode block. This preserves the full probe for ambiguous low-confidence pages while avoiding extra work on already Lao-dominant upright scans.
 

@@ -16,6 +16,11 @@ on:
         required: true
         default: "25"
         type: string
+      auto_orient_right_angles:
+        description: "Opt in to conservative right-angle auto-orientation"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -48,6 +53,7 @@ jobs:
           SOURCE_ID: ${{ inputs.source_id }}
           PAGE: ${{ inputs.page }}
           MAX_SOURCE_MB: ${{ inputs.max_source_mb }}
+          AUTO_ORIENT: ${{ inputs.auto_orient_right_angles }}
           REPORT: ${{ runner.temp }}/remote-source-diagnostic.json
         run: |
           set -euo pipefail
@@ -72,6 +78,9 @@ jobs:
             fi
             args+=(--page "$PAGE")
           fi
+          if [ "$AUTO_ORIENT" = "true" ]; then
+            args+=(--auto-orient-right-angles)
+          fi
           set +e
           "${args[@]}"
           code=$?
@@ -82,6 +91,7 @@ jobs:
       - name: Verify report privacy boundary
         env:
           REPORT: ${{ runner.temp }}/remote-source-diagnostic.json
+          EXPECTED_AUTO_ORIENT: ${{ inputs.auto_orient_right_angles }}
         run: |
           python - <<'PY'
           import json
@@ -94,6 +104,8 @@ jobs:
           assert payload["report_type"] == "remote-source-diagnostic"
           assert payload["not_benchmark_accuracy"] is True
           assert payload["summary"]["sources"] == 1
+          expected_auto_orient = os.environ["EXPECTED_AUTO_ORIENT"].lower() == "true"
+          assert payload["selection"]["auto_orient_right_angles"] is expected_auto_orient
 
           forbidden = {
               "reference",

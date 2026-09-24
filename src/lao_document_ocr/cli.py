@@ -476,6 +476,14 @@ def _parser() -> argparse.ArgumentParser:
     remote_eval.add_argument("--max-page-pixels", type=int, default=40_000_000)
     remote_eval.add_argument("--output", required=True, type=Path)
     remote_eval.add_argument(
+        "--auto-orient-right-angles",
+        action="store_true",
+        help=(
+            "Use the conservative right-angle auto-orientation path while "
+            "running selected remote-source diagnostics."
+        ),
+    )
+    remote_eval.add_argument(
         "--engine",
         choices=["tesseract", "owned"],
         default="tesseract",
@@ -1532,6 +1540,7 @@ def _evaluate_remote_sources(args: argparse.Namespace) -> int:
         max_page_pixels=args.max_page_pixels,
         timeout_seconds=args.timeout_seconds,
         reading_order_resolver=reading_order_resolver,
+        auto_orient_right_angles=args.auto_orient_right_angles,
     )
     output = write_remote_evaluation_report(report, args.output)
     summary = report["summary"]

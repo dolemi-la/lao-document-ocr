@@ -2420,6 +2420,7 @@ def test_evaluate_remote_sources_cli_forwards_limits_and_writes_report(
             "90",
             "--max-page-pixels",
             "123456",
+            "--auto-orient-right-angles",
             "--output",
             str(output),
         ],
@@ -2435,6 +2436,7 @@ def test_evaluate_remote_sources_cli_forwards_limits_and_writes_report(
     assert captured["timeout_seconds"] == 8.0
     assert captured["max_document_pages"] == 90
     assert captured["max_page_pixels"] == 123456
+    assert captured["auto_orient_right_angles"] is True
     assert captured["reading_order_resolver"].metadata()["name"] == "test-resolver"
 
     payload = json.loads(output.read_text(encoding="utf-8"))
