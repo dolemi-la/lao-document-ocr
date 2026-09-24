@@ -15,6 +15,7 @@ type Health = {
 type ConversionJob = {
   id: string;
   filename: string;
+  auto_orient_right_angles: boolean;
   status: "uploading" | "queued" | "running" | "succeeded" | "failed" | "cancelled";
   cancellation_requested: boolean;
   error: string | null;
@@ -29,6 +30,7 @@ function App() {
   const [file, setFile] = useState<File | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [busy, setBusy] = useState(false);
+  const [autoOrient, setAutoOrient] = useState(false);
   const [message, setMessage] = useState("");
   const [job, setJob] = useState<ConversionJob | null>(null);
   const m = MESSAGES[locale];
@@ -137,6 +139,9 @@ function App() {
     try {
       const form = new FormData();
       form.append("file", file);
+      if (autoOrient) {
+        form.append("auto_orient_right_angles", "true");
+      }
       const response = await fetch(`${API_URL}/v1/jobs`, {
         method: "POST",
         body: form,
@@ -253,6 +258,19 @@ function App() {
           <strong>{file ? m.selected : m.drop}</strong>
           <span id="file-help">{fileDescription}</span>
           <span className="browse">{file ? m.chooseAnother : m.browse}</span>
+        </label>
+
+        <label className={busy ? "advancedOption disabled" : "advancedOption"}>
+          <input
+            type="checkbox"
+            checked={autoOrient}
+            onChange={(event) => setAutoOrient(event.target.checked)}
+            disabled={busy}
+          />
+          <span>
+            <strong>{m.autoOrientTitle}</strong>
+            <small>{m.autoOrientHelp}</small>
+          </span>
         </label>
 
         <div className="actions">

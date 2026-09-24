@@ -208,6 +208,52 @@ h2 {
   font-weight: 700;
 }
 
+.advancedOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 14px 4px 0;
+  padding: 12px 14px;
+  border: 1px solid #e0e3ea;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #353d4c;
+  cursor: pointer;
+}
+
+.advancedOption input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: #5b42e8;
+}
+
+.advancedOption span {
+  display: grid;
+  gap: 3px;
+}
+
+.advancedOption strong {
+  font-size: 13px;
+}
+
+.advancedOption small {
+  color: #7a8290;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.advancedOption.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.advancedOption:focus-within {
+  outline: 3px solid rgba(91, 66, 232, 0.24);
+  outline-offset: 2px;
+}
+
 button {
   width: 100%;
   margin-top: 14px;

@@ -18,6 +18,8 @@ export type Messages = {
   drop: string;
   chooseAnother: string;
   browse: string;
+  autoOrientTitle: string;
+  autoOrientHelp: string;
   convert: string;
   processing: string;
   cancel: string;
@@ -59,6 +61,9 @@ export const MESSAGES: Record<Locale, Messages> = {
     drop: "Drop a document here",
     chooseAnother: "Choose another file",
     browse: "Browse files",
+    autoOrientTitle: "Auto-fix sideways or upside-down pages",
+    autoOrientHelp:
+      "Optional. Uses extra OCR only on pages that look ambiguous; leave off for the fastest conversion.",
     convert: "Convert to editable files",
     processing: "Processing…",
     cancel: "Cancel",
@@ -98,6 +103,9 @@ export const MESSAGES: Record<Locale, Messages> = {
     drop: "ລາກໄຟລ໌ມາວາງທີ່ນີ້",
     chooseAnother: "ເລືອກໄຟລ໌ອື່ນ",
     browse: "ເລືອກໄຟລ໌",
+    autoOrientTitle: "ປັບໜ້າທີ່ຫັນຂ້າງ ຫຼື ກັບຫົວອັດຕະໂນມັດ",
+    autoOrientHelp:
+      "ຕົວເລືອກເສີມ. ໃຊ້ OCR ເພີ່ມສະເພາະໜ້າທີ່ທິດທາງບໍ່ຊັດເຈນ; ປິດໄວ້ຈະໄວກວ່າ.",
     convert: "ປ່ຽນເປັນໄຟລ໌ແກ້ໄຂໄດ້",
     processing: "ກຳລັງປະມວນຜົນ…",
     cancel: "ຍົກເລີກ",
