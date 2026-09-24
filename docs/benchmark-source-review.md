@@ -129,6 +129,7 @@ Additional discovery sources:
 - a second MAF/forestry PDF is search-indexed as CamScanner 08-22-2022 13.28, but remains unverified because direct inspection is blocked by the host
 - the Lao Official Gazette states that authoritative legislation is distributed as image-form PDF; treat it as a collection-level discovery source and review individual files separately
 - ST Bank Laos Q4/2024 is search-indexed with a `Scanned with CS CamScanner` footer and dense Lao financial tables, but remains unverified because the original PDF endpoint timed out during direct inspection
+- MAF Forestry Strategy to 2035 / Vision 2050 is search-indexed with heavily corrupted Lao text plus a CamScanner marker, but remains unverified because the official PDF fetch timed out during direct rendering
 
 ## Preferred real-benchmark acquisition
 
