@@ -68,6 +68,21 @@ It deliberately does **not** store:
 - OCR-transcribed document text;
 - derived ground truth.
 
+## Layer-gap diagnostics
+
+For PDF pages, the report compares only **statistics** from the native PDF text layer and OCR output. It never stores either text body.
+
+Each sampled page gets a `layer_gap.classification`:
+
+- `native-layer-empty`: the PDF page exposes no native text, but OCR recovers text;
+- `native-layer-sparse`: the native layer is tiny (for example, only a scanner watermark) while OCR recovers substantially more;
+- `lao-missing-from-native-layer`: OCR recovers substantial Lao text while the native layer contains little or no Lao;
+- `ocr-much-richer-than-native`: OCR recovers at least about twice as much non-space text as the native layer;
+- `no-large-gap-detected`: no large statistical discrepancy was detected;
+- `image-no-native-layer`: direct image inputs have no PDF text layer by definition.
+
+The classifier is a triage signal, not ground truth. It helps prioritize pages for visual review and OCR improvement.
+
 ## Not benchmark accuracy
 
 A remote diagnostic report has:

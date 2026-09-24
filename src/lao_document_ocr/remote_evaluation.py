@@ -299,6 +299,38 @@ def _text_stats(text: str) -> dict[str, int | float]:
     }
 
 
+def _layer_gap_diagnostics(
+    native_text: dict[str, int | float],
+    ocr_text: dict[str, int | float],
+) -> dict[str, Any]:
+    native_nonspace = int(native_text["nonspace_characters"])
+    ocr_nonspace = int(ocr_text["nonspace_characters"])
+    native_lao = int(native_text["lao_characters"])
+    ocr_lao = int(ocr_text["lao_characters"])
+
+    if native_nonspace == 0 and ocr_nonspace > 0:
+        classification = "native-layer-empty"
+    elif native_nonspace <= 32 and ocr_nonspace >= max(100, native_nonspace * 5):
+        classification = "native-layer-sparse"
+    elif ocr_lao >= 50 and native_lao < max(5, int(ocr_lao * 0.1)):
+        classification = "lao-missing-from-native-layer"
+    elif native_nonspace > 0 and ocr_nonspace >= native_nonspace * 2:
+        classification = "ocr-much-richer-than-native"
+    else:
+        classification = "no-large-gap-detected"
+
+    return {
+        "classification": classification,
+        "native_layer_empty": native_nonspace == 0,
+        "native_layer_sparse": native_nonspace <= 32,
+        "ocr_minus_native_nonspace_characters": ocr_nonspace - native_nonspace,
+        "ocr_minus_native_lao_characters": ocr_lao - native_lao,
+        "ocr_to_native_nonspace_ratio": (
+            (ocr_nonspace / native_nonspace) if native_nonspace else None
+        ),
+    }
+
+
 def _ocr_document_stats(document) -> dict[str, Any]:
     block_counts = Counter()
     confidences: list[float] = []
@@ -433,12 +465,20 @@ def _evaluate_pdf(
                 reading_order_resolver=reading_order_resolver,
             )
             diagnostics["ocr"] = _ocr_document_stats(document)
+            diagnostics["layer_gap"] = _layer_gap_diagnostics(
+                diagnostics["native_text"],
+                diagnostics["ocr"]["text"],
+            )
             diagnostics["elapsed_seconds"] = time.perf_counter() - started
             page_results.append(diagnostics)
 
+        layer_gap_counts = Counter(
+            page["layer_gap"]["classification"] for page in page_results
+        )
         return {
             "page_count": pdf.page_count,
             "selected_pages": selected,
+            "layer_gap_summary": dict(sorted(layer_gap_counts.items())),
             "pages": page_results,
         }
     finally:
@@ -475,10 +515,23 @@ def _evaluate_image(
         reading_order_resolver=reading_order_resolver,
     )
     dimensions["ocr"] = _ocr_document_stats(document)
+    dimensions["layer_gap"] = {
+        "classification": "image-no-native-layer",
+        "native_layer_empty": True,
+        "native_layer_sparse": True,
+        "ocr_minus_native_nonspace_characters": int(
+            dimensions["ocr"]["text"]["nonspace_characters"]
+        ),
+        "ocr_minus_native_lao_characters": int(
+            dimensions["ocr"]["text"]["lao_characters"]
+        ),
+        "ocr_to_native_nonspace_ratio": None,
+    }
     dimensions["elapsed_seconds"] = time.perf_counter() - started
     return {
         "page_count": 1,
         "selected_pages": [1],
+        "layer_gap_summary": {"image-no-native-layer": 1},
         "pages": [dimensions],
     }
 

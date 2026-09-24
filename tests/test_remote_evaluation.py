@@ -14,6 +14,7 @@ from lao_document_ocr.ocr.base import OcrEngine, RecognizedLine
 from lao_document_ocr.remote_evaluation import (
     DownloadedRemote,
     RemoteEvaluationError,
+    _layer_gap_diagnostics,
     evaluate_remote_sources,
     load_remote_registry_sources,
     validate_remote_url,
@@ -242,4 +243,32 @@ def test_remote_evaluation_source_id_cannot_escape_temp_directory(tmp_path) -> N
     assert ".." not in destinations[0].parts
     assert "escape-attempt" not in destinations[0].parts
     assert not destinations[0].exists()
+
+
+def test_layer_gap_classifies_empty_and_missing_lao_layers() -> None:
+    empty = _layer_gap_diagnostics(
+        {
+            "nonspace_characters": 0,
+            "lao_characters": 0,
+        },
+        {
+            "nonspace_characters": 900,
+            "lao_characters": 800,
+        },
+    )
+    assert empty["classification"] == "native-layer-empty"
+    assert empty["ocr_to_native_nonspace_ratio"] is None
+
+    missing_lao = _layer_gap_diagnostics(
+        {
+            "nonspace_characters": 1200,
+            "lao_characters": 0,
+        },
+        {
+            "nonspace_characters": 1300,
+            "lao_characters": 1100,
+        },
+    )
+    assert missing_lao["classification"] == "lao-missing-from-native-layer"
+    assert missing_lao["ocr_minus_native_lao_characters"] == 1100
 
