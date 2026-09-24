@@ -76,7 +76,7 @@ def test_remote_scan_candidates_stay_non_ingestable() -> None:
         if source["status"].startswith("remote-evaluation-")
     ]
 
-    assert len(candidates) >= 12
+    assert len(candidates) >= 14
     for source in candidates:
         assert source["allowed_uses"] == []
         assert "public-benchmark-redistribution" in source["disallowed_uses"]
@@ -91,4 +91,6 @@ def test_remote_scan_candidates_stay_non_ingestable() -> None:
             "scanner-watermark-only",
             "unverified",
             "image-form-source-collection",
+            "present-but-noisy-ocr-layer",
+            "present-but-fragmented-layout-layer",
         }

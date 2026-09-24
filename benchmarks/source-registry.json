@@ -328,6 +328,48 @@
         "visual_observation": "Collection-level discovery source only; individual PDFs still require page/text-layer verification before being promoted to a verified candidate."
       },
       "notes": "High-yield discovery source for official image-form Lao legal documents with weak/absent native text layers. This collection is not asserted to be camera-captured; use it to discover individual scan candidates and review each separately."
+    },
+    {
+      "id": "naplaos-paris-agreement-camscanner",
+      "name": "NAP Laos Paris Agreement CamScanner PDF",
+      "url": "https://naplaos.com/publication?id=18",
+      "license": "rights-unclear; government-project-publication",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 41,
+        "text_layer": "present-but-noisy-ocr-layer",
+        "parsed_text_observation": "The PDF exposes an OCR layer, but Lao text contains visibly broken spacing/combining-mark segmentation and scanner-derived artifacts rather than a clean native document layer.",
+        "visual_observation": "Rendered pages are raster scans and page 2 visibly carries a Scanned by CamScanner footer."
+      },
+      "notes": "Useful camera-scan case where a text layer exists but should not be assumed trustworthy. NAP Laos is operated through the Lao environment/climate adaptation program; keep the document remote-only pending explicit rights review."
+    },
+    {
+      "id": "laowis-salavan-groundwater-plan-2023-camscanner",
+      "name": "LaoWIS Salavan groundwater management plan 2023 scan",
+      "url": "https://oieau-wiss.org/laowis-moae/images/pdf/ground_water_plan/groundwater-salavan-2023.pdf",
+      "license": "rights-unclear",
+      "status": "remote-evaluation-candidate-not-approved",
+      "allowed_uses": [],
+      "disallowed_uses": [
+        "public-benchmark-redistribution",
+        "training-data-ingestion",
+        "public-ground-truth"
+      ],
+      "evidence": {
+        "reviewed_on": "2026-09-24",
+        "pages": 64,
+        "text_layer": "present-but-fragmented-layout-layer",
+        "parsed_text_observation": "The PDF exposes OCR text, but table/page extraction is heavily fragmented into syllable-sized lines and loses the original table layout/order.",
+        "visual_observation": "Indexed rendered content includes a rotated Lao table page stamped Scanned with CamScanner; the document therefore provides a useful rotation/layout-plus-OCR-layer stress case."
+      },
+      "notes": "Mixed scan/OCR-layer candidate from the LaoWIS water-information repository. Especially useful for detecting unreliable pre-existing OCR/layout layers. Keep remote-only pending rights review."
     }
   ]
 }
