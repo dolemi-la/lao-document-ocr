@@ -9,6 +9,7 @@ import platform
 import socket
 import tempfile
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -278,14 +279,29 @@ def load_remote_registry_sources(
 def _text_stats(text: str) -> dict[str, int | float]:
     nonspace = [char for char in text if not char.isspace()]
     lao = sum(1 for char in nonspace if "\u0e80" <= char <= "\u0eff")
-    latin = sum(
-        1
-        for char in nonspace
-        if ("A" <= char <= "Z") or ("a" <= char <= "z")
-    )
+    latin = 0
+    other_letters = 0
+    marks = 0
+    punctuation_symbols = 0
+    for char in nonspace:
+        category = unicodedata.category(char)
+        name = unicodedata.name(char, "")
+        if category.startswith("L"):
+            if "\u0e80" <= char <= "\u0eff":
+                continue
+            if "LATIN" in name:
+                latin += 1
+            else:
+                other_letters += 1
+        elif category.startswith("M"):
+            marks += 1
+        elif category.startswith(("P", "S")):
+            punctuation_symbols += 1
+
     digits = sum(1 for char in nonspace if char.isdigit())
     replacement = text.count("\ufffd")
     total = len(nonspace)
+    letter_total = lao + latin + other_letters
     return {
         "characters": len(text),
         "nonspace_characters": total,
@@ -293,9 +309,16 @@ def _text_stats(text: str) -> dict[str, int | float]:
         "words": len(text.split()),
         "lao_characters": lao,
         "latin_characters": latin,
+        "other_letter_characters": other_letters,
+        "letter_characters": letter_total,
+        "mark_characters": marks,
+        "punctuation_symbol_characters": punctuation_symbols,
         "digit_characters": digits,
         "replacement_characters": replacement,
         "lao_ratio": (lao / total) if total else 0.0,
+        "other_letter_ratio": (
+            (other_letters / letter_total) if letter_total else 0.0
+        ),
     }
 
 
@@ -307,11 +330,28 @@ def _layer_gap_diagnostics(
     ocr_nonspace = int(ocr_text["nonspace_characters"])
     native_lao = int(native_text["lao_characters"])
     ocr_lao = int(ocr_text["lao_characters"])
+    native_latin = int(native_text.get("latin_characters", 0))
+    ocr_latin = int(ocr_text.get("latin_characters", 0))
+    native_other = int(native_text.get("other_letter_characters", 0))
+    ocr_other = int(ocr_text.get("other_letter_characters", 0))
+    native_letters = int(
+        native_text.get(
+            "letter_characters",
+            native_lao + native_latin + native_other,
+        )
+    )
 
     if native_nonspace == 0 and ocr_nonspace > 0:
         classification = "native-layer-empty"
     elif native_nonspace <= 32 and ocr_nonspace >= max(100, native_nonspace * 5):
         classification = "native-layer-sparse"
+    elif (
+        native_nonspace >= 100
+        and native_other >= max(20, int(native_letters * 0.15))
+        and ocr_other <= max(5, int(native_other * 0.1))
+        and (ocr_lao + ocr_latin) >= 50
+    ):
+        classification = "native-layer-script-anomaly"
     elif ocr_lao >= 50 and native_lao < max(5, int(ocr_lao * 0.1)):
         classification = "lao-missing-from-native-layer"
     elif native_nonspace > 0 and ocr_nonspace >= native_nonspace * 2:
@@ -328,6 +368,23 @@ def _layer_gap_diagnostics(
         "ocr_to_native_nonspace_ratio": (
             (ocr_nonspace / native_nonspace) if native_nonspace else None
         ),
+        "native_other_letter_characters": native_other,
+        "ocr_other_letter_characters": ocr_other,
+    }
+
+
+def _confidence_diagnostics(mean_confidence: float | None) -> dict[str, Any]:
+    if mean_confidence is None:
+        band = "no-confidence"
+    elif mean_confidence < 0.60:
+        band = "low"
+    elif mean_confidence < 0.80:
+        band = "medium"
+    else:
+        band = "high"
+    return {
+        "band": band,
+        "mean_block_confidence": mean_confidence,
     }
 
 
@@ -469,6 +526,9 @@ def _evaluate_pdf(
                 diagnostics["native_text"],
                 diagnostics["ocr"]["text"],
             )
+            diagnostics["ocr_quality"] = _confidence_diagnostics(
+                diagnostics["ocr"]["mean_block_confidence"]
+            )
             diagnostics["elapsed_seconds"] = time.perf_counter() - started
             page_results.append(diagnostics)
 
@@ -527,6 +587,9 @@ def _evaluate_image(
         ),
         "ocr_to_native_nonspace_ratio": None,
     }
+    dimensions["ocr_quality"] = _confidence_diagnostics(
+        dimensions["ocr"]["mean_block_confidence"]
+    )
     dimensions["elapsed_seconds"] = time.perf_counter() - started
     return {
         "page_count": 1,

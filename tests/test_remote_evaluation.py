@@ -14,7 +14,9 @@ from lao_document_ocr.ocr.base import OcrEngine, RecognizedLine
 from lao_document_ocr.remote_evaluation import (
     DownloadedRemote,
     RemoteEvaluationError,
+    _confidence_diagnostics,
     _layer_gap_diagnostics,
+    _text_stats,
     evaluate_remote_sources,
     load_remote_registry_sources,
     validate_remote_url,
@@ -271,4 +273,54 @@ def test_layer_gap_classifies_empty_and_missing_lao_layers() -> None:
     )
     assert missing_lao["classification"] == "lao-missing-from-native-layer"
     assert missing_lao["ocr_minus_native_lao_characters"] == 1100
+
+
+def test_text_stats_count_lao_latin_and_other_scripts_without_storing_text() -> None:
+    stats = _text_stats("ABC ЖЖ ລາວ 123")
+
+    assert stats["latin_characters"] == 3
+    assert stats["other_letter_characters"] == 2
+    assert stats["lao_characters"] == 3
+    assert stats["digit_characters"] == 3
+    assert stats["letter_characters"] == 8
+    assert stats["other_letter_ratio"] == pytest.approx(2 / 8)
+
+
+def test_layer_gap_detects_native_script_anomaly() -> None:
+    result = _layer_gap_diagnostics(
+        {
+            "nonspace_characters": 1000,
+            "lao_characters": 0,
+            "latin_characters": 100,
+            "other_letter_characters": 700,
+            "letter_characters": 800,
+        },
+        {
+            "nonspace_characters": 950,
+            "lao_characters": 0,
+            "latin_characters": 800,
+            "other_letter_characters": 2,
+            "letter_characters": 802,
+        },
+    )
+
+    assert result["classification"] == "native-layer-script-anomaly"
+    assert result["native_other_letter_characters"] == 700
+    assert result["ocr_other_letter_characters"] == 2
+
+
+@pytest.mark.parametrize(
+    ("confidence", "band"),
+    [
+        (None, "no-confidence"),
+        (0.0, "low"),
+        (0.59, "low"),
+        (0.60, "medium"),
+        (0.79, "medium"),
+        (0.80, "high"),
+        (1.0, "high"),
+    ],
+)
+def test_confidence_diagnostics_bands(confidence, band) -> None:
+    assert _confidence_diagnostics(confidence)["band"] == band
 

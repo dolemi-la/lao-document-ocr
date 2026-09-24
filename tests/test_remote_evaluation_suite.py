@@ -205,6 +205,7 @@ def test_remote_suite_runs_per_source_pages_and_aggregates(tmp_path) -> None:
     assert report["summary"]["errors"] == 0
     assert report["summary"]["sampled_pages"] == 3
     assert report["summary"]["ocr_lao_characters"] > 0
+    assert report["summary"]["ocr_confidence_bands"] == {"high": 3}
     assert report["sources"][0]["suite_pages"] == [1]
     assert report["sources"][1]["suite_pages"] == [1, 3]
     assert report["sources"][0]["suite_note"] == "empty layer"

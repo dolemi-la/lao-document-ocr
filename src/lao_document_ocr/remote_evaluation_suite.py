@@ -195,6 +195,7 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     layer_gaps: Counter[str] = Counter()
     registry_layers: Counter[str] = Counter()
     source_statuses: Counter[str] = Counter()
+    confidence_bands: Counter[str] = Counter()
     page_count = 0
     ocr_lao_characters = 0
     native_lao_characters = 0
@@ -216,6 +217,9 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             layer_gap = page.get("layer_gap")
             if isinstance(layer_gap, dict):
                 layer_gaps[str(layer_gap.get("classification", "unknown"))] += 1
+            ocr_quality = page.get("ocr_quality")
+            if isinstance(ocr_quality, dict):
+                confidence_bands[str(ocr_quality.get("band", "unknown"))] += 1
             native = page.get("native_text")
             if isinstance(native, dict):
                 native_lao_characters += int(native.get("lao_characters", 0))
@@ -240,6 +244,7 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "ocr_elapsed_seconds": elapsed_seconds,
         "layer_gap_classifications": dict(sorted(layer_gaps.items())),
+        "ocr_confidence_bands": dict(sorted(confidence_bands.items())),
         "registry_text_layers": dict(sorted(registry_layers.items())),
         "source_statuses": dict(sorted(source_statuses.items())),
     }

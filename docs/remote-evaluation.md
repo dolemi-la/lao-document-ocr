@@ -77,11 +77,14 @@ Each sampled page gets a `layer_gap.classification`:
 - `native-layer-empty`: the PDF page exposes no native text, but OCR recovers text;
 - `native-layer-sparse`: the native layer is tiny (for example, only a scanner watermark) while OCR recovers substantially more;
 - `lao-missing-from-native-layer`: OCR recovers substantial Lao text while the native layer contains little or no Lao;
+- `native-layer-script-anomaly`: the native layer contains a large share of non-Latin/non-Lao letters while OCR recovers mostly Lao/Latin text, which is a signal for garbled embedded text;
 - `ocr-much-richer-than-native`: OCR recovers at least about twice as much non-space text as the native layer;
 - `no-large-gap-detected`: no large statistical discrepancy was detected;
 - `image-no-native-layer`: direct image inputs have no PDF text layer by definition.
 
 The classifier is a triage signal, not ground truth. It helps prioritize pages for visual review and OCR improvement.
+
+Each page also includes an `ocr_quality.band` derived from mean OCR block confidence: `low` below 0.60, `medium` from 0.60 to below 0.80, `high` from 0.80 upward, and `no-confidence` when the engine reports no block confidence. The curated suite aggregates these bands so low-confidence real scans are easy to prioritize.
 
 ## Not benchmark accuracy
 
