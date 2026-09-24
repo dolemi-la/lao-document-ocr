@@ -2,6 +2,12 @@ name: Remote Scan Diagnostic Suite
 
 on:
   workflow_dispatch:
+    inputs:
+      auto_orient_right_angles:
+        description: "Apply conservative 0/90/180/270 auto-orientation during OCR"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -20,7 +26,10 @@ jobs:
       - name: Install Tesseract Lao/English
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends             tesseract-ocr             tesseract-ocr-lao             tesseract-ocr-eng
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr \
+            tesseract-ocr-lao \
+            tesseract-ocr-eng
           tesseract --list-langs
 
       - name: Install project
@@ -51,9 +60,20 @@ jobs:
         id: diagnostic
         env:
           REPORT: ${{ runner.temp }}/remote-diagnostic-suite.json
+          AUTO_ORIENT: ${{ inputs.auto_orient_right_angles }}
         run: |
+          args=(
+            lao-ocr evaluate-remote-suite
+            --suite benchmarks/remote-diagnostic-suite.json
+            --registry benchmarks/source-registry.json
+            --output "$REPORT"
+          )
+          if [ "$AUTO_ORIENT" = "true" ]; then
+            args+=(--auto-orient-right-angles)
+          fi
+
           set +e
-          lao-ocr evaluate-remote-suite             --suite benchmarks/remote-diagnostic-suite.json             --registry benchmarks/source-registry.json             --output "$REPORT"
+          "${args[@]}"
           code=$?
           set -e
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
@@ -62,6 +82,7 @@ jobs:
       - name: Verify suite report privacy boundary
         env:
           REPORT: ${{ runner.temp }}/remote-diagnostic-suite.json
+          AUTO_ORIENT: ${{ inputs.auto_orient_right_angles }}
         run: |
           python - <<'PY'
           import json
@@ -75,6 +96,11 @@ jobs:
           assert payload["not_benchmark_accuracy"] is True
           assert payload["suite"]["id"] == "real-world-scan-diagnostic-v1"
           assert payload["summary"]["sources"] == 6
+          expected_auto = os.environ["AUTO_ORIENT"].lower() == "true"
+          assert (
+              payload["selection"]["auto_orient_right_angles"]
+              is expected_auto
+          )
 
           forbidden = {
               "reference",

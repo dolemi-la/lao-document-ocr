@@ -127,6 +127,14 @@ def _parser() -> argparse.ArgumentParser:
         default=256,
     )
     convert.add_argument("--max-pages", type=int, default=60)
+    convert.add_argument(
+        "--auto-orient-right-angles",
+        action="store_true",
+        help=(
+            "Conservatively probe 0/90/180/270-degree page orientation and "
+            "apply a non-zero rotation only when OCR confidence improves enough."
+        ),
+    )
     convert.add_argument("--font", default="Noto Sans Lao")
 
     validate = subparsers.add_parser("validate-dataset", help="Validate a benchmark dataset.")
@@ -530,6 +538,14 @@ def _parser() -> argparse.ArgumentParser:
         default=Path("benchmarks/source-registry.json"),
     )
     remote_suite.add_argument("--output", required=True, type=Path)
+    remote_suite.add_argument(
+        "--auto-orient-right-angles",
+        action="store_true",
+        help=(
+            "Use the conservative right-angle auto-orientation path while "
+            "running the curated diagnostic suite."
+        ),
+    )
     _add_remote_suite_engine_arguments(remote_suite)
 
     capture_suite_qa = subparsers.add_parser(
@@ -1055,6 +1071,7 @@ def _convert_document(args: argparse.Namespace) -> int:
         max_pages=args.max_pages,
         font_name=args.font,
         reading_order_resolver=reading_order_resolver,
+        auto_orient_right_angles=args.auto_orient_right_angles,
     )
     print(json.dumps(outputs.to_dict(), indent=2))
     return 0
@@ -1531,6 +1548,7 @@ def _evaluate_remote_suite(args: argparse.Namespace) -> int:
         args.registry,
         engine=engine,
         reading_order_resolver=reading_order_resolver,
+        auto_orient_right_angles=args.auto_orient_right_angles,
     )
     output = write_remote_evaluation_report(report, args.output)
     summary = report["summary"]

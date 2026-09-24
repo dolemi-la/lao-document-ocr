@@ -206,6 +206,7 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     confidence_bands: Counter[str] = Counter()
     page_media: Counter[str] = Counter()
     rotation_recommendations: Counter[str] = Counter()
+    applied_orientations: Counter[str] = Counter()
     page_count = 0
     ocr_lao_characters = 0
     native_lao_characters = 0
@@ -238,6 +239,10 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
                 recommended = rotation_probe.get("recommended_degrees_clockwise")
                 key = "none" if recommended is None else str(int(recommended))
                 rotation_recommendations[key] += 1
+            auto_orientation = page.get("auto_orientation")
+            if isinstance(auto_orientation, dict):
+                applied = int(auto_orientation.get("degrees_clockwise", 0))
+                applied_orientations[str(applied)] += 1
             native = page.get("native_text")
             if isinstance(native, dict):
                 native_lao_characters += int(native.get("lao_characters", 0))
@@ -265,6 +270,7 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         "ocr_confidence_bands": dict(sorted(confidence_bands.items())),
         "page_media_classifications": dict(sorted(page_media.items())),
         "rotation_recommendations": dict(sorted(rotation_recommendations.items())),
+        "applied_auto_orientations": dict(sorted(applied_orientations.items())),
         "registry_text_layers": dict(sorted(registry_layers.items())),
         "source_statuses": dict(sorted(source_statuses.items())),
     }
@@ -276,6 +282,7 @@ def evaluate_remote_diagnostic_suite(
     *,
     engine: OcrEngine,
     reading_order_resolver: ReadingOrderResolver | None = None,
+    auto_orient_right_angles: bool = False,
     fetcher: RemoteFetcher = download_remote_source,
 ) -> dict[str, Any]:
     suite = load_remote_diagnostic_suite(suite_path)
@@ -301,7 +308,10 @@ def evaluate_remote_diagnostic_suite(
             max_page_pixels=suite.max_page_pixels,
             timeout_seconds=suite.timeout_seconds,
             reading_order_resolver=reading_order_resolver,
-            probe_right_angle_rotations=entry.rotation_probe,
+            probe_right_angle_rotations=(
+                entry.rotation_probe and not auto_orient_right_angles
+            ),
+            auto_orient_right_angles=auto_orient_right_angles,
             fetcher=fetcher,
         )
         result = report["sources"][0]
@@ -344,6 +354,7 @@ def evaluate_remote_diagnostic_suite(
             "timeout_seconds": suite.timeout_seconds,
             "max_document_pages": suite.max_document_pages,
             "max_page_pixels": suite.max_page_pixels,
+            "auto_orient_right_angles": auto_orient_right_angles,
         },
         "summary": _aggregate_suite_results(source_results),
         "sources": source_results,

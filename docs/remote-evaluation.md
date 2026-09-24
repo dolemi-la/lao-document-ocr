@@ -99,7 +99,7 @@ The suite aggregates these categories as `page_media_classifications`. This help
 
 For selected suite entries, `rotation_probe: true` runs diagnostic OCR at 0°, 90°, 180°, and 270° clockwise. The report stores only per-rotation confidence/text statistics and a conservative recommendation; it never stores rotated page images or OCR text. A non-zero orientation is recommended only when its composite confidence/letter score improves by at least 15%, mean block confidence improves by at least 0.08, and the rotated result retains enough recognized letters.
 
-The curated suite currently enables this probe only for the verified World Bank/KPMG raster-overlay pages. This is diagnostic evidence for a later production orientation decision, not automatic rotation in the main OCR pipeline.
+The curated suite enables the diagnostic rotation probe only for the verified World Bank/KPMG raster-overlay pages. The main OCR pipeline also has an opt-in `--auto-orient-right-angles` mode for `convert-document` and `evaluate-remote-suite`. It uses the same conservative score/confidence/character thresholds and keeps 0° when improvement is not clear. The feature remains off by default while real-suite A/B evidence is collected.
 
 ## Not benchmark accuracy
 

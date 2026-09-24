@@ -412,3 +412,46 @@ def test_rotation_probe_recommends_clear_right_angle_improvement(tmp_path) -> No
         270,
     }
 
+
+def test_remote_evaluation_reports_applied_auto_orientation(tmp_path) -> None:
+    registry = _registry(tmp_path)
+    source_pdf = tmp_path / "landscape.pdf"
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=300, height=160)
+    page.insert_text((20, 40), "orientation test", fontsize=12)
+    pdf.save(source_pdf)
+    pdf.close()
+
+    def fetcher(url, destination_base, *, max_bytes, timeout_seconds):
+        del url, max_bytes, timeout_seconds
+        destination = Path(destination_base).with_suffix(".pdf")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_pdf, destination)
+        data = destination.read_bytes()
+        return DownloadedRemote(
+            path=destination,
+            final_url="https://example.com/document.pdf",
+            sha256=hashlib.sha256(data).hexdigest(),
+            size_bytes=len(data),
+            content_type="application/pdf",
+            etag=None,
+            last_modified=None,
+            format="pdf",
+        )
+
+    report = evaluate_remote_sources(
+        registry,
+        engine=OrientationSensitiveEngine(),
+        source_ids=["remote-scan"],
+        requested_pages=[1],
+        auto_orient_right_angles=True,
+        fetcher=fetcher,
+    )
+
+    page_report = report["sources"][0]["document"]["pages"][0]
+    assert page_report["auto_orientation"]["degrees_clockwise"] == 90
+    assert page_report["auto_orientation"]["diagnostics"][
+        "selected_confidence"
+    ] > 0.9
+    assert report["selection"]["auto_orient_right_angles"] is True
+

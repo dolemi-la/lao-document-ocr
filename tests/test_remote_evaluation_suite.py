@@ -212,6 +212,7 @@ def test_remote_suite_runs_per_source_pages_and_aggregates(tmp_path) -> None:
         "no-large-raster-layer": 3
     }
     assert report["summary"]["rotation_recommendations"] == {"none": 2}
+    assert report["summary"]["applied_auto_orientations"] == {}
     assert report["sources"][0]["suite_pages"] == [1]
     assert report["sources"][1]["suite_pages"] == [1, 3]
     assert report["sources"][0]["suite_note"] == "empty layer"
@@ -291,4 +292,68 @@ def test_remote_suite_detects_registry_text_layer_drift(tmp_path) -> None:
 
     with pytest.raises(RemoteEvaluationError, match="classification changed"):
         validate_suite_against_registry(suite, registry)
+
+
+def test_remote_suite_can_apply_auto_orientation(tmp_path) -> None:
+    registry = _registry(tmp_path)
+    suite_path = _suite(tmp_path)
+    payload = json.loads(suite_path.read_text(encoding="utf-8"))
+    payload["sources"] = [payload["sources"][0]]
+    suite_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    source = tmp_path / "source.pdf"
+    pdf = pymupdf.open()
+    pdf.new_page(width=300, height=160)
+    pdf.save(source)
+    pdf.close()
+
+    def fetcher(url, destination_base, *, max_bytes, timeout_seconds):
+        del url, max_bytes, timeout_seconds
+        destination = Path(destination_base).with_suffix(".pdf")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        data = destination.read_bytes()
+        return DownloadedRemote(
+            path=destination,
+            final_url="https://example.com/a.pdf",
+            sha256=hashlib.sha256(data).hexdigest(),
+            size_bytes=len(data),
+            content_type="application/pdf",
+            etag=None,
+            last_modified=None,
+            format="pdf",
+        )
+
+    class OrientationEngine(OcrEngine):
+        def is_available(self) -> bool:
+            return True
+
+        def metadata(self):
+            return {"name": "OrientationEngine"}
+
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            confidence = 0.95 if image.height > image.width else 0.30
+            return [
+                RecognizedLine(
+                    text="orientation text with enough characters",
+                    bbox=BoundingBox(x=10, y=10, width=100, height=20),
+                    confidence=confidence,
+                    block_id=1,
+                    paragraph_id=1,
+                    line_id=1,
+                )
+            ]
+
+    report = evaluate_remote_diagnostic_suite(
+        suite_path,
+        registry,
+        engine=OrientationEngine(),
+        auto_orient_right_angles=True,
+        fetcher=fetcher,
+    )
+
+    assert report["summary"]["applied_auto_orientations"] == {"90": 1}
+    page = report["sources"][0]["document"]["pages"][0]
+    assert page["auto_orientation"]["degrees_clockwise"] == 90
+    assert "rotation_probe" not in page
 

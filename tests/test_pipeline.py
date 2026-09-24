@@ -272,3 +272,169 @@ def test_engine_learned_visual_blocks_are_preserved_without_heuristic_duplicate(
     ]
     assert len(image_blocks) == 1
     assert image_blocks[0].metadata["source"] == "learned-layout-image"
+
+
+class OrientationSensitiveEngine(OcrEngine):
+    def is_available(self) -> bool:
+        return True
+
+    def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+        confidence = 0.95 if image.height > image.width else 0.30
+        return [
+            RecognizedLine(
+                text="orientation text with enough recognized characters",
+                bbox=BoundingBox(x=10, y=10, width=100, height=20),
+                confidence=confidence,
+                block_id=1,
+                paragraph_id=1,
+                line_id=1,
+            )
+        ]
+
+
+def test_auto_orientation_rotates_page_and_records_metadata(tmp_path) -> None:
+    image_path = tmp_path / "landscape.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    document = process_document(
+        image_path,
+        engine=OrientationSensitiveEngine(),
+        auto_orient_right_angles=True,
+    )
+
+    page = document.pages[0]
+    assert (page.width, page.height) == (180, 320)
+    assert document.metadata["auto_orientation"]["enabled"] is True
+    orientation = document.metadata["auto_orientation"]["pages"][0]
+    assert orientation["degrees_clockwise"] == 90
+    assert orientation["diagnostics"]["selected_confidence"] > 0.9
+    assert orientation["diagnostics"]["baseline_confidence"] < 0.4
+
+
+def test_auto_orientation_is_disabled_by_default(tmp_path) -> None:
+    image_path = tmp_path / "landscape-default.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    document = process_document(image_path, engine=OrientationSensitiveEngine())
+
+    page = document.pages[0]
+    assert (page.width, page.height) == (320, 180)
+    assert document.metadata["auto_orientation"]["enabled"] is False
+    assert document.metadata["auto_orientation"]["pages"][0][
+        "degrees_clockwise"
+    ] == 0
+
+
+def test_auto_orientation_keeps_baseline_without_clear_improvement(tmp_path) -> None:
+    class StableEngine(OcrEngine):
+        def is_available(self) -> bool:
+            return True
+
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            return [
+                RecognizedLine(
+                    text="stable orientation recognition text",
+                    bbox=BoundingBox(x=10, y=10, width=100, height=20),
+                    confidence=0.85,
+                    block_id=1,
+                    paragraph_id=1,
+                    line_id=1,
+                )
+            ]
+
+    image_path = tmp_path / "stable.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    document = process_document(
+        image_path,
+        engine=StableEngine(),
+        auto_orient_right_angles=True,
+    )
+
+    assert (document.pages[0].width, document.pages[0].height) == (320, 180)
+    assert document.metadata["auto_orientation"]["pages"][0][
+        "degrees_clockwise"
+    ] == 0
+
+
+def test_auto_orientation_honors_cancellation_between_probes(tmp_path) -> None:
+    import pytest
+
+    from lao_document_ocr.pipeline import DocumentProcessingCancelled
+
+    state = {"calls": 0, "cancel": False}
+
+    class CancellingOrientationEngine(OrientationSensitiveEngine):
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            state["calls"] += 1
+            lines = super().recognize(image)
+            if state["calls"] == 1:
+                state["cancel"] = True
+            return lines
+
+    image_path = tmp_path / "cancel-orientation.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    with pytest.raises(DocumentProcessingCancelled):
+        process_document(
+            image_path,
+            engine=CancellingOrientationEngine(),
+            auto_orient_right_angles=True,
+            should_cancel=lambda: state["cancel"],
+        )
+
+    assert state["calls"] == 1
+
+
+def test_right_angle_bbox_rotation_coordinates() -> None:
+    from lao_document_ocr.pipeline import _rotate_bbox_clockwise
+
+    bbox = BoundingBox(x=10, y=20, width=30, height=40)
+
+    rotated_90 = _rotate_bbox_clockwise(
+        bbox,
+        page_width=200,
+        page_height=100,
+        degrees=90,
+    )
+    assert rotated_90 == BoundingBox(x=40, y=10, width=40, height=30)
+
+    rotated_180 = _rotate_bbox_clockwise(
+        bbox,
+        page_width=200,
+        page_height=100,
+        degrees=180,
+    )
+    assert rotated_180 == BoundingBox(x=160, y=40, width=30, height=40)
+
+    rotated_270 = _rotate_bbox_clockwise(
+        bbox,
+        page_width=200,
+        page_height=100,
+        degrees=270,
+    )
+    assert rotated_270 == BoundingBox(x=20, y=160, width=40, height=30)
+
+
+def test_embedded_asset_bbox_rotates_with_page() -> None:
+    from lao_document_ocr.embedded_images import EmbeddedImageAsset
+    from lao_document_ocr.pipeline import _rotate_embedded_assets
+
+    asset = EmbeddedImageAsset(
+        bbox=BoundingBox(x=10, y=20, width=30, height=40),
+        png_bytes=b"png",
+        width_ratio=0.15,
+        xref=7,
+    )
+
+    rotated = _rotate_embedded_assets(
+        (asset,),
+        page_width=200,
+        page_height=100,
+        degrees=90,
+    )
+
+    assert len(rotated) == 1
+    assert rotated[0].bbox == BoundingBox(x=40, y=10, width=40, height=30)
+    assert rotated[0].width_ratio == 0.4
+    assert rotated[0].xref == 7

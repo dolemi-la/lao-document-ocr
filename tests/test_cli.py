@@ -827,6 +827,62 @@ def test_prepare_layout_targets_cli(tmp_path, monkeypatch, capsys) -> None:
     assert "Samples: 1" in captured
 
 
+def test_convert_document_cli_forwards_auto_orientation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import lao_document_ocr.cli as cli
+
+    captured = {}
+
+    class Outputs:
+        def to_dict(self):
+            return {
+                "docx": "out.docx",
+                "markdown": "out.md",
+                "text": "out.txt",
+                "json": "out.json",
+            }
+
+    monkeypatch.setattr(cli, "_build_ocr_engine", lambda args: object())
+    monkeypatch.setattr(
+        cli,
+        "_build_reading_order_resolver",
+        lambda args: None,
+    )
+
+    def fake_convert(input_path, output_dir, **kwargs):
+        captured["input"] = input_path
+        captured["output_dir"] = output_dir
+        captured.update(kwargs)
+        return Outputs()
+
+    monkeypatch.setattr(cli, "convert_document_to_outputs", fake_convert)
+
+    source = tmp_path / "page.png"
+    Image.new("RGB", (100, 60), "white").save(source)
+    output_dir = tmp_path / "output"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "convert-document",
+            "--input",
+            str(source),
+            "--output-dir",
+            str(output_dir),
+            "--auto-orient-right-angles",
+        ],
+    )
+
+    assert cli.main() == 0
+    assert captured["input"] == source
+    assert captured["output_dir"] == output_dir
+    assert captured["auto_orient_right_angles"] is True
+
+
 def test_convert_document_learned_reading_order_requires_model(
     tmp_path,
     monkeypatch,
@@ -2502,6 +2558,7 @@ def test_evaluate_remote_suite_cli_forwards_paths_and_writes_report(
             str(suite),
             "--registry",
             str(registry),
+            "--auto-orient-right-angles",
             "--output",
             str(output),
         ],
@@ -2512,6 +2569,7 @@ def test_evaluate_remote_suite_cli_forwards_paths_and_writes_report(
     assert captured["registry_path"] == registry
     assert captured["engine"].metadata()["name"] == "test-engine"
     assert captured["reading_order_resolver"].metadata()["name"] == "test-resolver"
+    assert captured["auto_orient_right_angles"] is True
 
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["report_type"] == "remote-source-diagnostic-suite"

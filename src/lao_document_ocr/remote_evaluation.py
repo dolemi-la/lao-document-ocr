@@ -632,6 +632,7 @@ def _evaluate_pdf(
     work_dir: Path,
     reading_order_resolver: ReadingOrderResolver | None,
     probe_right_angle_rotations: bool,
+    auto_orient_right_angles: bool,
 ) -> dict[str, Any]:
     try:
         pdf = pymupdf.open(path)
@@ -667,8 +668,15 @@ def _evaluate_pdf(
                 max_pages=1,
                 max_page_pixels=max_page_pixels,
                 reading_order_resolver=reading_order_resolver,
+                auto_orient_right_angles=auto_orient_right_angles,
             )
             diagnostics["ocr"] = _ocr_document_stats(document)
+            if auto_orient_right_angles:
+                pages_meta = document.metadata.get("auto_orientation", {}).get(
+                    "pages", []
+                )
+                if pages_meta:
+                    diagnostics["auto_orientation"] = pages_meta[0]
             diagnostics["layer_gap"] = _layer_gap_diagnostics(
                 diagnostics["native_text"],
                 diagnostics["ocr"]["text"],
@@ -676,7 +684,7 @@ def _evaluate_pdf(
             diagnostics["ocr_quality"] = _confidence_diagnostics(
                 diagnostics["ocr"]["mean_block_confidence"]
             )
-            if probe_right_angle_rotations:
+            if probe_right_angle_rotations and not auto_orient_right_angles:
                 diagnostics["rotation_probe"] = _rotation_probe(
                     page_path,
                     baseline_ocr=diagnostics["ocr"],
@@ -706,6 +714,7 @@ def _evaluate_image(
     engine: OcrEngine,
     max_page_pixels: int,
     reading_order_resolver: ReadingOrderResolver | None,
+    auto_orient_right_angles: bool,
 ) -> dict[str, Any]:
     with Image.open(path) as image:
         if image.width * image.height > max_page_pixels:
@@ -734,8 +743,13 @@ def _evaluate_image(
         max_pages=1,
         max_page_pixels=max_page_pixels,
         reading_order_resolver=reading_order_resolver,
+        auto_orient_right_angles=auto_orient_right_angles,
     )
     dimensions["ocr"] = _ocr_document_stats(document)
+    if auto_orient_right_angles:
+        pages_meta = document.metadata.get("auto_orientation", {}).get("pages", [])
+        if pages_meta:
+            dimensions["auto_orientation"] = pages_meta[0]
     dimensions["layer_gap"] = {
         "classification": "image-no-native-layer",
         "native_layer_empty": True,
@@ -774,6 +788,7 @@ def evaluate_remote_sources(
     timeout_seconds: float = 20.0,
     reading_order_resolver: ReadingOrderResolver | None = None,
     probe_right_angle_rotations: bool = False,
+    auto_orient_right_angles: bool = False,
     fetcher: RemoteFetcher = download_remote_source,
 ) -> dict[str, Any]:
     if max_document_pages < 1:
@@ -832,6 +847,7 @@ def evaluate_remote_sources(
                         work_dir=source_dir,
                         reading_order_resolver=reading_order_resolver,
                         probe_right_angle_rotations=probe_right_angle_rotations,
+                        auto_orient_right_angles=auto_orient_right_angles,
                     )
                 else:
                     result["document"] = _evaluate_image(
@@ -839,6 +855,7 @@ def evaluate_remote_sources(
                         engine=engine,
                         max_page_pixels=max_page_pixels,
                         reading_order_resolver=reading_order_resolver,
+                        auto_orient_right_angles=auto_orient_right_angles,
                     )
                 result["status"] = "ok"
             except Exception as exc:
@@ -871,6 +888,7 @@ def evaluate_remote_sources(
             "max_document_pages": max_document_pages,
             "max_page_pixels": max_page_pixels,
             "probe_right_angle_rotations": probe_right_angle_rotations,
+            "auto_orient_right_angles": auto_orient_right_angles,
         },
         "summary": {
             "sources": len(results),

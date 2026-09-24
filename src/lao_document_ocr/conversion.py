@@ -38,6 +38,7 @@ def convert_document_to_outputs(
     max_pages: int = 60,
     font_name: str = "Noto Sans Lao",
     reading_order_resolver: ReadingOrderResolver | None = None,
+    auto_orient_right_angles: bool = False,
 ) -> ConversionOutputs:
     source = Path(input_path)
     if not source.is_file():
@@ -53,6 +54,7 @@ def convert_document_to_outputs(
         engine=engine,
         max_pages=max_pages,
         reading_order_resolver=reading_order_resolver,
+        auto_orient_right_angles=auto_orient_right_angles,
     )
 
     return ConversionOutputs(

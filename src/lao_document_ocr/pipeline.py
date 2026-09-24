@@ -123,6 +123,173 @@ def _load_pages(
     raise DocumentProcessingError(f"Unsupported file type: {suffix or 'unknown'}")
 
 
+def _rotate_image_clockwise(image: Image.Image, degrees: int) -> Image.Image:
+    normalized = degrees % 360
+    if normalized == 0:
+        return image
+    operations = {
+        90: Image.Transpose.ROTATE_270,
+        180: Image.Transpose.ROTATE_180,
+        270: Image.Transpose.ROTATE_90,
+    }
+    operation = operations.get(normalized)
+    if operation is None:
+        raise ValueError("Right-angle rotation must be 0, 90, 180, or 270 degrees.")
+    return image.transpose(operation)
+
+
+def _rotate_bbox_clockwise(
+    bbox,
+    *,
+    page_width: int,
+    page_height: int,
+    degrees: int,
+):
+    from lao_document_ocr.models import BoundingBox
+
+    normalized = degrees % 360
+    if normalized == 0:
+        return bbox
+    if normalized == 90:
+        return BoundingBox(
+            x=page_height - (bbox.y + bbox.height),
+            y=bbox.x,
+            width=bbox.height,
+            height=bbox.width,
+        )
+    if normalized == 180:
+        return BoundingBox(
+            x=page_width - (bbox.x + bbox.width),
+            y=page_height - (bbox.y + bbox.height),
+            width=bbox.width,
+            height=bbox.height,
+        )
+    if normalized == 270:
+        return BoundingBox(
+            x=bbox.y,
+            y=page_width - (bbox.x + bbox.width),
+            width=bbox.height,
+            height=bbox.width,
+        )
+    raise ValueError("Right-angle rotation must be 0, 90, 180, or 270 degrees.")
+
+
+def _rotate_embedded_assets(
+    assets: tuple[EmbeddedImageAsset, ...],
+    *,
+    page_width: int,
+    page_height: int,
+    degrees: int,
+) -> tuple[EmbeddedImageAsset, ...]:
+    normalized = degrees % 360
+    if normalized == 0:
+        return assets
+
+    rotated_page_width = page_height if normalized in {90, 270} else page_width
+    output: list[EmbeddedImageAsset] = []
+    for asset in assets:
+        bbox = _rotate_bbox_clockwise(
+            asset.bbox,
+            page_width=page_width,
+            page_height=page_height,
+            degrees=normalized,
+        )
+        output.append(
+            EmbeddedImageAsset(
+                bbox=bbox,
+                png_bytes=asset.png_bytes,
+                width_ratio=bbox.width / max(1, rotated_page_width),
+                xref=asset.xref,
+            )
+        )
+    return tuple(sorted(output, key=lambda asset: (asset.bbox.y, asset.bbox.x)))
+
+
+def _orientation_line_stats(lines) -> tuple[float, int, float]:
+    total_weight = 0
+    weighted_confidence = 0.0
+    recognized_characters = 0
+    for line in lines:
+        weight = max(1, len([char for char in line.text if not char.isspace()]))
+        total_weight += weight
+        recognized_characters += weight
+        weighted_confidence += float(line.confidence) * weight
+    mean_confidence = (
+        weighted_confidence / total_weight if total_weight else 0.0
+    )
+    score = mean_confidence * math.log1p(recognized_characters)
+    return mean_confidence, recognized_characters, score
+
+
+def _recognize_with_right_angle_orientation(
+    image: Image.Image,
+    *,
+    engine: OcrEngine,
+    should_cancel: Callable[[], bool] | None = None,
+) -> tuple[Image.Image, list, int, dict[str, float | int | None]]:
+    baseline_lines = engine.recognize(image)
+    baseline_confidence, baseline_characters, baseline_score = _orientation_line_stats(
+        baseline_lines
+    )
+    candidates = [
+        (
+            0,
+            image,
+            baseline_lines,
+            baseline_confidence,
+            baseline_characters,
+            baseline_score,
+        )
+    ]
+
+    for degrees in (90, 180, 270):
+        _raise_if_cancelled(should_cancel)
+        rotated = _rotate_image_clockwise(image, degrees)
+        try:
+            lines = engine.recognize(rotated)
+        except OcrEngineError:
+            continue
+        confidence, characters, score = _orientation_line_stats(lines)
+        candidates.append(
+            (degrees, rotated, lines, confidence, characters, score)
+        )
+
+    best = max(
+        candidates,
+        key=lambda item: (item[5], item[3], item[4]),
+    )
+    best_degrees, best_image, best_lines, best_confidence, best_characters, best_score = best
+
+    use_best = (
+        best_degrees != 0
+        and best_score >= max(0.01, baseline_score * 1.15)
+        and best_confidence >= baseline_confidence + 0.08
+        and best_characters >= max(20, int(baseline_characters * 0.5))
+    )
+
+    if not use_best:
+        best_degrees = 0
+        best_image = image
+        best_lines = baseline_lines
+        best_confidence = baseline_confidence
+        best_characters = baseline_characters
+        best_score = baseline_score
+
+    return (
+        best_image,
+        best_lines,
+        int(best_degrees),
+        {
+            "baseline_confidence": baseline_confidence,
+            "selected_confidence": best_confidence,
+            "baseline_characters": baseline_characters,
+            "selected_characters": best_characters,
+            "baseline_score": baseline_score,
+            "selected_score": best_score,
+        },
+    )
+
+
 def process_document(
     path: str | Path,
     *,
@@ -132,6 +299,7 @@ def process_document(
     max_page_pixels: int = DEFAULT_MAX_PAGE_PIXELS,
     should_cancel: Callable[[], bool] | None = None,
     reading_order_resolver: ReadingOrderResolver | None = None,
+    auto_orient_right_angles: bool = False,
 ) -> Document:
     path = Path(path)
     engine = engine or TesseractEngine()
@@ -147,13 +315,51 @@ def process_document(
     )
 
     output_pages: list[Page] = []
+    orientation_pages: list[dict[str, object]] = []
     for page_number, loaded_page in enumerate(pages, start=1):
         _raise_if_cancelled(should_cancel)
         cleaned = preprocess_image(loaded_page.image)
+        source_image = loaded_page.image
+        embedded_images = loaded_page.embedded_images
+        orientation_degrees = 0
+        orientation_diagnostics: dict[str, float | int | None] | None = None
         try:
-            lines = engine.recognize(cleaned)
+            if auto_orient_right_angles:
+                (
+                    cleaned,
+                    lines,
+                    orientation_degrees,
+                    orientation_diagnostics,
+                ) = _recognize_with_right_angle_orientation(
+                    cleaned,
+                    engine=engine,
+                    should_cancel=should_cancel,
+                )
+                if orientation_degrees:
+                    original_width = source_image.width
+                    original_height = source_image.height
+                    source_image = _rotate_image_clockwise(
+                        source_image,
+                        orientation_degrees,
+                    )
+                    embedded_images = _rotate_embedded_assets(
+                        embedded_images,
+                        page_width=original_width,
+                        page_height=original_height,
+                        degrees=orientation_degrees,
+                    )
+            else:
+                lines = engine.recognize(cleaned)
         except OcrEngineError as exc:
             raise DocumentProcessingError(str(exc)) from exc
+
+        orientation_pages.append(
+            {
+                "page": page_number,
+                "degrees_clockwise": orientation_degrees,
+                "diagnostics": orientation_diagnostics,
+            }
+        )
 
         semantic_blocks = build_page_blocks(lines, cleaned)
         table_boxes = [
@@ -161,16 +367,13 @@ def process_document(
             for block in semantic_blocks
             if block.type == BlockType.TABLE and block.bbox is not None
         ]
-        embedded_blocks = [
-            asset.to_block()
-            for asset in loaded_page.embedded_images
-        ]
-        embedded_boxes = [asset.bbox for asset in loaded_page.embedded_images]
+        embedded_blocks = [asset.to_block() for asset in embedded_images]
+        embedded_boxes = [asset.bbox for asset in embedded_images]
         line_boxes = [line.bbox for line in lines]
 
         learned_visual_blocks = engine.visual_blocks(
             cleaned,
-            source_image=loaded_page.image,
+            source_image=source_image,
             exclude_boxes=[
                 *table_boxes,
                 *embedded_boxes,
@@ -186,7 +389,7 @@ def process_document(
         raster_blocks = detect_raster_regions(
             cleaned,
             lines,
-            source_image=loaded_page.image,
+            source_image=source_image,
             exclude_boxes=[
                 *table_boxes,
                 *embedded_boxes,
@@ -202,7 +405,7 @@ def process_document(
         diagram_blocks = detect_diagram_regions(
             cleaned,
             lines,
-            source_image=loaded_page.image,
+            source_image=source_image,
             exclude_boxes=[
                 *table_boxes,
                 *embedded_boxes,
@@ -243,5 +446,9 @@ def process_document(
             "engine": engine.metadata(),
             "reading_order": resolver.metadata(),
             "page_count": len(output_pages),
+            "auto_orientation": {
+                "enabled": auto_orient_right_angles,
+                "pages": orientation_pages,
+            },
         },
     )
