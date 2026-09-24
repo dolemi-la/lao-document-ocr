@@ -389,6 +389,90 @@ def _parser() -> argparse.ArgumentParser:
         help="Verify this benchmark lock before running OCR.",
     )
 
+    remote_eval = subparsers.add_parser(
+        "evaluate-remote-sources",
+        help=(
+            "Run diagnostic OCR against selected remote source-registry entries "
+            "without persisting downloaded document bytes."
+        ),
+    )
+    remote_eval.add_argument(
+        "--registry",
+        type=Path,
+        default=Path("benchmarks/source-registry.json"),
+    )
+    remote_eval.add_argument(
+        "--source-id",
+        action="append",
+        default=[],
+        help="Remote source-registry ID to evaluate. Repeat for multiple sources.",
+    )
+    remote_eval.add_argument(
+        "--all-remote",
+        action="store_true",
+        help="Evaluate every remote-evaluation registry entry. Explicit opt-in.",
+    )
+    remote_eval.add_argument(
+        "--page",
+        action="append",
+        type=int,
+        default=[],
+        help=(
+            "1-based page number to evaluate. Repeat for multiple pages. "
+            "Without --page, representative pages are sampled."
+        ),
+    )
+    remote_eval.add_argument("--max-pages-per-source", type=int, default=3)
+    remote_eval.add_argument("--max-source-mb", type=float, default=25.0)
+    remote_eval.add_argument("--timeout-seconds", type=float, default=20.0)
+    remote_eval.add_argument("--max-document-pages", type=int, default=500)
+    remote_eval.add_argument("--max-page-pixels", type=int, default=40_000_000)
+    remote_eval.add_argument("--output", required=True, type=Path)
+    remote_eval.add_argument(
+        "--engine",
+        choices=["tesseract", "owned"],
+        default="tesseract",
+    )
+    remote_eval.add_argument("--languages", default="lao+eng")
+    remote_eval.add_argument("--psm", type=int, default=3)
+    remote_eval.add_argument("--tessdata-dir", type=Path)
+    remote_eval.add_argument("--model", type=Path)
+    remote_eval.add_argument("--calibration", type=Path)
+    remote_eval.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="cpu",
+    )
+    remote_eval.add_argument(
+        "--decoder",
+        choices=["greedy", "beam"],
+        default="greedy",
+    )
+    remote_eval.add_argument("--beam-width", type=int, default=10)
+    _add_language_model_arguments(remote_eval)
+    remote_eval.add_argument(
+        "--layout-detector",
+        choices=["morphology", "learned"],
+        default="morphology",
+    )
+    remote_eval.add_argument("--layout-model", type=Path)
+    remote_eval.add_argument(
+        "--layout-confidence",
+        type=float,
+        default=0.55,
+    )
+    remote_eval.add_argument(
+        "--reading-order",
+        choices=["deterministic", "learned"],
+        default="deterministic",
+    )
+    remote_eval.add_argument("--reading-order-model", type=Path)
+    remote_eval.add_argument(
+        "--reading-order-max-blocks",
+        type=int,
+        default=256,
+    )
+
     capture_suite_qa = subparsers.add_parser(
         "benchmark-capture-suite",
         help=(
@@ -1341,6 +1425,40 @@ def _benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def _evaluate_remote_sources(args: argparse.Namespace) -> int:
+    from lao_document_ocr.remote_evaluation import (
+        evaluate_remote_sources,
+        write_remote_evaluation_report,
+    )
+
+    if args.max_source_mb <= 0:
+        raise ValueError("--max-source-mb must be positive")
+
+    engine = _build_ocr_engine(args)
+    reading_order_resolver = _build_reading_order_resolver(args)
+    report = evaluate_remote_sources(
+        args.registry,
+        engine=engine,
+        source_ids=args.source_id,
+        all_remote=args.all_remote,
+        requested_pages=args.page,
+        max_pages_per_source=args.max_pages_per_source,
+        max_source_bytes=max(1, int(args.max_source_mb * 1024 * 1024)),
+        max_document_pages=args.max_document_pages,
+        max_page_pixels=args.max_page_pixels,
+        timeout_seconds=args.timeout_seconds,
+        reading_order_resolver=reading_order_resolver,
+    )
+    output = write_remote_evaluation_report(report, args.output)
+    summary = report["summary"]
+    print(f"Report: {output}")
+    print("Mode: diagnostic only (not benchmark accuracy)")
+    print(f"Sources: {summary['sources']}")
+    print(f"OK: {summary['ok']}")
+    print(f"Errors: {summary['errors']}")
+    return 0 if summary["errors"] == 0 else 1
+
+
 def _benchmark_capture_suite(args: argparse.Namespace) -> int:
     from lao_document_ocr.capture_suite_qa import benchmark_capture_suite
 
@@ -1985,6 +2103,8 @@ def main() -> int:
             return _compare_benchmarks(args)
         if args.command == "benchmark":
             return _benchmark(args)
+        if args.command == "evaluate-remote-sources":
+            return _evaluate_remote_sources(args)
         if args.command == "benchmark-capture-suite":
             return _benchmark_capture_suite(args)
         if args.command == "sample-hplt-lao":

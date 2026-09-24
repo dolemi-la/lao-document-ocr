@@ -2290,3 +2290,137 @@ def test_register_capture_submission_cli_uses_submission_metadata(
     assert "Capture ID: phone-a" in rendered
     assert "Planned captures: 60" in rendered
     assert "Dry run: yes" in rendered
+
+
+
+def test_evaluate_remote_sources_cli_forwards_limits_and_writes_report(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    import lao_document_ocr.cli as cli
+    import lao_document_ocr.remote_evaluation as remote_evaluation
+
+    captured = {}
+
+    class Engine:
+        def metadata(self):
+            return {"name": "test-engine"}
+
+    class Resolver:
+        def metadata(self):
+            return {"name": "test-resolver"}
+
+    def fake_evaluate_remote_sources(registry, **kwargs):
+        captured["registry"] = registry
+        captured.update(kwargs)
+        return {
+            "schema_version": "1",
+            "report_type": "remote-source-diagnostic",
+            "not_benchmark_accuracy": True,
+            "summary": {"sources": 1, "ok": 1, "errors": 0},
+            "sources": [],
+        }
+
+    monkeypatch.setattr(cli, "_build_ocr_engine", lambda args: Engine())
+    monkeypatch.setattr(
+        cli,
+        "_build_reading_order_resolver",
+        lambda args: Resolver(),
+    )
+    monkeypatch.setattr(
+        remote_evaluation,
+        "evaluate_remote_sources",
+        fake_evaluate_remote_sources,
+    )
+
+    registry = tmp_path / "registry.json"
+    registry.write_text('{"schema_version":"1","sources":[]}', encoding="utf-8")
+    output = tmp_path / "remote-report.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "evaluate-remote-sources",
+            "--registry",
+            str(registry),
+            "--source-id",
+            "candidate-a",
+            "--source-id",
+            "candidate-b",
+            "--page",
+            "2",
+            "--page",
+            "5",
+            "--max-pages-per-source",
+            "4",
+            "--max-source-mb",
+            "7.5",
+            "--timeout-seconds",
+            "8",
+            "--max-document-pages",
+            "90",
+            "--max-page-pixels",
+            "123456",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert cli.main() == 0
+    assert captured["registry"] == registry
+    assert captured["source_ids"] == ["candidate-a", "candidate-b"]
+    assert captured["all_remote"] is False
+    assert captured["requested_pages"] == [2, 5]
+    assert captured["max_pages_per_source"] == 4
+    assert captured["max_source_bytes"] == int(7.5 * 1024 * 1024)
+    assert captured["timeout_seconds"] == 8.0
+    assert captured["max_document_pages"] == 90
+    assert captured["max_page_pixels"] == 123456
+    assert captured["reading_order_resolver"].metadata()["name"] == "test-resolver"
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["not_benchmark_accuracy"] is True
+    rendered = capsys.readouterr().out
+    assert "diagnostic only" in rendered
+    assert "Errors: 0" in rendered
+
+
+def test_evaluate_remote_sources_cli_returns_nonzero_on_source_error(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import lao_document_ocr.cli as cli
+    import lao_document_ocr.remote_evaluation as remote_evaluation
+
+    monkeypatch.setattr(cli, "_build_ocr_engine", lambda args: object())
+    monkeypatch.setattr(cli, "_build_reading_order_resolver", lambda args: None)
+    monkeypatch.setattr(
+        remote_evaluation,
+        "evaluate_remote_sources",
+        lambda *args, **kwargs: {
+            "schema_version": "1",
+            "report_type": "remote-source-diagnostic",
+            "not_benchmark_accuracy": True,
+            "summary": {"sources": 1, "ok": 0, "errors": 1},
+            "sources": [],
+        },
+    )
+
+    output = tmp_path / "remote-report.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "evaluate-remote-sources",
+            "--source-id",
+            "candidate-a",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert cli.main() == 1
