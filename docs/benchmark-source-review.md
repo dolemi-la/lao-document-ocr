@@ -96,6 +96,8 @@ Verified examples include:
 - Lao Census registration guidance: four pages with zero extracted text lines
 - Lao Census household-book notices: image-only pages with handwriting, stamps/signatures, and scan noise
 - PTC CamScanner notice: three pages whose extracted text is effectively only the CamScanner watermark
+- HPC CamScanner legislation: 21 image-only pages with seals/signatures and zero extracted text lines
+- Lao National Assembly CamScanner invitation: document published directly as a scanned image
 
 These are valuable for understanding real OCR failure modes, but public availability does not establish redistribution/model-training rights. Project policy therefore remains:
 
