@@ -216,6 +216,15 @@ def test_remote_suite_runs_per_source_pages_and_aggregates(tmp_path) -> None:
     assert report["summary"]["applied_auto_orientations"] == {}
     assert report["summary"]["auto_orientation_probe_states"] == {}
     assert report["summary"]["auto_orientation_strategies"] == {}
+    assert report["summary"]["rotation_probe_score_margin_ratios"] == {
+        "samples": 2,
+        "min": 0.0,
+        "mean": 0.0,
+        "max": 0.0,
+    }
+    assert report["summary"]["auto_orientation_score_margin_ratios"] == {
+        "samples": 0
+    }
     assert report["sources"][0]["suite_pages"] == [1]
     assert report["sources"][1]["suite_pages"] == [1, 3]
     assert report["sources"][0]["suite_note"] == "empty layer"
@@ -359,6 +368,15 @@ def test_remote_suite_can_apply_auto_orientation(tmp_path) -> None:
     assert report["summary"]["auto_orientation_probe_states"] == {"probed": 1}
     assert report["summary"]["auto_orientation_strategies"] == {
         "exhaustive": 1
+    }
+    assert report["summary"]["rotation_probe_score_margin_ratios"] == {
+        "samples": 0
+    }
+    assert report["summary"]["auto_orientation_score_margin_ratios"] == {
+        "samples": 1,
+        "min": 0.0,
+        "mean": 0.0,
+        "max": 0.0,
     }
     page = report["sources"][0]["document"]["pages"][0]
     assert page["auto_orientation"]["degrees_clockwise"] == 90

@@ -320,6 +320,11 @@ def _recognize_with_right_angle_orientation(
                 "probe_strategy": "skipped",
                 "probed_degrees": [],
                 "engine_orientation_hint": None,
+                "best_degrees_clockwise": 0,
+                "best_score": baseline_score,
+                "runner_up_degrees_clockwise": None,
+                "runner_up_score": None,
+                "best_score_margin_ratio": None,
             },
         )
 
@@ -360,10 +365,13 @@ def _recognize_with_right_angle_orientation(
     for degrees in (90, 180, 270):
         probe(degrees)
 
-    best = max(
+    ranked_candidates = sorted(
         candidates,
         key=lambda item: (item[5], item[3], item[4]),
+        reverse=True,
     )
+    best = ranked_candidates[0]
+    runner_up = ranked_candidates[1] if len(ranked_candidates) > 1 else None
     (
         best_degrees,
         best_image,
@@ -373,6 +381,14 @@ def _recognize_with_right_angle_orientation(
         best_score,
         best_lao_ratio,
     ) = best
+
+    runner_up_degrees = int(runner_up[0]) if runner_up is not None else None
+    runner_up_score = float(runner_up[5]) if runner_up is not None else None
+    best_score_margin_ratio = (
+        (best_score / runner_up_score) - 1.0
+        if runner_up_score is not None and runner_up_score > 0
+        else None
+    )
 
     use_best = _orientation_candidate_is_acceptable(
         degrees=best_degrees,
@@ -408,6 +424,11 @@ def _recognize_with_right_angle_orientation(
             "probe_strategy": "exhaustive",
             "probed_degrees": list(probed_degrees),
             "engine_orientation_hint": None,
+            "best_degrees_clockwise": int(best[0]),
+            "best_score": float(best[5]),
+            "runner_up_degrees_clockwise": runner_up_degrees,
+            "runner_up_score": runner_up_score,
+            "best_score_margin_ratio": best_score_margin_ratio,
         },
     )
 

@@ -417,6 +417,8 @@ def test_rotation_probe_recommends_clear_right_angle_improvement(tmp_path) -> No
     assert probe["scoring_basis"] == "production-line-stats"
     assert probe["best_degrees_clockwise"] == 90
     assert probe["recommended_degrees_clockwise"] == 90
+    assert probe["runner_up_degrees_clockwise"] == 270
+    assert probe["best_score_margin_ratio"] == 0.0
     assert probe["confidence_improvement"] > 0.5
     assert probe["engine_orientation_hint"]["degrees_clockwise"] == 90
     assert probe["hint_matches_best"] is True

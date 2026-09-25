@@ -38,6 +38,7 @@ Status: in progress
 - [x] opt-in right-angle auto-orientation exposed for focused remote-source CLI/workflow diagnostics
 - [x] focused exhaustive rotation probes exposed for selected remote PDF/image diagnostics
 - [x] align remote rotation-probe scoring with production weighted OCR-line metrics
+- [x] expose best-vs-runner-up orientation score-margin diagnostics + suite summaries
 - [x] bilingual web UI opt-in control for right-angle auto-orientation
 - [x] Lao-dominance probe-skip optimization + auto-orientation probe-state reporting
 - [x] retire production orientation-hint early exit after production-equivalent remote comparison

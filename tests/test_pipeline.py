@@ -332,6 +332,9 @@ def test_auto_orientation_rotates_page_and_records_metadata(tmp_path) -> None:
     assert orientation["diagnostics"]["selected_confidence"] > 0.9
     assert orientation["diagnostics"]["baseline_confidence"] < 0.4
     assert orientation["diagnostics"]["probe_skipped"] is False
+    assert orientation["diagnostics"]["best_degrees_clockwise"] == 90
+    assert orientation["diagnostics"]["runner_up_degrees_clockwise"] == 270
+    assert orientation["diagnostics"]["best_score_margin_ratio"] == 0.0
 
 
 def test_auto_orientation_is_disabled_by_default(tmp_path) -> None:
@@ -520,6 +523,7 @@ def test_auto_orientation_skips_probe_for_strong_lao_baseline(tmp_path) -> None:
         "lao-dominant-baseline"
     )
     assert orientation["diagnostics"]["baseline_lao_ratio"] >= 0.75
+    assert orientation["diagnostics"]["best_score_margin_ratio"] is None
     assert state["calls"] == 1
 
 
@@ -577,6 +581,9 @@ def test_auto_orientation_ignores_engine_hint_and_selects_best_exhaustive_candid
     assert diagnostics["probe_strategy"] == "exhaustive"
     assert diagnostics["probed_degrees"] == [90, 180, 270]
     assert diagnostics["engine_orientation_hint"] is None
+    assert diagnostics["best_degrees_clockwise"] == 180
+    assert diagnostics["runner_up_degrees_clockwise"] == 90
+    assert diagnostics["best_score_margin_ratio"] > 0.0
     assert state["hint_calls"] == 0
     assert state["recognize_calls"] == 4
 

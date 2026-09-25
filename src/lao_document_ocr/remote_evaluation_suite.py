@@ -209,6 +209,8 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     applied_orientations: Counter[str] = Counter()
     auto_orientation_probe_states: Counter[str] = Counter()
     auto_orientation_strategies: Counter[str] = Counter()
+    rotation_probe_score_margins: list[float] = []
+    auto_orientation_score_margins: list[float] = []
     page_count = 0
     ocr_lao_characters = 0
     native_lao_characters = 0
@@ -241,6 +243,9 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
                 recommended = rotation_probe.get("recommended_degrees_clockwise")
                 key = "none" if recommended is None else str(int(recommended))
                 rotation_recommendations[key] += 1
+                margin = rotation_probe.get("best_score_margin_ratio")
+                if isinstance(margin, (int, float)):
+                    rotation_probe_score_margins.append(float(margin))
             auto_orientation = page.get("auto_orientation")
             if isinstance(auto_orientation, dict):
                 applied = int(auto_orientation.get("degrees_clockwise", 0))
@@ -258,6 +263,9 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
                         diagnostics.get("probe_strategy") or "unknown"
                     )
                     auto_orientation_strategies[strategy] += 1
+                    margin = diagnostics.get("best_score_margin_ratio")
+                    if isinstance(margin, (int, float)):
+                        auto_orientation_score_margins.append(float(margin))
             native = page.get("native_text")
             if isinstance(native, dict):
                 native_lao_characters += int(native.get("lao_characters", 0))
@@ -267,6 +275,16 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
                 if isinstance(text_stats, dict):
                     ocr_lao_characters += int(text_stats.get("lao_characters", 0))
             elapsed_seconds += float(page.get("elapsed_seconds", 0.0))
+
+    def summarize_margins(values: list[float]) -> dict[str, float | int]:
+        if not values:
+            return {"samples": 0}
+        return {
+            "samples": len(values),
+            "min": min(values),
+            "mean": sum(values) / len(values),
+            "max": max(values),
+        }
 
     ok = source_statuses.get("ok", 0)
     total = len(results)
@@ -291,6 +309,12 @@ def _aggregate_suite_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "auto_orientation_strategies": dict(
             sorted(auto_orientation_strategies.items())
+        ),
+        "rotation_probe_score_margin_ratios": summarize_margins(
+            rotation_probe_score_margins
+        ),
+        "auto_orientation_score_margin_ratios": summarize_margins(
+            auto_orientation_score_margins
         ),
         "registry_text_layers": dict(sorted(registry_layers.items())),
         "source_statuses": dict(sorted(source_statuses.items())),

@@ -516,9 +516,16 @@ def _rotation_probe(
         reverse=True,
     )
     best = ranked[0]
+    runner_up = ranked[1] if len(ranked) > 1 else None
     baseline = next(item for item in variants if item["degrees_clockwise"] == 0)
     baseline_score = float(baseline["score"])
     best_score = float(best["score"])
+    runner_up_score = float(runner_up["score"]) if runner_up is not None else None
+    best_score_margin_ratio = (
+        (best_score / runner_up_score) - 1.0
+        if runner_up_score is not None and runner_up_score > 0
+        else None
+    )
     baseline_confidence = float(baseline["orientation_confidence"])
     best_confidence = float(best["orientation_confidence"])
     baseline_characters = int(baseline["recognized_characters"])
@@ -542,6 +549,11 @@ def _rotation_probe(
         "recommended_degrees_clockwise": recommended,
         "baseline_score": baseline_score,
         "best_score": best_score,
+        "runner_up_degrees_clockwise": (
+            int(runner_up["degrees_clockwise"]) if runner_up is not None else None
+        ),
+        "runner_up_score": runner_up_score,
+        "best_score_margin_ratio": best_score_margin_ratio,
         "score_improvement_ratio": (
             (best_score / baseline_score) if baseline_score > 0 else None
         ),

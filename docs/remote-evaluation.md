@@ -111,6 +111,8 @@ Current curated evidence keeps OSD diagnostic-only: on the three verified KPMG p
 
 Production auto-orientation no longer uses the engine orientation hint as an early-exit candidate. After the existing high-confidence and Lao-dominant skip checks, it OCR-probes 90°, 180°, and 270° and selects the highest production score that passes the same score/confidence/recognized-character thresholds. OSD remains available only in remote diagnostics for comparison.
 
+For probed pages, both production auto-orientation diagnostics and the standalone rotation probe also record the best candidate, runner-up candidate, and the relative best-vs-runner-up score margin. The curated suite summarizes those margins without storing OCR text. This is diagnostic evidence only: no extra ambiguity threshold is enforced yet, and the project should not tighten orientation acceptance until real-suite measurements show that a margin gate improves decisions.
+
 When a page is rotated, preserved partial embedded-PDF image payloads rotate with their bounding boxes so exported DOCX figures/photos stay aligned with the corrected page orientation.
 
 The curated suite enables the diagnostic rotation probe only for the verified World Bank/KPMG raster-overlay pages. The main OCR pipeline also has an opt-in `--auto-orient-right-angles` mode for `convert-document`, `evaluate-remote-sources`, and `evaluate-remote-suite`. It uses the same conservative score/confidence/character thresholds and keeps 0° when improvement is not clear. The feature remains off by default while real-suite A/B evidence is collected.
