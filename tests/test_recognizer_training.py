@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from lao_document_ocr.recognizer_model import RecognizerConfig
 from lao_document_ocr.recognizer_training import (
     MODEL_VERSION,
     UNIDIRECTIONAL_MODEL_VERSION,
@@ -61,9 +61,9 @@ def test_training_config_rejects_unknown_device() -> None:
 
 
 def test_model_version_tracks_recurrent_direction() -> None:
-    assert _model_version_for_config(RecognizerConfig(bidirectional=True)) == MODEL_VERSION
+    assert _model_version_for_config(SimpleNamespace(bidirectional=True)) == MODEL_VERSION
     assert (
-        _model_version_for_config(RecognizerConfig(bidirectional=False))
+        _model_version_for_config(SimpleNamespace(bidirectional=False))
         == UNIDIRECTIONAL_MODEL_VERSION
     )
 
