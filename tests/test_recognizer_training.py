@@ -8,9 +8,11 @@ from PIL import Image
 
 from lao_document_ocr.recognizer_training import (
     TrainingConfig,
+    _training_samples_checksum,
     ctc_required_timesteps,
     prepare_line_image,
 )
+from lao_document_ocr.training_manifest import TrainingSample
 
 
 def test_prepare_line_image_normalizes_and_preserves_width(tmp_path) -> None:
@@ -57,3 +59,31 @@ def test_ctc_required_timesteps_counts_adjacent_repeats() -> None:
     assert ctc_required_timesteps([]) == 0
     assert ctc_required_timesteps([1, 2, 3]) == 3
     assert ctc_required_timesteps([1, 1, 2, 2, 2]) == 8
+
+
+def test_training_samples_checksum_binds_order_text_and_image_hash(tmp_path) -> None:
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    Image.new("L", (8, 8), 255).save(first)
+    Image.new("L", (8, 8), 0).save(second)
+
+    samples = [
+        TrainingSample(id="a", image=first, text="ກ", sha256="1" * 64),
+        TrainingSample(id="b", image=second, text="ຂ", sha256="2" * 64),
+    ]
+
+    baseline = _training_samples_checksum(samples)
+    assert baseline == _training_samples_checksum(list(samples))
+    assert baseline != _training_samples_checksum(list(reversed(samples)))
+    assert baseline != _training_samples_checksum(
+        [
+            TrainingSample(id="a", image=first, text="ກ", sha256="3" * 64),
+            samples[1],
+        ]
+    )
+    assert baseline != _training_samples_checksum(
+        [
+            TrainingSample(id="a", image=first, text="ຄ", sha256="1" * 64),
+            samples[1],
+        ]
+    )

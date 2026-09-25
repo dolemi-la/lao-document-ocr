@@ -975,6 +975,7 @@ def _parser() -> argparse.ArgumentParser:
         choices=["cpu", "cuda", "mps", "auto"],
         default="auto",
     )
+    train.add_argument("--resume-from", type=Path)
     train.add_argument("--no-hash-check", action="store_true")
 
     export = subparsers.add_parser(
@@ -2100,8 +2101,14 @@ def _train_recognizer(args: argparse.Namespace) -> int:
         num_workers=args.num_workers,
         device=args.device,
     )
-    result = train_recognizer(samples, args.output, training_config=config)
+    result = train_recognizer(
+        samples,
+        args.output,
+        training_config=config,
+        resume_from=args.resume_from,
+    )
     print(f"Checkpoint: {result['checkpoint']}")
+    print(f"Training state: {result['training_state']}")
     print(f"Metadata: {result['metadata']}")
     print(f"Best dev CER: {result['best_dev_cer']:.4f}")
     return 0

@@ -31,6 +31,97 @@ def _sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def _training_samples_checksum(samples: list[TrainingSample]) -> str:
+    digest = hashlib.sha256()
+    for sample in samples:
+        image_sha256 = sample.sha256 or _sha256_file(sample.image)
+        payload = json.dumps(
+            {
+                "id": sample.id,
+                "text": normalize_lao_text(sample.text),
+                "image_sha256": image_sha256,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        digest.update(len(payload).to_bytes(8, "big"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def _cpu_state_dict(state_dict: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value.detach().cpu().clone()
+        for key, value in state_dict.items()
+    }
+
+
+def _to_cpu(value):
+    if hasattr(value, "detach") and hasattr(value, "cpu"):
+        return value.detach().cpu()
+    if isinstance(value, dict):
+        return {key: _to_cpu(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_to_cpu(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_to_cpu(item) for item in value)
+    return value
+
+
+def _atomic_torch_save(torch, payload: dict[str, Any], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        torch.save(payload, temporary)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _capture_rng_state(torch, device) -> dict[str, Any]:
+    state: dict[str, Any] = {
+        "torch": torch.get_rng_state(),
+        "python": random.getstate(),
+        "numpy": np.random.get_state(),
+    }
+    if device.type == "cuda" and torch.cuda.is_available():
+        state["cuda"] = torch.cuda.get_rng_state_all()
+    elif (
+        device.type == "mps"
+        and hasattr(torch, "mps")
+        and hasattr(torch.mps, "get_rng_state")
+    ):
+        state["mps"] = torch.mps.get_rng_state()
+    return _to_cpu(state)
+
+
+def _restore_rng_state(torch, device, state: dict[str, Any] | None) -> bool:
+    if not isinstance(state, dict):
+        return False
+
+    required = {"torch", "python", "numpy"}
+    if device.type == "cuda":
+        required.add("cuda")
+    elif device.type == "mps":
+        required.add("mps")
+    if not required.issubset(state):
+        return False
+
+    torch.set_rng_state(state["torch"])
+    random.setstate(state["python"])
+    np.random.set_state(state["numpy"])
+    if device.type == "cuda" and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(state["cuda"])
+    elif (
+        device.type == "mps"
+        and hasattr(torch, "mps")
+        and hasattr(torch.mps, "set_rng_state")
+    ):
+        torch.mps.set_rng_state(state["mps"])
+    return True
+
+
 def ctc_required_timesteps(token_ids: list[int]) -> int:
     if not token_ids:
         return 0
@@ -245,6 +336,7 @@ def train_recognizer(
     output_dir: str | Path,
     *,
     training_config: TrainingConfig | None = None,
+    resume_from: str | Path | None = None,
 ) -> dict:
     training_config = training_config or TrainingConfig()
     torch, nn, DataLoader, _ = _require_torch()
@@ -260,6 +352,7 @@ def train_recognizer(
         dev_ratio=training_config.dev_ratio,
     )
     vocabulary = CharacterVocabulary.from_texts([sample.text for sample in samples])
+    training_samples_checksum = _training_samples_checksum(samples)
 
     model_config = RecognizerConfig(
         image_height=training_config.image_height,
@@ -305,11 +398,179 @@ def train_recognizer(
     optimizer = torch.optim.AdamW(model.parameters(), lr=training_config.learning_rate)
     loss_fn = nn.CTCLoss(blank=0, zero_infinity=True)
 
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    training_state_path = output / "training-state.pt"
+
     history: list[dict[str, float | int]] = []
     best_cer = math.inf
-    best_state = None
+    best_state: dict[str, Any] | None = None
+    start_epoch = 1
+    resume_metadata: dict[str, Any] | None = None
 
-    for epoch in range(1, training_config.epochs + 1):
+    if resume_from is not None:
+        resume_path = Path(resume_from)
+        if not resume_path.is_file():
+            raise FileNotFoundError(f"Resume checkpoint not found: {resume_path}")
+        checkpoint = torch.load(resume_path, map_location="cpu", weights_only=False)
+
+        if checkpoint.get("model") != "LaoCrnnRecognizer":
+            raise ValueError("Resume checkpoint model is not LaoCrnnRecognizer")
+        if checkpoint.get("model_version") != MODEL_VERSION:
+            raise ValueError("Resume checkpoint model version mismatch")
+        if checkpoint.get("model_config") != model_config.to_dict():
+            raise ValueError("Resume checkpoint model configuration mismatch")
+        if checkpoint.get("vocabulary_checksum") != vocabulary.checksum():
+            raise ValueError("Resume checkpoint vocabulary checksum mismatch")
+        if checkpoint.get("split_strategy", SPLIT_STRATEGY) != SPLIT_STRATEGY:
+            raise ValueError("Resume checkpoint split strategy mismatch")
+
+        resume_artifact_type = checkpoint.get("artifact_type")
+        previous_samples_checksum = checkpoint.get("training_samples_checksum")
+        if (
+            resume_artifact_type == "recognizer-training-state"
+            and not isinstance(previous_samples_checksum, str)
+        ):
+            raise ValueError("Resume training state has no training-samples checksum")
+        if (
+            isinstance(previous_samples_checksum, str)
+            and previous_samples_checksum != training_samples_checksum
+        ):
+            raise ValueError("Resume checkpoint training samples mismatch")
+
+        previous_resolved_device = checkpoint.get("resolved_device")
+        if (
+            resume_artifact_type == "recognizer-training-state"
+            and isinstance(previous_resolved_device, str)
+            and previous_resolved_device != str(device)
+        ):
+            raise ValueError(
+                "Resume training state device mismatch "
+                f"({previous_resolved_device} != {device})"
+            )
+
+        previous_config = checkpoint.get("training_config")
+        if not isinstance(previous_config, dict):
+            raise ValueError("Resume checkpoint has no training configuration")
+        compatibility_fields = (
+            "batch_size",
+            "learning_rate",
+            "dev_ratio",
+            "seed",
+            "image_height",
+            "max_width",
+            "num_workers",
+        )
+        mismatched = [
+            field
+            for field in compatibility_fields
+            if previous_config.get(field) != training_config.to_dict().get(field)
+        ]
+        if mismatched:
+            raise ValueError(
+                "Resume checkpoint training configuration mismatch: "
+                + ", ".join(mismatched)
+            )
+
+        latest_state_value = checkpoint.get("latest_state_dict")
+        has_latest_state = isinstance(latest_state_value, dict)
+        latest_state = latest_state_value or checkpoint.get("state_dict")
+        if not isinstance(latest_state, dict):
+            raise ValueError("Resume checkpoint has no model state")
+        model.load_state_dict(latest_state)
+
+        best_source = checkpoint.get("best_state_dict") or checkpoint.get("state_dict")
+        if isinstance(best_source, dict):
+            best_state = _cpu_state_dict(best_source)
+
+        history_value = checkpoint.get("history", [])
+        if not isinstance(history_value, list):
+            raise ValueError("Resume checkpoint history must be a list")
+        history = [dict(item) for item in history_value]
+        completed_epoch = max(
+            (int(item.get("epoch", 0)) for item in history),
+            default=0,
+        )
+        best_cer = float(checkpoint.get("best_dev_cer", math.inf))
+        if not has_latest_state and history and math.isfinite(best_cer):
+            matching_best_epochs = [
+                int(item.get("epoch", 0))
+                for item in history
+                if math.isclose(
+                    float(item.get("dev_cer", math.inf)),
+                    best_cer,
+                    rel_tol=1e-12,
+                    abs_tol=1e-12,
+                )
+            ]
+            if matching_best_epochs:
+                completed_epoch = max(matching_best_epochs)
+                history = [
+                    item
+                    for item in history
+                    if int(item.get("epoch", 0)) <= completed_epoch
+                ]
+
+        if training_config.epochs <= completed_epoch:
+            raise ValueError(
+                "epochs must be greater than the completed resume epoch "
+                f"({completed_epoch})"
+            )
+        start_epoch = completed_epoch + 1
+
+        optimizer_restored = False
+        optimizer_state = checkpoint.get("optimizer_state_dict")
+        if isinstance(optimizer_state, dict):
+            optimizer.load_state_dict(optimizer_state)
+            optimizer_restored = True
+
+        generator_restored = False
+        generator_state = checkpoint.get("data_loader_generator_state")
+        if generator_state is not None:
+            generator.set_state(generator_state)
+            generator_restored = True
+
+        rng_restored = _restore_rng_state(
+            torch,
+            device,
+            checkpoint.get("rng_state"),
+        )
+        if resume_artifact_type == "recognizer-training-state":
+            missing_state = [
+                name
+                for name, restored in (
+                    ("optimizer", optimizer_restored),
+                    ("data-loader generator", generator_restored),
+                    ("RNG", rng_restored),
+                )
+                if not restored
+            ]
+            if missing_state:
+                raise ValueError(
+                    "Resume training state is incomplete: "
+                    + ", ".join(missing_state)
+                )
+
+        resume_metadata = {
+            "source": str(resume_path),
+            "source_sha256": _sha256_file(resume_path),
+            "completed_epoch": completed_epoch,
+            "training_samples_checksum_verified": (
+                previous_samples_checksum == training_samples_checksum
+                if isinstance(previous_samples_checksum, str)
+                else False
+            ),
+            "resolved_device_verified": (
+                previous_resolved_device == str(device)
+                if isinstance(previous_resolved_device, str)
+                else False
+            ),
+            "optimizer_state_restored": optimizer_restored,
+            "data_loader_generator_state_restored": generator_restored,
+            "rng_state_restored": rng_restored,
+        }
+
+    for epoch in range(start_epoch, training_config.epochs + 1):
         model.train()
         total_loss = 0.0
         batches = 0
@@ -343,16 +604,37 @@ def train_recognizer(
 
         if dev_metrics["cer"] < best_cer:
             best_cer = dev_metrics["cer"]
-            best_state = {
-                key: value.detach().cpu().clone()
-                for key, value in model.state_dict().items()
-            }
+            best_state = _cpu_state_dict(model.state_dict())
+
+        if best_state is None:
+            best_state = _cpu_state_dict(model.state_dict())
+
+        training_state = {
+            "schema_version": "1",
+            "artifact_type": "recognizer-training-state",
+            "model": "LaoCrnnRecognizer",
+            "model_version": MODEL_VERSION,
+            "model_config": model_config.to_dict(),
+            "training_config": training_config.to_dict(),
+            "split_strategy": SPLIT_STRATEGY,
+            "training_samples_checksum": training_samples_checksum,
+            "resolved_device": str(device),
+            "vocabulary": vocabulary.to_dict(),
+            "vocabulary_checksum": vocabulary.checksum(),
+            "latest_state_dict": _cpu_state_dict(model.state_dict()),
+            "best_state_dict": best_state,
+            "optimizer_state_dict": _to_cpu(optimizer.state_dict()),
+            "data_loader_generator_state": generator.get_state(),
+            "rng_state": _capture_rng_state(torch, device),
+            "history": history,
+            "best_dev_cer": best_cer,
+            "completed_epoch": epoch,
+        }
+        _atomic_torch_save(torch, training_state, training_state_path)
 
     if best_state is not None:
         model.load_state_dict(best_state)
 
-    output = Path(output_dir)
-    output.mkdir(parents=True, exist_ok=True)
     vocabulary_path = vocabulary.save(output / "vocab.json")
     checkpoint_path = output / "recognizer.pt"
 
@@ -363,11 +645,14 @@ def train_recognizer(
         "model_config": model_config.to_dict(),
         "training_config": training_config.to_dict(),
         "split_strategy": SPLIT_STRATEGY,
+        "training_samples_checksum": training_samples_checksum,
+        "resolved_device": str(device),
         "vocabulary": vocabulary.to_dict(),
         "vocabulary_checksum": vocabulary.checksum(),
         "state_dict": model.state_dict(),
         "history": history,
         "best_dev_cer": best_cer,
+        "resume": resume_metadata,
     }
     torch.save(checkpoint, checkpoint_path)
     checkpoint_sha256 = _sha256_file(checkpoint_path)
@@ -383,11 +668,14 @@ def train_recognizer(
         "model_config": model_config.to_dict(),
         "training_config": training_config.to_dict(),
         "split_strategy": SPLIT_STRATEGY,
+        "training_samples_checksum": training_samples_checksum,
         "train_samples": len(train_samples),
         "dev_samples": len(dev_samples),
         "best_dev_cer": best_cer,
         "device": str(device),
         "history": history,
+        "training_state": training_state_path.name,
+        "resume": resume_metadata,
     }
     metadata_path = output / "metadata.json"
     metadata_path.write_text(
@@ -399,6 +687,7 @@ def train_recognizer(
         "checkpoint": checkpoint_path,
         "metadata": metadata_path,
         "vocabulary": vocabulary_path,
+        "training_state": training_state_path,
         "best_dev_cer": best_cer,
     }
 

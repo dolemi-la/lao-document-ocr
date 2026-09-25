@@ -73,14 +73,25 @@ The output directory contains:
 - `recognizer.pt` — training checkpoint
 - `metadata.json` — architecture/training metadata and checkpoint SHA-256
 - `vocab.json` — exact character vocabulary
+- `training-state.pt` — atomic latest/best training state for exact long-run resume
 
 The train/dev split is deterministic from sample IDs.
 
-## 5. Export for CPU inference
+Long runs also write `training-state.pt` atomically after every completed epoch. It contains the latest weights, best weights, optimizer state, deterministic shuffle-generator state, Python/NumPy/Torch RNG state, training history, the exact ordered training-sample checksum, and the resolved runtime device. To continue, set `--epochs` to the new total epoch target and pass `--resume-from`.
+
+Exact `training-state.pt` resume is intentionally strict: the training samples, model/vocabulary, compatible training settings, resolved device, optimizer state, shuffle-generator state, and RNG state must match and restore successfully. A mismatch is rejected rather than silently continuing a different experiment.
+
+Example: `lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2 --epochs 50 --batch-size 32 --device auto --resume-from training/runs/crnn-v2/training-state.pt`.
+
+A legacy/final `recognizer.pt` can also be used as a weights-only fallback. In that case optimizer, shuffle-generator, and RNG state cannot be restored; metadata records that limitation and continuation starts from the best stored epoch rather than pretending to restore a later state.
+
+## 5. Export for portable inference
 
 ```bash
 lao-ocr export-recognizer   --checkpoint training/runs/crnn-v2/recognizer.pt   --output training/runs/crnn-v2/recognizer.pt2
 ```
+
+The exported `torch.export` artifact uses runtime-device-relative recurrent state, so the same artifact can run on supported CPU, CUDA, or Apple MPS runtimes.
 
 The exported `torch.export` artifact uses a fixed padded input width. The original valid line width is retained during decoding so padded pixels do not contribute CTC output.
 
