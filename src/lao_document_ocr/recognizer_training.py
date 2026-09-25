@@ -21,7 +21,16 @@ from lao_document_ocr.training_manifest import (
 from lao_document_ocr.vocabulary import CharacterVocabulary
 
 MODEL_VERSION = "crnn-ctc-v2"
+UNIDIRECTIONAL_MODEL_VERSION = "crnn-ctc-v3"
 DEV_EVALUATION_VERSION = "valid-timestep-v1"
+
+
+def _model_version_for_config(model_config) -> str:
+    return (
+        MODEL_VERSION
+        if model_config.bidirectional
+        else UNIDIRECTIONAL_MODEL_VERSION
+    )
 
 
 def _sha256_file(path: str | Path) -> str:
@@ -141,6 +150,7 @@ class TrainingConfig:
     max_width: int = 768
     num_workers: int = 0
     device: str = "auto"
+    bidirectional: bool = True
 
     def __post_init__(self) -> None:
         if self.epochs < 1:
@@ -378,7 +388,9 @@ def train_recognizer(
     model_config = RecognizerConfig(
         image_height=training_config.image_height,
         max_width=training_config.max_width,
+        bidirectional=training_config.bidirectional,
     )
+    model_version = _model_version_for_config(model_config)
     LineDataset = _build_dataset_type()
     train_dataset = LineDataset(
         train_samples,
@@ -437,7 +449,7 @@ def train_recognizer(
 
         if checkpoint.get("model") != "LaoCrnnRecognizer":
             raise ValueError("Resume checkpoint model is not LaoCrnnRecognizer")
-        if checkpoint.get("model_version") != MODEL_VERSION:
+        if checkpoint.get("model_version") != model_version:
             raise ValueError("Resume checkpoint model version mismatch")
         if checkpoint.get("model_config") != model_config.to_dict():
             raise ValueError("Resume checkpoint model configuration mismatch")
@@ -670,7 +682,7 @@ def train_recognizer(
             "schema_version": "1",
             "artifact_type": "recognizer-training-state",
             "model": "LaoCrnnRecognizer",
-            "model_version": MODEL_VERSION,
+            "model_version": model_version,
             "model_config": model_config.to_dict(),
             "training_config": training_config.to_dict(),
             "split_strategy": SPLIT_STRATEGY,
@@ -699,7 +711,7 @@ def train_recognizer(
     checkpoint = {
         "schema_version": "1",
         "model": "LaoCrnnRecognizer",
-        "model_version": MODEL_VERSION,
+        "model_version": model_version,
         "model_config": model_config.to_dict(),
         "training_config": training_config.to_dict(),
         "split_strategy": SPLIT_STRATEGY,
@@ -719,7 +731,7 @@ def train_recognizer(
     metadata = {
         "schema_version": "1",
         "model": "LaoCrnnRecognizer",
-        "model_version": MODEL_VERSION,
+        "model_version": model_version,
         "checkpoint": checkpoint_path.name,
         "checkpoint_sha256": checkpoint_sha256,
         "vocabulary": vocabulary_path.name,
@@ -788,7 +800,10 @@ def export_recognizer(
         "schema_version": "1",
         "format": "torch-export",
         "model": "LaoCrnnRecognizer",
-        "model_version": MODEL_VERSION,
+        "model_version": checkpoint.get(
+            "model_version",
+            _model_version_for_config(model_config),
+        ),
         "artifact": destination.name,
         "artifact_sha256": artifact_sha256,
         "vocabulary": checkpoint["vocabulary"],

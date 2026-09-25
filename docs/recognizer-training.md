@@ -66,6 +66,8 @@ lao-ocr train-recognizer   --manifest training/generated/v1/manifest.jsonl   --o
 
 `--device auto` prefers CUDA, then Apple MPS, then CPU. You can also select `cpu`, `cuda`, or `mps` explicitly. The resolved runtime device is recorded in `metadata.json`.
 
+The default recurrent encoder remains the bidirectional `crnn-ctc-v2` model for checkpoint compatibility. New experiments can opt into `--unidirectional`, which records `crnn-ctc-v3` and removes right-padding dependence from the recurrent prefix. A bidirectional LSTM can change valid-prefix predictions when extra white padding is appended on the right, while the forward-only v3 prefix is stable. Keep v3 opt-in until it is evaluated on the fixed real benchmark; current synthetic sanity evidence is development-only.
+
 The training default `--max-width 768` is sized for the current bounded model-development corpus (up to 180 normalized characters); narrower custom widths remain available for shorter-line datasets.
 
 The output directory contains:

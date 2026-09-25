@@ -28,6 +28,7 @@ class _TinyRecognizerConfig:
         hidden_size: int = 1,
         lstm_layers: int = 1,
         blank_logit_bias: float = -2.0,
+        bidirectional: bool = True,
     ) -> None:
         self.image_height = image_height
         self.max_width = max_width
@@ -35,8 +36,9 @@ class _TinyRecognizerConfig:
         self.hidden_size = hidden_size
         self.lstm_layers = lstm_layers
         self.blank_logit_bias = blank_logit_bias
+        self.bidirectional = bidirectional
 
-    def to_dict(self) -> dict[str, int | float]:
+    def to_dict(self) -> dict[str, int | float | bool]:
         return {
             "image_height": self.image_height,
             "max_width": self.max_width,
@@ -44,6 +46,7 @@ class _TinyRecognizerConfig:
             "hidden_size": self.hidden_size,
             "lstm_layers": self.lstm_layers,
             "blank_logit_bias": self.blank_logit_bias,
+            "bidirectional": self.bidirectional,
         }
 
 

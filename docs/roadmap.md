@@ -107,6 +107,7 @@ Status: started
 - [x] width-aware dev decoding aligned with exported recognizer inference
 - [x] model export for CPU inference (`torch.export`)
 - [x] device-portable exported recognizer LSTM state for CPU/CUDA/MPS inference
+- [x] opt-in padding-invariant unidirectional CRNN v3 with v2 checkpoint compatibility
 - [x] confidence calibration pipeline (held-out dev report -> calibration artifact)
 - [x] optional CTC prefix beam-search decoder + decoder-specific calibration
 - [x] versioned checkpoints/artifact checksums

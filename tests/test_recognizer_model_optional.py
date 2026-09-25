@@ -58,3 +58,42 @@ def test_exported_lstm_state_is_runtime_device_relative() -> None:
     output = module(example)
     assert output.device.type == "cpu"
     assert output.shape == (32, 1, 10)
+
+
+def test_legacy_config_defaults_to_bidirectional_v2_shape() -> None:
+    config = RecognizerConfig(hidden_size=32, lstm_layers=1, cnn_channels=64)
+    model = LaoCrnnRecognizer(num_classes=10, config=config)
+
+    assert config.bidirectional is True
+    assert model.sequence.bidirectional is True
+    assert model.classifier.in_features == 64
+
+
+def test_unidirectional_model_is_right_padding_invariant() -> None:
+    config = RecognizerConfig(
+        image_height=48,
+        max_width=256,
+        hidden_size=32,
+        lstm_layers=1,
+        cnn_channels=64,
+        bidirectional=False,
+    )
+    model = LaoCrnnRecognizer(num_classes=10, config=config).eval()
+
+    valid_width = 96
+    base = torch.randn((1, 1, 48, valid_width), dtype=torch.float32)
+    predictions = []
+    with torch.no_grad():
+        for padded_width in (valid_width, 128, 256):
+            image = torch.zeros((1, 1, 48, padded_width), dtype=torch.float32)
+            image[:, :, :, :valid_width] = base
+            log_probs = model(image)
+            valid_steps = valid_width // model.width_downsample_factor
+            predictions.append(
+                log_probs[:valid_steps, 0].argmax(dim=-1).tolist()
+            )
+
+    assert config.bidirectional is False
+    assert model.sequence.bidirectional is False
+    assert model.classifier.in_features == 32
+    assert predictions[0] == predictions[1] == predictions[2]

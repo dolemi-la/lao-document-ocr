@@ -6,8 +6,12 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from lao_document_ocr.recognizer_model import RecognizerConfig
 from lao_document_ocr.recognizer_training import (
+    MODEL_VERSION,
+    UNIDIRECTIONAL_MODEL_VERSION,
     TrainingConfig,
+    _model_version_for_config,
     _training_samples_checksum,
     ctc_required_timesteps,
     prepare_line_image,
@@ -43,6 +47,7 @@ def test_training_config_validation() -> None:
     assert payload["batch_size"] == 4
     assert payload["max_width"] == 768
     assert payload["device"] == "auto"
+    assert payload["bidirectional"] is True
 
 
 def test_training_config_accepts_supported_devices() -> None:
@@ -53,6 +58,14 @@ def test_training_config_accepts_supported_devices() -> None:
 def test_training_config_rejects_unknown_device() -> None:
     with pytest.raises(ValueError, match="device must be one of"):
         TrainingConfig(device="tpu")
+
+
+def test_model_version_tracks_recurrent_direction() -> None:
+    assert _model_version_for_config(RecognizerConfig(bidirectional=True)) == MODEL_VERSION
+    assert (
+        _model_version_for_config(RecognizerConfig(bidirectional=False))
+        == UNIDIRECTIONAL_MODEL_VERSION
+    )
 
 
 def test_ctc_required_timesteps_counts_adjacent_repeats() -> None:

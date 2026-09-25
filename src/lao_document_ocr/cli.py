@@ -976,6 +976,7 @@ def _parser() -> argparse.ArgumentParser:
         default="auto",
     )
     train.add_argument("--resume-from", type=Path)
+    train.add_argument("--unidirectional", action="store_true")
     train.add_argument("--no-hash-check", action="store_true")
 
     export = subparsers.add_parser(
@@ -2100,6 +2101,7 @@ def _train_recognizer(args: argparse.Namespace) -> int:
         max_width=args.max_width,
         num_workers=args.num_workers,
         device=args.device,
+        bidirectional=not args.unidirectional,
     )
     result = train_recognizer(
         samples,

@@ -20,6 +20,7 @@ class RecognizerConfig:
     hidden_size: int = 192
     lstm_layers: int = 2
     blank_logit_bias: float = -2.0
+    bidirectional: bool = True
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -52,10 +53,11 @@ class LaoCrnnRecognizer(nn.Module):
             input_size=c,
             hidden_size=self.config.hidden_size,
             num_layers=self.config.lstm_layers,
-            bidirectional=True,
+            bidirectional=self.config.bidirectional,
             dropout=0.1 if self.config.lstm_layers > 1 else 0.0,
         )
-        self.classifier = nn.Linear(self.config.hidden_size * 2, num_classes)
+        directions = 2 if self.config.bidirectional else 1
+        self.classifier = nn.Linear(self.config.hidden_size * directions, num_classes)
         with torch.no_grad():
             self.classifier.bias[0] = self.config.blank_logit_bias
 
