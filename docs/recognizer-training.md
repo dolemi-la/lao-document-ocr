@@ -59,8 +59,12 @@ The generated manifest is `training/generated/v1/manifest.jsonl`. For augmentati
 ## 4. Train
 
 ```bash
-lao-ocr train-recognizer   --manifest training/generated/v1/manifest.jsonl   --output training/runs/crnn-v2   --epochs 20   --batch-size 32   --dev-ratio 0.1
+lao-ocr train-recognizer   --manifest training/generated/v1/manifest.jsonl   --output training/runs/crnn-v2   --epochs 20   --batch-size 32   --dev-ratio 0.1   --device auto
 ```
+
+`--device auto` prefers CUDA, then Apple MPS, then CPU. You can also select `cpu`, `cuda`, or `mps` explicitly. The resolved runtime device is recorded in `metadata.json`.
+
+The training default `--max-width 768` is sized for the current bounded model-development corpus (up to 180 normalized characters); narrower custom widths remain available for shorter-line datasets.
 
 The output directory contains:
 

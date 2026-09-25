@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import numpy as np
+import pytest
 from PIL import Image
 
 from lao_document_ocr.recognizer_training import (
@@ -38,6 +39,18 @@ def test_training_config_validation() -> None:
     payload = json.loads(json.dumps(config.to_dict()))
     assert payload["epochs"] == 2
     assert payload["batch_size"] == 4
+    assert payload["max_width"] == 768
+    assert payload["device"] == "auto"
+
+
+def test_training_config_accepts_supported_devices() -> None:
+    for device in ("cpu", "cuda", "mps", "auto"):
+        assert TrainingConfig(device=device).device == device
+
+
+def test_training_config_rejects_unknown_device() -> None:
+    with pytest.raises(ValueError, match="device must be one of"):
+        TrainingConfig(device="tpu")
 
 
 def test_ctc_required_timesteps_counts_adjacent_repeats() -> None:

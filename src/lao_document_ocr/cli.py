@@ -967,8 +967,13 @@ def _parser() -> argparse.ArgumentParser:
     train.add_argument("--dev-ratio", type=float, default=0.1)
     train.add_argument("--seed", type=int, default=20260921)
     train.add_argument("--image-height", type=int, default=48)
-    train.add_argument("--max-width", type=int, default=512)
+    train.add_argument("--max-width", type=int, default=768)
     train.add_argument("--num-workers", type=int, default=0)
+    train.add_argument(
+        "--device",
+        choices=["cpu", "cuda", "mps", "auto"],
+        default="auto",
+    )
     train.add_argument("--no-hash-check", action="store_true")
 
     export = subparsers.add_parser(
@@ -2091,6 +2096,7 @@ def _train_recognizer(args: argparse.Namespace) -> int:
         image_height=args.image_height,
         max_width=args.max_width,
         num_workers=args.num_workers,
+        device=args.device,
     )
     result = train_recognizer(samples, args.output, training_config=config)
     print(f"Checkpoint: {result['checkpoint']}")

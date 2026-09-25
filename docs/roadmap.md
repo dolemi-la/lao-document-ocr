@@ -99,6 +99,7 @@ Status: started
 - [x] leakage-safe normalized-text-group train/dev splitting
 - [x] clean/noisy/phone synthetic augmentation profiles
 - [x] line recognizer training pipeline (CRNN + CTC)
+- [x] recognizer training device selection (CPU/CUDA/Apple MPS/auto)
 - [x] model export for CPU inference (`torch.export`)
 - [x] confidence calibration pipeline (held-out dev report -> calibration artifact)
 - [x] optional CTC prefix beam-search decoder + decoder-specific calibration

@@ -46,8 +46,9 @@ class TrainingConfig:
     dev_ratio: float = 0.1
     seed: int = 20260921
     image_height: int = 48
-    max_width: int = 512
+    max_width: int = 768
     num_workers: int = 0
+    device: str = "auto"
 
     def __post_init__(self) -> None:
         if self.epochs < 1:
@@ -60,6 +61,10 @@ class TrainingConfig:
             raise ValueError("image_height must be at least 16")
         if self.max_width < 32:
             raise ValueError("max_width must be at least 32")
+        if self.num_workers < 0:
+            raise ValueError("num_workers must be non-negative")
+        if self.device not in {"cpu", "cuda", "mps", "auto"}:
+            raise ValueError("device must be one of: cpu, cuda, mps, auto")
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -293,7 +298,9 @@ def train_recognizer(
         collate_fn=_collate,
     )
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from lao_document_ocr.recognizer_inference import resolve_torch_device
+
+    device = resolve_torch_device(training_config.device)
     model = LaoCrnnRecognizer(vocabulary.size, model_config).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=training_config.learning_rate)
     loss_fn = nn.CTCLoss(blank=0, zero_infinity=True)
