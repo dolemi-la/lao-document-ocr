@@ -217,6 +217,27 @@ def _export_test_recognizer(tmp_path):
     return artifact
 
 
+
+
+def test_exported_recognizer_runs_on_mps_when_available(tmp_path) -> None:
+    if not (
+        hasattr(torch.backends, "mps")
+        and torch.backends.mps.is_available()
+    ):
+        pytest.skip("MPS is not available")
+
+    artifact = _export_test_recognizer(tmp_path)
+    image_path = tmp_path / "mps-line.png"
+    Image.new("L", (80, 32), 255).save(image_path)
+
+    recognizer = ExportedLineRecognizer(artifact, device="mps")
+    result = recognizer.recognize(image_path)
+
+    assert recognizer.device.type == "mps"
+    assert isinstance(result.text, str)
+    assert result.valid_timesteps > 0
+
+
 def test_recognizer_rejects_invalid_decoder_configuration(tmp_path) -> None:
     artifact = _export_test_recognizer(tmp_path)
 

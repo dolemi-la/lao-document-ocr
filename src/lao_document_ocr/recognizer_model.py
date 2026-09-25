@@ -63,7 +63,15 @@ class LaoCrnnRecognizer(nn.Module):
         features = self.features(images)
         features = features.mean(dim=2)
         sequence = features.permute(2, 0, 1)
-        sequence, _ = self.sequence(sequence)
+        directions = 2 if self.sequence.bidirectional else 1
+        state_shape = (
+            self.sequence.num_layers * directions,
+            sequence.shape[1],
+            self.sequence.hidden_size,
+        )
+        hidden = sequence.new_zeros(state_shape)
+        cell = sequence.new_zeros(state_shape)
+        sequence, _ = self.sequence(sequence, (hidden, cell))
         logits = self.classifier(sequence)
         return logits.log_softmax(dim=-1)
 
