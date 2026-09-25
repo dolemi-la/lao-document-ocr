@@ -77,6 +77,8 @@ The output directory contains:
 
 The train/dev split is deterministic from sample IDs.
 
+Development CER decoding is width-aware: each sample is decoded only through its valid CTC timesteps, excluding batch padding exactly like exported recognizer inference. The current metric semantics are recorded as `valid-timestep-v1` in training state/checkpoints. When an older weights-only checkpoint lacks that version, its baseline dev CER is recomputed before new best-checkpoint decisions are made.
+
 Long runs also write `training-state.pt` atomically after every completed epoch. It contains the latest weights, best weights, optimizer state, deterministic shuffle-generator state, Python/NumPy/Torch RNG state, training history, the exact ordered training-sample checksum, and the resolved runtime device. To continue, set `--epochs` to the new total epoch target and pass `--resume-from`.
 
 Exact `training-state.pt` resume is intentionally strict: the training samples, model/vocabulary, compatible training settings, resolved device, optimizer state, shuffle-generator state, and RNG state must match and restore successfully. A mismatch is rejected rather than silently continuing a different experiment.

@@ -8,8 +8,79 @@ from PIL import Image, ImageDraw
 
 torch = pytest.importorskip("torch")
 
-from lao_document_ocr.recognizer_training import TrainingConfig, train_recognizer  # noqa: E402
+import lao_document_ocr.recognizer_model as recognizer_model_module  # noqa: E402
+from lao_document_ocr.recognizer_training import (  # noqa: E402
+    DEV_EVALUATION_VERSION,
+    TrainingConfig,
+    _greedy_decode,
+    train_recognizer,
+)
 from lao_document_ocr.training_manifest import TrainingSample  # noqa: E402
+from lao_document_ocr.vocabulary import CharacterVocabulary  # noqa: E402
+
+
+class _TinyRecognizerConfig:
+    def __init__(
+        self,
+        image_height: int = 16,
+        max_width: int = 64,
+        cnn_channels: int = 1,
+        hidden_size: int = 1,
+        lstm_layers: int = 1,
+        blank_logit_bias: float = -2.0,
+    ) -> None:
+        self.image_height = image_height
+        self.max_width = max_width
+        self.cnn_channels = cnn_channels
+        self.hidden_size = hidden_size
+        self.lstm_layers = lstm_layers
+        self.blank_logit_bias = blank_logit_bias
+
+    def to_dict(self) -> dict[str, int | float]:
+        return {
+            "image_height": self.image_height,
+            "max_width": self.max_width,
+            "cnn_channels": self.cnn_channels,
+            "hidden_size": self.hidden_size,
+            "lstm_layers": self.lstm_layers,
+            "blank_logit_bias": self.blank_logit_bias,
+        }
+
+
+class _TinyRecognizer(torch.nn.Module):
+    width_downsample_factor = 4
+
+    def __init__(self, num_classes: int, config: _TinyRecognizerConfig) -> None:
+        super().__init__()
+        self.config = config
+        self.dropout = torch.nn.Dropout(p=0.2)
+        self.projection = torch.nn.Linear(1, num_classes)
+        with torch.no_grad():
+            self.projection.bias[0] = config.blank_logit_bias
+
+    def forward(self, images):
+        sequence = images.mean(dim=2)[:, :, :: self.width_downsample_factor]
+        sequence = sequence.permute(2, 0, 1)
+        sequence = self.dropout(sequence)
+        return self.projection(sequence).log_softmax(dim=-1)
+
+    @classmethod
+    def output_lengths(cls, input_widths):
+        return torch.clamp(input_widths // cls.width_downsample_factor, min=1)
+
+
+@pytest.fixture(autouse=True)
+def _use_tiny_recognizer(monkeypatch):
+    monkeypatch.setattr(
+        recognizer_model_module,
+        "RecognizerConfig",
+        _TinyRecognizerConfig,
+    )
+    monkeypatch.setattr(
+        recognizer_model_module,
+        "LaoCrnnRecognizer",
+        _TinyRecognizer,
+    )
 
 
 def _samples(tmp_path) -> list[TrainingSample]:
@@ -143,3 +214,51 @@ def test_resume_rejects_incomplete_training_state(tmp_path) -> None:
             training_config=_config(epochs=2),
             resume_from=broken,
         )
+
+
+def test_greedy_decode_ignores_padded_timesteps() -> None:
+    vocabulary = CharacterVocabulary.from_texts(["ab"])
+    a_id = vocabulary.encode("a")[0]
+    b_id = vocabulary.encode("b")[0]
+    classes = vocabulary.size
+
+    log_probs = torch.full((4, 2, classes), -10.0)
+    log_probs[:, :, 0] = -5.0
+
+    log_probs[0, 0, a_id] = 5.0
+    log_probs[1, 0, 0] = 5.0
+    log_probs[2, 0, b_id] = 5.0
+    log_probs[3, 0, 0] = 5.0
+
+    log_probs[0, 1, b_id] = 5.0
+    log_probs[1, 1, 0] = 5.0
+    log_probs[2, 1, b_id] = 5.0
+    log_probs[3, 1, 0] = 5.0
+
+    decoded = _greedy_decode(
+        log_probs,
+        vocabulary,
+        input_lengths=torch.tensor([2, 4]),
+    )
+
+    assert decoded == ["a", "bb"]
+
+
+def test_exact_resume_records_dev_evaluation_version(tmp_path) -> None:
+    samples = _samples(tmp_path)
+    partial = train_recognizer(
+        samples,
+        tmp_path / "version-partial",
+        training_config=_config(epochs=1),
+    )
+    state = torch.load(
+        partial["training_state"],
+        map_location="cpu",
+        weights_only=False,
+    )
+
+    assert state["dev_evaluation_version"] == DEV_EVALUATION_VERSION
+    assert all(
+        row["dev_evaluation_version"] == DEV_EVALUATION_VERSION
+        for row in state["history"]
+    )

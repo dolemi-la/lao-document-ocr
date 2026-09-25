@@ -21,6 +21,7 @@ from lao_document_ocr.training_manifest import (
 from lao_document_ocr.vocabulary import CharacterVocabulary
 
 MODEL_VERSION = "crnn-ctc-v2"
+DEV_EVALUATION_VERSION = "valid-timestep-v1"
 
 
 def _sha256_file(path: str | Path) -> str:
@@ -298,9 +299,23 @@ def _collate(batch: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _greedy_decode(log_probs, vocabulary: CharacterVocabulary) -> list[str]:
+def _greedy_decode(
+    log_probs,
+    vocabulary: CharacterVocabulary,
+    *,
+    input_lengths=None,
+) -> list[str]:
     predictions = log_probs.argmax(dim=-1).permute(1, 0)
-    return [vocabulary.decode_ctc(row.tolist()) for row in predictions]
+    if input_lengths is None:
+        return [vocabulary.decode_ctc(row.tolist()) for row in predictions]
+
+    lengths = [int(value) for value in input_lengths.tolist()]
+    if len(lengths) != len(predictions):
+        raise ValueError("input_lengths must match the prediction batch size")
+    return [
+        vocabulary.decode_ctc(row[:length].tolist())
+        for row, length in zip(predictions, lengths, strict=True)
+    ]
 
 
 def _edit_distance(reference: str, hypothesis: str) -> int:
@@ -323,7 +338,13 @@ def evaluate(model, loader, vocabulary: CharacterVocabulary, device) -> dict[str
         for batch in loader:
             images = batch["images"].to(device)
             log_probs = model(images)
-            predictions = _greedy_decode(log_probs.cpu(), vocabulary)
+            input_lengths = model.output_lengths(batch["widths"])
+            input_lengths = input_lengths.clamp(max=log_probs.shape[0])
+            predictions = _greedy_decode(
+                log_probs.cpu(),
+                vocabulary,
+                input_lengths=input_lengths,
+            )
             for reference, hypothesis in zip(batch["texts"], predictions, strict=True):
                 edits += _edit_distance(reference, hypothesis)
                 characters += len(reference)
@@ -426,6 +447,16 @@ def train_recognizer(
             raise ValueError("Resume checkpoint split strategy mismatch")
 
         resume_artifact_type = checkpoint.get("artifact_type")
+        previous_eval_version = checkpoint.get("dev_evaluation_version")
+        if (
+            resume_artifact_type == "recognizer-training-state"
+            and previous_eval_version != DEV_EVALUATION_VERSION
+        ):
+            raise ValueError(
+                "Resume training state dev-evaluation version mismatch "
+                f"({previous_eval_version!r} != {DEV_EVALUATION_VERSION!r})"
+            )
+
         previous_samples_checksum = checkpoint.get("training_samples_checksum")
         if (
             resume_artifact_type == "recognizer-training-state"
@@ -486,7 +517,17 @@ def train_recognizer(
         history_value = checkpoint.get("history", [])
         if not isinstance(history_value, list):
             raise ValueError("Resume checkpoint history must be a list")
-        history = [dict(item) for item in history_value]
+        history_version = previous_eval_version or "legacy-unbounded-padding-v0"
+        history = [
+            {
+                **dict(item),
+                "dev_evaluation_version": dict(item).get(
+                    "dev_evaluation_version",
+                    history_version,
+                ),
+            }
+            for item in history_value
+        ]
         completed_epoch = max(
             (int(item.get("epoch", 0)) for item in history),
             default=0,
@@ -535,6 +576,18 @@ def train_recognizer(
             device,
             checkpoint.get("rng_state"),
         )
+
+        baseline_dev_cer_recomputed = None
+        if previous_eval_version != DEV_EVALUATION_VERSION:
+            baseline_dev_cer_recomputed = evaluate(
+                model,
+                dev_loader,
+                vocabulary,
+                device,
+            )["cer"]
+            best_cer = baseline_dev_cer_recomputed
+            best_state = _cpu_state_dict(model.state_dict())
+
         if resume_artifact_type == "recognizer-training-state":
             missing_state = [
                 name
@@ -555,6 +608,9 @@ def train_recognizer(
             "source": str(resume_path),
             "source_sha256": _sha256_file(resume_path),
             "completed_epoch": completed_epoch,
+            "previous_dev_evaluation_version": previous_eval_version,
+            "dev_evaluation_version": DEV_EVALUATION_VERSION,
+            "baseline_dev_cer_recomputed": baseline_dev_cer_recomputed,
             "training_samples_checksum_verified": (
                 previous_samples_checksum == training_samples_checksum
                 if isinstance(previous_samples_checksum, str)
@@ -599,6 +655,7 @@ def train_recognizer(
             "epoch": epoch,
             "train_loss": total_loss / max(1, batches),
             "dev_cer": dev_metrics["cer"],
+            "dev_evaluation_version": DEV_EVALUATION_VERSION,
         }
         history.append(epoch_record)
 
@@ -617,6 +674,7 @@ def train_recognizer(
             "model_config": model_config.to_dict(),
             "training_config": training_config.to_dict(),
             "split_strategy": SPLIT_STRATEGY,
+            "dev_evaluation_version": DEV_EVALUATION_VERSION,
             "training_samples_checksum": training_samples_checksum,
             "resolved_device": str(device),
             "vocabulary": vocabulary.to_dict(),
@@ -645,6 +703,7 @@ def train_recognizer(
         "model_config": model_config.to_dict(),
         "training_config": training_config.to_dict(),
         "split_strategy": SPLIT_STRATEGY,
+        "dev_evaluation_version": DEV_EVALUATION_VERSION,
         "training_samples_checksum": training_samples_checksum,
         "resolved_device": str(device),
         "vocabulary": vocabulary.to_dict(),
@@ -668,6 +727,7 @@ def train_recognizer(
         "model_config": model_config.to_dict(),
         "training_config": training_config.to_dict(),
         "split_strategy": SPLIT_STRATEGY,
+        "dev_evaluation_version": DEV_EVALUATION_VERSION,
         "training_samples_checksum": training_samples_checksum,
         "train_samples": len(train_samples),
         "dev_samples": len(dev_samples),
