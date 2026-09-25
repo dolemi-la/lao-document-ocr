@@ -55,6 +55,36 @@ def test_process_document_can_include_safe_ocr_line_stats(tmp_path) -> None:
     assert "text" not in stats
 
 
+def test_safe_ocr_line_stats_ignore_whitespace_only_lines(tmp_path) -> None:
+    image_path = tmp_path / "sample-whitespace-line-stats.png"
+    Image.new("RGB", (320, 180), "white").save(image_path)
+
+    class WhitespaceEngine(FakeEngine):
+        def recognize(self, image: Image.Image) -> list[RecognizedLine]:
+            return [
+                RecognizedLine(
+                    text="   \n\t",
+                    bbox=BoundingBox(x=10, y=10, width=120, height=24),
+                    confidence=0.99,
+                    block_id=1,
+                    paragraph_id=1,
+                    line_id=1,
+                )
+            ]
+
+    document = process_document(
+        image_path,
+        engine=WhitespaceEngine(),
+        include_ocr_line_stats=True,
+    )
+
+    stats = document.metadata["ocr_line_stats"]["pages"][0]
+    assert stats["mean_confidence"] == 0.0
+    assert stats["recognized_characters"] == 0
+    assert stats["score"] == 0.0
+    assert stats["lao_ratio"] == 0.0
+
+
 def test_processing_can_be_cancelled_before_start(tmp_path) -> None:
     import pytest
 

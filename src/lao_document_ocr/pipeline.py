@@ -228,7 +228,9 @@ def _orientation_line_stats(lines) -> tuple[float, int, float, float]:
     lao_characters = 0
     for line in lines:
         nonspace = [char for char in line.text if not char.isspace()]
-        weight = max(1, len(nonspace))
+        weight = len(nonspace)
+        if weight == 0:
+            continue
         total_weight += weight
         recognized_characters += weight
         lao_characters += sum(
