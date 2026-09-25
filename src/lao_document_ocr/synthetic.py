@@ -350,6 +350,7 @@ def generate_synthetic_lines(
     min_font_size: int = 40,
     max_font_size: int = 56,
     max_samples: int | None = None,
+    start_line: int = 0,
     augmentation: AugmentationConfig | None = None,
     augmentation_profile: AugmentationProfile | str = AugmentationProfile.DEFAULT,
 ) -> Path:
@@ -361,6 +362,8 @@ def generate_synthetic_lines(
         raise ValueError("variants_per_line must be at least 1")
     if max_samples is not None and max_samples < 1:
         raise ValueError("max_samples must be at least 1")
+    if start_line < 0 or start_line >= len(corpus_lines):
+        raise ValueError("start_line must be within the corpus")
 
     requested_profile = AugmentationProfile(augmentation_profile)
     if augmentation is not None and requested_profile != AugmentationProfile.DEFAULT:
@@ -380,13 +383,15 @@ def generate_synthetic_lines(
     manifest = output / "manifest.jsonl"
 
     entries: list[str] = []
-    sample_index = 0
+    prior_nonblank_lines = sum(1 for text in corpus_lines[:start_line] if text.strip())
+    sample_index = prior_nonblank_lines * variants_per_line
+    emitted_samples = 0
 
-    for line_index, text in enumerate(corpus_lines):
+    for line_index, text in enumerate(corpus_lines[start_line:], start=start_line):
         if not text.strip():
             continue
         for variant in range(variants_per_line):
-            if max_samples is not None and sample_index >= max_samples:
+            if max_samples is not None and emitted_samples >= max_samples:
                 manifest.write_text("\n".join(entries) + "\n", encoding="utf-8")
                 return manifest
 
@@ -424,6 +429,7 @@ def generate_synthetic_lines(
             )
             entries.append(json.dumps(asdict(sample), ensure_ascii=False))
             sample_index += 1
+            emitted_samples += 1
 
     manifest.write_text(
         "\n".join(entries) + ("\n" if entries else ""),

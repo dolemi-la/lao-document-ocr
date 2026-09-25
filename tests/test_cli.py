@@ -1248,6 +1248,10 @@ def test_generate_synthetic_cli_balanced_profiles(tmp_path, monkeypatch) -> None
             str(_cli_font_path()),
             "--variants-per-line",
             "3",
+            "--start-line",
+            "1",
+            "--max-samples",
+            "3",
             "--min-font-size",
             "24",
             "--max-font-size",
@@ -1262,10 +1266,12 @@ def test_generate_synthetic_cli_balanced_profiles(tmp_path, monkeypatch) -> None
         json.loads(line)
         for line in (output / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
     ]
+    assert [entry["id"] for entry in entries] == [
+        "line-00000003",
+        "line-00000004",
+        "line-00000005",
+    ]
     assert [entry["augmentation_profile"] for entry in entries] == [
-        "clean-scan",
-        "noisy-scan",
-        "phone-photo",
         "clean-scan",
         "noisy-scan",
         "phone-photo",

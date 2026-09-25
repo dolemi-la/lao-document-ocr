@@ -56,6 +56,8 @@ lao-ocr generate-synthetic   --corpus training/data/lao-lines.txt   --output tra
 
 The generated manifest is `training/generated/v1/manifest.jsonl`. For augmentation profiles and their reproducibility metadata, see [synthetic-augmentation.md](synthetic-augmentation.md).
 
+For large corpora, generation can be split into deterministic chunks with `--start-line` plus `--max-samples`. The offset is zero-based in the prepared corpus; sample IDs, seeds, font rotation, and balanced augmentation profiles stay aligned with an equivalent single full run. This lets interrupted local generation resume in bounded directories that can be merged into one training manifest without changing sample identity.
+
 ## 4. Train
 
 ```bash

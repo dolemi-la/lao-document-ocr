@@ -73,6 +73,69 @@ def test_generate_synthetic_lines_writes_manifest(tmp_path) -> None:
     assert (manifest.parent / entries[0]["image"]).is_file()
 
 
+def test_generate_synthetic_lines_chunk_matches_full_run(tmp_path) -> None:
+    corpus = ["first", "", "second", "third", "fourth"]
+    full = generate_synthetic_lines(
+        corpus,
+        tmp_path / "full",
+        [_font_path()],
+        variants_per_line=1,
+        seed=77,
+        min_font_size=24,
+        max_font_size=24,
+        augmentation_profile="balanced",
+    )
+    chunk = generate_synthetic_lines(
+        corpus,
+        tmp_path / "chunk",
+        [_font_path()],
+        variants_per_line=1,
+        seed=77,
+        min_font_size=24,
+        max_font_size=24,
+        max_samples=2,
+        start_line=2,
+        augmentation_profile="balanced",
+    )
+
+    full_entries = [json.loads(line) for line in full.read_text().splitlines()]
+    chunk_entries = [json.loads(line) for line in chunk.read_text().splitlines()]
+
+    assert [entry["id"] for entry in chunk_entries] == [
+        full_entries[1]["id"],
+        full_entries[2]["id"],
+    ]
+    assert [entry["seed"] for entry in chunk_entries] == [
+        full_entries[1]["seed"],
+        full_entries[2]["seed"],
+    ]
+    assert [entry["augmentation_profile"] for entry in chunk_entries] == [
+        full_entries[1]["augmentation_profile"],
+        full_entries[2]["augmentation_profile"],
+    ]
+    assert [entry["sha256"] for entry in chunk_entries] == [
+        full_entries[1]["sha256"],
+        full_entries[2]["sha256"],
+    ]
+
+
+def test_generate_synthetic_lines_rejects_invalid_start_line(tmp_path) -> None:
+    with pytest.raises(ValueError, match="start_line"):
+        generate_synthetic_lines(
+            ["OCR"],
+            tmp_path / "negative",
+            [_font_path()],
+            start_line=-1,
+        )
+    with pytest.raises(ValueError, match="start_line"):
+        generate_synthetic_lines(
+            ["OCR"],
+            tmp_path / "past-end",
+            [_font_path()],
+            start_line=1,
+        )
+
+
 def test_generate_synthetic_lines_rejects_missing_font(tmp_path) -> None:
     with pytest.raises(FileNotFoundError):
         generate_synthetic_lines(
