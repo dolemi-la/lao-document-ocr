@@ -60,6 +60,8 @@ phone-photo
 
 This is useful when each corpus line has multiple variants and you want a predictable mixture without maintaining separate datasets.
 
+When multiple fonts are supplied, balanced scheduling also rotates font choice across the three capture profiles instead of pairing one font with one fixed degradation mode. Over the deterministic cycle, each font is exercised with clean-scan, noisy-scan, and phone-photo augmentation, avoiding a hidden font/profile correlation in training data.
+
 ## Generate a balanced training set
 
 ```bash

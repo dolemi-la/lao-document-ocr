@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -75,10 +76,17 @@ def test_generate_synthetic_lines_writes_manifest(tmp_path) -> None:
 
 def test_generate_synthetic_lines_chunk_matches_full_run(tmp_path) -> None:
     corpus = ["first", "", "second", "third", "fourth"]
+    source_font = _font_path()
+    fonts = []
+    for name in ("chunk-font-a.ttf", "chunk-font-b.ttf", "chunk-font-c.ttf"):
+        path = tmp_path / name
+        shutil.copyfile(source_font, path)
+        fonts.append(path)
+
     full = generate_synthetic_lines(
         corpus,
         tmp_path / "full",
-        [_font_path()],
+        fonts,
         variants_per_line=1,
         seed=77,
         min_font_size=24,
@@ -88,7 +96,7 @@ def test_generate_synthetic_lines_chunk_matches_full_run(tmp_path) -> None:
     chunk = generate_synthetic_lines(
         corpus,
         tmp_path / "chunk",
-        [_font_path()],
+        fonts,
         variants_per_line=1,
         seed=77,
         min_font_size=24,
@@ -112,6 +120,10 @@ def test_generate_synthetic_lines_chunk_matches_full_run(tmp_path) -> None:
     assert [entry["augmentation_profile"] for entry in chunk_entries] == [
         full_entries[1]["augmentation_profile"],
         full_entries[2]["augmentation_profile"],
+    ]
+    assert [entry["font"] for entry in chunk_entries] == [
+        full_entries[1]["font"],
+        full_entries[2]["font"],
     ]
     assert [entry["sha256"] for entry in chunk_entries] == [
         full_entries[1]["sha256"],
@@ -181,6 +193,38 @@ def test_profile_presets_have_distinct_severity() -> None:
     assert clean.jpeg_quality_min > noisy.jpeg_quality_min
     assert phone.perspective_jitter > 0
     assert phone.shadow_strength > noisy.shadow_strength
+
+
+def test_balanced_profile_crosses_fonts_and_capture_modes(tmp_path) -> None:
+    source_font = _font_path()
+    fonts = []
+    for name in ("font-a.ttf", "font-b.ttf", "font-c.ttf"):
+        path = tmp_path / name
+        shutil.copyfile(source_font, path)
+        fonts.append(path)
+
+    manifest = generate_synthetic_lines(
+        [f"line {index}" for index in range(9)],
+        tmp_path / "balanced-fonts",
+        fonts,
+        variants_per_line=1,
+        seed=99,
+        min_font_size=24,
+        max_font_size=24,
+        augmentation_profile="balanced",
+    )
+    entries = [json.loads(line) for line in manifest.read_text().splitlines()]
+
+    pairs = {
+        (entry["font"], entry["augmentation_profile"])
+        for entry in entries
+    }
+    assert len(pairs) == 9
+    assert pairs == {
+        (font.name, profile)
+        for font in fonts
+        for profile in ("clean-scan", "noisy-scan", "phone-photo")
+    }
 
 
 def test_balanced_profile_cycles_capture_modes(tmp_path) -> None:

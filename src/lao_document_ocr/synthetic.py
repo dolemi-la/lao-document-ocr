@@ -326,18 +326,36 @@ def _font_sizes(min_size: int, max_size: int) -> list[int]:
     return sizes
 
 
+_BALANCED_PROFILES = (
+    AugmentationProfile.CLEAN_SCAN,
+    AugmentationProfile.NOISY_SCAN,
+    AugmentationProfile.PHONE_PHOTO,
+)
+
+
 def _resolve_profile(
     requested: AugmentationProfile,
     sample_index: int,
 ) -> AugmentationProfile:
     if requested != AugmentationProfile.BALANCED:
         return requested
-    profiles = (
-        AugmentationProfile.CLEAN_SCAN,
-        AugmentationProfile.NOISY_SCAN,
-        AugmentationProfile.PHONE_PHOTO,
-    )
-    return profiles[sample_index % len(profiles)]
+    return _BALANCED_PROFILES[sample_index % len(_BALANCED_PROFILES)]
+
+
+def _font_index(
+    *,
+    requested_profile: AugmentationProfile,
+    sample_index: int,
+    line_index: int,
+    variant: int,
+    font_count: int,
+) -> int:
+    if requested_profile != AugmentationProfile.BALANCED:
+        return (line_index + variant) % font_count
+
+    profile_count = len(_BALANCED_PROFILES)
+    cycle_index, profile_index = divmod(sample_index, profile_count)
+    return (cycle_index + profile_index) % font_count
 
 
 def generate_synthetic_lines(
@@ -395,7 +413,15 @@ def generate_synthetic_lines(
                 manifest.write_text("\n".join(entries) + "\n", encoding="utf-8")
                 return manifest
 
-            font = fonts[(line_index + variant) % len(fonts)]
+            font = fonts[
+                _font_index(
+                    requested_profile=requested_profile,
+                    sample_index=sample_index,
+                    line_index=line_index,
+                    variant=variant,
+                    font_count=len(fonts),
+                )
+            ]
             font_size = sizes[(line_index + variant) % len(sizes)]
             sample_seed = seed + sample_index
             sample_id = f"line-{sample_index:08d}"
