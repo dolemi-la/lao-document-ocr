@@ -193,6 +193,62 @@ def test_resume_rejects_different_training_samples(tmp_path) -> None:
         )
 
 
+def test_resume_accepts_legacy_v2_config_without_bidirectional_field(tmp_path) -> None:
+    samples = _samples(tmp_path)
+    partial = train_recognizer(
+        samples,
+        tmp_path / "legacy-v2-partial",
+        training_config=_config(epochs=1),
+    )
+
+    state = torch.load(
+        partial["training_state"],
+        map_location="cpu",
+        weights_only=False,
+    )
+    state["model_config"].pop("bidirectional", None)
+    state["training_config"].pop("bidirectional", None)
+    legacy = tmp_path / "legacy-v2-training-state.pt"
+    torch.save(state, legacy)
+
+    resumed = train_recognizer(
+        samples,
+        tmp_path / "legacy-v2-resumed",
+        training_config=_config(epochs=2),
+        resume_from=legacy,
+    )
+
+    metadata = json.loads(resumed["metadata"].read_text(encoding="utf-8"))
+    assert metadata["history"][-1]["epoch"] == 2
+    assert metadata["model_version"] == "crnn-ctc-v2"
+
+
+def test_resume_rejects_conflicting_v2_bidirectional_config(tmp_path) -> None:
+    samples = _samples(tmp_path)
+    partial = train_recognizer(
+        samples,
+        tmp_path / "conflicting-v2-partial",
+        training_config=_config(epochs=1),
+    )
+
+    state = torch.load(
+        partial["training_state"],
+        map_location="cpu",
+        weights_only=False,
+    )
+    state["model_config"]["bidirectional"] = False
+    conflicting = tmp_path / "conflicting-v2-training-state.pt"
+    torch.save(state, conflicting)
+
+    with pytest.raises(ValueError, match="model configuration mismatch"):
+        train_recognizer(
+            samples,
+            tmp_path / "conflicting-v2-resumed",
+            training_config=_config(epochs=2),
+            resume_from=conflicting,
+        )
+
+
 def test_resume_rejects_incomplete_training_state(tmp_path) -> None:
     samples = _samples(tmp_path)
     partial = train_recognizer(

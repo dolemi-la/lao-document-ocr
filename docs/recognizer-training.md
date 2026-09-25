@@ -85,6 +85,8 @@ Long runs also write `training-state.pt` atomically after every completed epoch.
 
 Exact `training-state.pt` resume is intentionally strict: the training samples, model/vocabulary, compatible training settings, resolved device, optimizer state, shuffle-generator state, and RNG state must match and restore successfully. A mismatch is rejected rather than silently continuing a different experiment.
 
+Legacy `crnn-ctc-v2` states created before the `bidirectional` config field existed are normalized as `bidirectional=true`, matching v2 semantics. An explicit conflicting value is still rejected.
+
 Example: `lao-ocr train-recognizer --manifest training/generated/v1/manifest.jsonl --output training/runs/crnn-v2 --epochs 50 --batch-size 32 --device auto --resume-from training/runs/crnn-v2/training-state.pt`.
 
 A legacy/final `recognizer.pt` can also be used as a weights-only fallback. In that case optimizer, shuffle-generator, and RNG state cannot be restored; metadata records that limitation and continuation starts from the best stored epoch rather than pretending to restore a later state.

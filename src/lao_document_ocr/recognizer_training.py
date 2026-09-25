@@ -33,6 +33,19 @@ def _model_version_for_config(model_config) -> str:
     )
 
 
+def _normalized_resume_model_config(
+    payload: Any,
+    *,
+    model_version: str,
+) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    normalized = dict(payload)
+    if model_version == MODEL_VERSION and "bidirectional" not in normalized:
+        normalized["bidirectional"] = True
+    return normalized
+
+
 def _sha256_file(path: str | Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as source:
@@ -449,9 +462,14 @@ def train_recognizer(
 
         if checkpoint.get("model") != "LaoCrnnRecognizer":
             raise ValueError("Resume checkpoint model is not LaoCrnnRecognizer")
-        if checkpoint.get("model_version") != model_version:
+        checkpoint_model_version = checkpoint.get("model_version")
+        if checkpoint_model_version != model_version:
             raise ValueError("Resume checkpoint model version mismatch")
-        if checkpoint.get("model_config") != model_config.to_dict():
+        resume_model_config = _normalized_resume_model_config(
+            checkpoint.get("model_config"),
+            model_version=checkpoint_model_version,
+        )
+        if resume_model_config != model_config.to_dict():
             raise ValueError("Resume checkpoint model configuration mismatch")
         if checkpoint.get("vocabulary_checksum") != vocabulary.checksum():
             raise ValueError("Resume checkpoint vocabulary checksum mismatch")
