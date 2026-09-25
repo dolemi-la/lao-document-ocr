@@ -148,6 +148,22 @@ def test_generate_synthetic_lines_rejects_invalid_start_line(tmp_path) -> None:
         )
 
 
+def test_generate_synthetic_lines_store_grayscale_pngs(tmp_path) -> None:
+    manifest = generate_synthetic_lines(
+        ["OCR grayscale"],
+        tmp_path / "grayscale",
+        [_font_path()],
+        min_font_size=24,
+        max_font_size=24,
+    )
+    entry = json.loads(manifest.read_text(encoding="utf-8").strip())
+
+    from PIL import Image
+
+    with Image.open(manifest.parent / entry["image"]) as image:
+        assert image.mode == "L"
+
+
 def test_generate_synthetic_lines_rejects_missing_font(tmp_path) -> None:
     with pytest.raises(FileNotFoundError):
         generate_synthetic_lines(

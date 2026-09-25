@@ -98,6 +98,7 @@ Status: started
 - [x] deterministic augmentation pipeline
 - [x] deterministic chunked synthetic generation for large corpora
 - [x] decorrelate balanced synthetic font and capture-profile schedules
+- [x] storage-efficient grayscale synthetic training images
 - [x] leakage-safe normalized-text-group train/dev splitting
 - [x] clean/noisy/phone synthetic augmentation profiles
 - [x] line recognizer training pipeline (CRNN + CTC)

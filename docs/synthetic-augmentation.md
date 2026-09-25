@@ -74,6 +74,8 @@ lao-ocr generate-synthetic \
   --seed 20260921
 ```
 
+Generated training images are stored as grayscale PNGs. The augmentation pipeline is grayscale before serialization, so this avoids redundant RGB channels while preserving the exact intensity data consumed by recognizer training.
+
 Each manifest entry records:
 
 - resolved `augmentation_profile`

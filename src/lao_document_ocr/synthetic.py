@@ -440,7 +440,7 @@ def generate_synthetic_lines(
             )
 
             image_path = images_dir / f"{sample_id}.png"
-            image.save(image_path, format="PNG", optimize=True)
+            image.convert("L").save(image_path, format="PNG", optimize=True)
 
             sample = SyntheticSample(
                 id=sample_id,
