@@ -14,6 +14,34 @@ lao-ocr serve-capture-kit \
   --mode phone-photo
 ```
 
+## Canonical first-pass Make targets
+
+For the project-authored 60-page campaign, the repository Makefile wraps the standard private capture paths and ports:
+
+```bash
+make capture-phone
+make capture-flatbed
+```
+
+Defaults:
+
+```text
+phone-a   -> benchmarks/private/captures/phone-a   -> port 8090
+flatbed-a -> benchmarks/private/captures/flatbed-a -> port 8091
+```
+
+Both bind to `0.0.0.0` for trusted-LAN collection and still use the collector's random access token. Override `CAPTURE_HOST`, `PHONE_CAPTURE_PORT`, `FLATBED_CAPTURE_PORT`, `PHONE_CAPTURE_ID`, or `FLATBED_CAPTURE_ID` when needed.
+
+After all 60 pages for a mode are complete, package the checksum-bound submission with:
+
+```bash
+make capture-phone-pack
+make capture-flatbed-pack
+```
+
+The pack targets use `--require-complete` and write to `benchmarks/private/submissions/`, so incomplete sessions fail instead of producing a misleading first-pass handoff. Capture/session/submission files stay outside Git.
+
+
 Default bind:
 
 ```text
