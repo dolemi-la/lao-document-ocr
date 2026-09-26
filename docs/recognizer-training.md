@@ -70,6 +70,8 @@ The default recurrent encoder remains the bidirectional `crnn-ctc-v2` model for 
 
 The training default `--max-width 768` is sized for the current bounded model-development corpus (up to 180 normalized characters); narrower custom widths remain available for shorter-line datasets.
 
+Before model/optimizer work starts, recognizer training now preflights every sample against CTC timestep capacity using its prepared image width. A run fails immediately if any target cannot fit; successful runs persist the sample count, minimum timestep margin, and maximum required/available timesteps in training state, checkpoint metadata, and final metadata.
+
 Train and dev batches are now padded to that configured fixed width rather than only to each batch maximum. This matches the fixed-width exported inference path for bidirectional v2, so the backward LSTM sees the same right-padding regime during development evaluation and deployment. The padding semantics are versioned as `fixed-max-width-v1` and are part of the strict resumable-training state contract.
 
 The output directory contains:

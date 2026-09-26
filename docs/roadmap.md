@@ -106,6 +106,7 @@ Status: started
 - [x] atomic per-epoch recognizer training state + resumable long runs
 - [x] width-aware dev decoding aligned with exported recognizer inference
 - [x] fixed-width train/dev padding aligned with exported bidirectional inference
+- [x] upfront CTC-capacity preflight + persisted capacity diagnostics
 - [x] model export for CPU inference (`torch.export`)
 - [x] device-portable exported recognizer LSTM state for CPU/CUDA/MPS inference
 - [x] opt-in padding-invariant unidirectional CRNN v3 with v2 checkpoint compatibility

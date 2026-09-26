@@ -16,6 +16,7 @@ from lao_document_ocr.recognizer_training import (
     _model_version_for_config,
     _training_samples_checksum,
     ctc_required_timesteps,
+    preflight_ctc_capacity,
     prepare_line_image,
 )
 from lao_document_ocr.training_manifest import TrainingSample
@@ -125,6 +126,45 @@ def test_collate_rejects_too_small_fixed_width() -> None:
 
 def test_training_padding_strategy_is_versioned() -> None:
     assert TRAINING_PADDING_STRATEGY == "fixed-max-width-v1"
+
+
+
+
+def test_ctc_preflight_reports_capacity_margin(tmp_path) -> None:
+    image_path = tmp_path / "capacity-ok.png"
+    Image.new("L", (32, 16), 255).save(image_path)
+    sample = TrainingSample(id="ok", image=image_path, text="aa")
+    from lao_document_ocr.vocabulary import CharacterVocabulary
+
+    vocab = CharacterVocabulary.from_texts([sample.text])
+    report = preflight_ctc_capacity(
+        [sample],
+        vocab,
+        image_height=16,
+        max_width=32,
+    )
+
+    assert report["samples"] == 1
+    assert report["failures"] == 0
+    assert report["min_timestep_margin"] == 5
+    assert report["max_required_timesteps"] == 3
+    assert report["max_available_timesteps"] == 8
+
+
+def test_ctc_preflight_rejects_incompatible_sample_before_training(tmp_path) -> None:
+    image_path = tmp_path / "capacity-fail.png"
+    Image.new("L", (32, 16), 255).save(image_path)
+    sample = TrainingSample(id="too-long", image=image_path, text="aaaaaaaaaa")
+    from lao_document_ocr.vocabulary import CharacterVocabulary
+
+    vocab = CharacterVocabulary.from_texts([sample.text])
+    with pytest.raises(ValueError, match="CTC capacity preflight failed.*too-long"):
+        preflight_ctc_capacity(
+            [sample],
+            vocab,
+            image_height=16,
+            max_width=32,
+        )
 
 
 def test_training_samples_checksum_binds_order_text_and_image_hash(tmp_path) -> None:

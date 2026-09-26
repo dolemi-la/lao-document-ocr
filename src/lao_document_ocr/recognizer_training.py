@@ -147,6 +147,73 @@ def _restore_rng_state(torch, device, state: dict[str, Any] | None) -> bool:
     return True
 
 
+def _prepared_line_width(
+    path: str | Path,
+    *,
+    image_height: int,
+    max_width: int,
+) -> int:
+    with Image.open(path) as source:
+        image = ImageOps.exif_transpose(source)
+        if image.width < 1 or image.height < 1:
+            raise ValueError("Invalid image dimensions")
+        scale = image_height / image.height
+        target_width = max(1, int(round(image.width * scale)))
+        return min(max_width, target_width)
+
+
+def preflight_ctc_capacity(
+    samples: list[TrainingSample],
+    vocabulary: CharacterVocabulary,
+    *,
+    image_height: int,
+    max_width: int,
+) -> dict[str, int]:
+    if not samples:
+        raise ValueError("Training manifest contains no samples")
+
+    min_margin: int | None = None
+    max_required = 0
+    max_available = 0
+    first_failure: tuple[str, int, int] | None = None
+    failures = 0
+
+    for sample in samples:
+        target = vocabulary.encode(sample.text)
+        required = ctc_required_timesteps(target)
+        width = _prepared_line_width(
+            sample.image,
+            image_height=image_height,
+            max_width=max_width,
+        )
+        available = max(1, width // 4)
+        margin = available - required
+        min_margin = margin if min_margin is None else min(min_margin, margin)
+        max_required = max(max_required, required)
+        max_available = max(max_available, available)
+        if margin < 0:
+            failures += 1
+            if first_failure is None:
+                first_failure = (sample.id, required, available)
+
+    if first_failure is not None:
+        sample_id, required, available = first_failure
+        raise ValueError(
+            f"CTC capacity preflight failed for {failures} sample(s); "
+            f"first failure {sample_id} requires {required} timesteps "
+            f"but only {available} are available. Increase --max-width "
+            "or shorten the training line."
+        )
+
+    return {
+        "samples": len(samples),
+        "failures": failures,
+        "min_timestep_margin": int(min_margin or 0),
+        "max_required_timesteps": max_required,
+        "max_available_timesteps": max_available,
+    }
+
+
 def ctc_required_timesteps(token_ids: list[int]) -> int:
     if not token_ids:
         return 0
@@ -406,6 +473,12 @@ def train_recognizer(
     )
     vocabulary = CharacterVocabulary.from_texts([sample.text for sample in samples])
     training_samples_checksum = _training_samples_checksum(samples)
+    ctc_preflight = preflight_ctc_capacity(
+        samples,
+        vocabulary,
+        image_height=training_config.image_height,
+        max_width=training_config.max_width,
+    )
 
     model_config = RecognizerConfig(
         image_height=training_config.image_height,
@@ -731,6 +804,7 @@ def train_recognizer(
             "dev_evaluation_version": DEV_EVALUATION_VERSION,
             "training_padding_strategy": TRAINING_PADDING_STRATEGY,
             "training_samples_checksum": training_samples_checksum,
+            "ctc_preflight": ctc_preflight,
             "resolved_device": str(device),
             "vocabulary": vocabulary.to_dict(),
             "vocabulary_checksum": vocabulary.checksum(),
@@ -761,6 +835,7 @@ def train_recognizer(
         "dev_evaluation_version": DEV_EVALUATION_VERSION,
         "training_padding_strategy": TRAINING_PADDING_STRATEGY,
         "training_samples_checksum": training_samples_checksum,
+        "ctc_preflight": ctc_preflight,
         "resolved_device": str(device),
         "vocabulary": vocabulary.to_dict(),
         "vocabulary_checksum": vocabulary.checksum(),
@@ -786,6 +861,7 @@ def train_recognizer(
         "dev_evaluation_version": DEV_EVALUATION_VERSION,
         "training_padding_strategy": TRAINING_PADDING_STRATEGY,
         "training_samples_checksum": training_samples_checksum,
+        "ctc_preflight": ctc_preflight,
         "train_samples": len(train_samples),
         "dev_samples": len(dev_samples),
         "best_dev_cer": best_cer,
