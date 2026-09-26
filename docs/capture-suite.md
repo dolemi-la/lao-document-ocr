@@ -19,7 +19,7 @@ plus one combined PDF.
 lao-ocr generate-capture-suite \
   --corpus training/data/lao-lines.txt \
   --output benchmarks/capture-packs/baseline-suite-v1 \
-  --font /path/to/NotoSansLao-Regular.ttf \
+  --font /path/to/PhetsarathOT-Regular.ttf \
   --suite-id baseline-suite-v1 \
   --text-license CC0-1.0 \
   --text-provenance "independently cleared Lao corpus" \
@@ -38,7 +38,7 @@ Repeat `--template`:
 lao-ocr generate-capture-suite \
   --corpus training/data/lao-lines.txt \
   --output benchmarks/capture-packs/forms-and-receipts-v1 \
-  --font /path/to/NotoSansLao-Regular.ttf \
+  --font /path/to/PhetsarathOT-Regular.ttf \
   --suite-id forms-and-receipts-v1 \
   --text-license CC0-1.0 \
   --text-provenance "Reviewed CC0 Lao corpus" \

@@ -79,15 +79,11 @@ and reduces transitions/animations to effectively instantaneous behavior.
 
 ## Lao typography
 
-The default font stack prefers:
+The default font stack prefers Phetsarath OT, then the platform system font.
 
-```text
-Noto Sans Lao
-Noto Sans
-system-ui
-```
+Phetsarath OT is the canonical Lao font for this project and the default requested font for generated editable documents. The web app does not vendor the font binary, so devices without Phetsarath installed fall back to the platform font stack.
 
-When `lang="lo"` is active, large headings use Lao-friendly line height and normal letter spacing instead of the tighter Latin display treatment.
+When lang=lo is active, large headings use Lao-friendly line height and normal letter spacing instead of the tighter Latin display treatment.
 
 ## Current accessibility scope
 

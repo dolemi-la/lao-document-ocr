@@ -135,7 +135,7 @@ def _parser() -> argparse.ArgumentParser:
             "apply a non-zero rotation only when OCR confidence improves enough."
         ),
     )
-    convert.add_argument("--font", default="Noto Sans Lao")
+    convert.add_argument("--font", default="Phetsarath OT")
 
     validate = subparsers.add_parser("validate-dataset", help="Validate a benchmark dataset.")
     validate.add_argument("--manifest", required=True, type=Path)
@@ -681,6 +681,14 @@ def _parser() -> argparse.ArgumentParser:
     synthetic.add_argument("--max-samples", type=int)
     synthetic.add_argument("--start-line", type=int, default=0)
     synthetic.add_argument(
+        "--require-complete-font",
+        action="store_true",
+        help=(
+            "Reject any synthetic font missing corpus characters instead of "
+            "rendering fallback/tofu glyphs."
+        ),
+    )
+    synthetic.add_argument(
         "--augmentation-profile",
         choices=[
             "default",
@@ -731,6 +739,14 @@ def _parser() -> argparse.ArgumentParser:
     capture_suite.add_argument("--dpi", type=int, default=150)
     capture_suite.add_argument("--lines-per-page", type=int, default=8)
     capture_suite.add_argument("--max-pages-per-template", type=int)
+    capture_suite.add_argument(
+        "--require-complete-font",
+        action="store_true",
+        help=(
+            "Reject the capture font when any corpus/template character "
+            "is missing instead of allowing fallback/tofu glyphs."
+        ),
+    )
     capture_suite.add_argument(
         "--template",
         action="append",
@@ -1701,6 +1717,7 @@ def _generate_synthetic(args: argparse.Namespace) -> int:
         max_font_size=args.max_font_size,
         max_samples=args.max_samples,
         start_line=args.start_line,
+        require_complete_font=args.require_complete_font,
         augmentation_profile=args.augmentation_profile,
     )
     count = sum(1 for line in manifest.read_text(encoding="utf-8").splitlines() if line)
@@ -1750,6 +1767,7 @@ def _generate_capture_suite(args: argparse.Namespace) -> int:
         dpi=args.dpi,
         lines_per_page=args.lines_per_page,
         max_pages_per_template=args.max_pages_per_template,
+        require_complete_font=args.require_complete_font,
     )
     print(f"Capture suite: {manifest}")
     print(f"Combined PDF: {manifest.parent / (args.suite_id + '.pdf')}")

@@ -7,10 +7,12 @@ from itertools import groupby
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageFilter
 
-DEFAULT_LAO_FONT = "/usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf"
-DEFAULT_LATIN_FONT = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
+from lao_document_ocr.shaped_text import shaped_text_image
+
+DEFAULT_LAO_FONT = "benchmarks/private/fonts/PhetsarathOT-v4.103/PhetsarathOT-Regular.ttf"
+DEFAULT_LATIN_FONT = DEFAULT_LAO_FONT
 
 SAMPLES = [
     {
@@ -55,20 +57,19 @@ def _is_lao(char: str) -> bool:
 
 
 def _render_line(
-    draw: ImageDraw.ImageDraw,
+    image: Image.Image,
     text: str,
     position: tuple[int, int],
-    lao_font: ImageFont.FreeTypeFont,
-    latin_font: ImageFont.FreeTypeFont,
+    lao_font_path: Path,
+    latin_font_path: Path,
 ) -> None:
     x, y = position
     for use_lao, chars in groupby(text, key=_is_lao):
         run = "".join(chars)
-        font = lao_font if use_lao else latin_font
-        language = "lo" if use_lao else "en"
-        draw.text((x, y), run, font=font, fill=0, language=language)
-        x += int(draw.textlength(run, font=font, language=language))
-
+        font_path = lao_font_path if use_lao else latin_font_path
+        rendered = shaped_text_image(font_path, 58, run)
+        image.paste(rendered, (x, y), rendered)
+        x += rendered.width
 
 def _render(
     text: str,
@@ -76,21 +77,24 @@ def _render(
     latin_font_path: Path,
     noisy: bool,
 ) -> Image.Image:
-    image = Image.new("L", (1800, 520), 255)
-    draw = ImageDraw.Draw(image)
-    lao_font = ImageFont.truetype(str(lao_font_path), size=58)
-    latin_font = ImageFont.truetype(str(latin_font_path), size=58)
+    image = Image.new("RGB", (1800, 520), "white")
 
     y = 100
     for line in text.splitlines():
-        _render_line(draw, line, (90, y), lao_font, latin_font)
+        _render_line(
+            image,
+            line,
+            (90, y),
+            lao_font_path,
+            latin_font_path,
+        )
         y += 100
 
     if not noisy:
-        return image.convert("RGB")
+        return image
 
     rng = np.random.default_rng(20260921)
-    array = np.asarray(image, dtype=np.int16)
+    array = np.asarray(image.convert("L"), dtype=np.int16)
     noise = rng.normal(0, 7, size=array.shape)
     array = np.clip(array + noise, 0, 255).astype(np.uint8)
     noisy_image = Image.fromarray(array)

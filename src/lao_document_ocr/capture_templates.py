@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from lao_document_ocr.capture_page_id import render_page_id_qr
 from lao_document_ocr.normalization import normalize_lao_text
+from lao_document_ocr.shaped_text import paste_shaped_text
 
 
 class CaptureTemplate(StrEnum):
@@ -18,6 +19,15 @@ class CaptureTemplate(StrEnum):
     BORDERLESS_TABLE = "borderless-table"
     RECEIPT = "receipt"
     FORM = "form"
+
+
+CAPTURE_TEMPLATE_FONT_PROBE = (
+    "Lao OCR Capture Pack Page ID: Capture ID: "
+    "plain two-column ruled-table borderless-table receipt form "
+    "ລາຍການ ຈຳນວນ (₭) ໃບຮັບເງິນ / RECEIPT TOTAL "
+    "ແບບຟອມ / FORM Field "
+    "0123456789 ,.-_/()"
+)
 
 
 def _clusters(text: str) -> list[str]:
@@ -176,18 +186,20 @@ def _base(
     draw = ImageDraw.Draw(image)
 
     y = margin
-    draw.text(
+    paste_shaped_text(
+        image,
         (margin, y),
         "Lao OCR Capture Pack",
-        font=meta_font,
-        fill="black",
+        font_path=font_path,
+        font_size=meta_font.size,
     )
     y += round(dpi * 0.20)
-    draw.text(
+    paste_shaped_text(
+        image,
         (margin, y),
         f"Page ID: {page_id}",
-        font=meta_font,
-        fill="black",
+        font_path=font_path,
+        font_size=meta_font.size,
     )
 
     qr = render_page_id_qr(
@@ -205,19 +217,21 @@ def _base(
 
 
 def _footer(
-    draw: ImageDraw.ImageDraw,
+    image: Image.Image,
     page_id: str,
     meta_font: ImageFont.FreeTypeFont,
+    font_path: Path,
     *,
     height: int,
     margin: int,
 ) -> str:
     footer = f"Capture ID: {page_id}"
-    draw.text(
+    paste_shaped_text(
+        image,
         (margin, height - margin),
         footer,
-        font=meta_font,
-        fill="black",
+        font_path=font_path,
+        font_size=meta_font.size,
         anchor="ls",
     )
     return footer
@@ -262,7 +276,13 @@ def _render_plain(
         for wrapped_line in wrapped:
             if y + line_spacing > bottom_limit:
                 break
-            draw.text((margin, y), wrapped_line, font=body_font, fill="black")
+            paste_shaped_text(
+                image,
+                (margin, y),
+                wrapped_line,
+                font_path=font_path,
+                font_size=body_font.size,
+            )
             rendered.append(wrapped_line)
             y += line_spacing
         y += paragraph_spacing
@@ -270,9 +290,10 @@ def _render_plain(
             break
 
     footer = _footer(
-        draw,
+        image,
         page_id,
         meta_font,
+        font_path,
         height=height,
         margin=margin,
     )
@@ -313,7 +334,13 @@ def _render_two_column(
             ):
                 if y + line_spacing > bottom_limit:
                     break
-                draw.text((x, y), wrapped_line, font=body_font, fill="black")
+                paste_shaped_text(
+                    image,
+                    (x, y),
+                    wrapped_line,
+                    font_path=font_path,
+                    font_size=body_font.size,
+                )
                 rendered.append(wrapped_line)
                 y += line_spacing
             y += paragraph_spacing
@@ -322,9 +349,10 @@ def _render_two_column(
         rendered_columns.append(rendered)
 
     footer = _footer(
-        draw,
+        image,
         page_id,
         meta_font,
+        font_path,
         height=height,
         margin=margin,
     )
@@ -390,24 +418,27 @@ def _render_table(
             min_size=max(12, round(body_font.size * 0.70)),
             width=(right - split_x) - round(dpi * 0.12),
         )
-        draw.text(
+        paste_shaped_text(
+            image,
             (left + round(dpi * 0.06), y),
             description,
-            font=description_font,
-            fill="black",
+            font_path=font_path,
+            font_size=description_font.size,
         )
-        draw.text(
+        paste_shaped_text(
+            image,
             (split_x + round(dpi * 0.06), y),
             amount,
-            font=amount_font,
-            fill="black",
+            font_path=font_path,
+            font_size=amount_font.size,
         )
         truth_rows.append(f"{description}	{amount}")
 
     footer = _footer(
-        draw,
+        image,
         page_id,
         meta_font,
+        font_path,
         height=height,
         margin=margin,
     )
@@ -430,7 +461,14 @@ def _render_receipt(
         str(font_path),
         size=max(body_font.size + 4, round(dpi * 0.14)),
     )
-    draw.text((width // 2, y), title, font=title_font, fill="black", anchor="ma")
+    paste_shaped_text(
+        image,
+        (width // 2, y),
+        title,
+        font_path=font_path,
+        font_size=title_font.size,
+        anchor="ma",
+    )
     y += round(dpi * 0.38)
 
     left = margin + round(dpi * 0.25)
@@ -453,8 +491,21 @@ def _render_receipt(
             min_size=max(12, round(body_font.size * 0.70)),
             width=(split_x - left) - round(dpi * 0.10),
         )
-        draw.text((left, y), item, font=item_font, fill="black")
-        draw.text((right, y), amount, font=body_font, fill="black", anchor="ra")
+        paste_shaped_text(
+            image,
+            (left, y),
+            item,
+            font_path=font_path,
+            font_size=item_font.size,
+        )
+        paste_shaped_text(
+            image,
+            (right, y),
+            amount,
+            font_path=font_path,
+            font_size=body_font.size,
+            anchor="ra",
+        )
         truth_rows.append(f"{item}	{amount}")
         y += row_height
 
@@ -462,14 +513,28 @@ def _render_receipt(
     draw.line((left, y, right, y), fill="black", width=max(1, dpi // 120))
     y += round(dpi * 0.10)
     total_text = f"TOTAL	{total:,} ₭"
-    draw.text((left, y), "TOTAL", font=body_font, fill="black")
-    draw.text((right, y), f"{total:,} ₭", font=body_font, fill="black", anchor="ra")
+    paste_shaped_text(
+        image,
+        (left, y),
+        "TOTAL",
+        font_path=font_path,
+        font_size=body_font.size,
+    )
+    paste_shaped_text(
+        image,
+        (right, y),
+        f"{total:,} ₭",
+        font_path=font_path,
+        font_size=body_font.size,
+        anchor="ra",
+    )
     truth_rows.append(total_text)
 
     footer = _footer(
-        draw,
+        image,
         page_id,
         meta_font,
+        font_path,
         height=height,
         margin=margin,
     )
@@ -492,7 +557,13 @@ def _render_form(
         str(font_path),
         size=max(body_font.size + 3, round(dpi * 0.14)),
     )
-    draw.text((margin, y), title, font=title_font, fill="black")
+    paste_shaped_text(
+        image,
+        (margin, y),
+        title,
+        font_path=font_path,
+        font_size=title_font.size,
+    )
     y += round(dpi * 0.40)
 
     label_width = round((width - 2 * margin) * 0.25)
@@ -512,8 +583,20 @@ def _render_form(
             min_size=max(12, round(body_font.size * 0.68)),
             width=value_width,
         )
-        draw.text((margin, y), label, font=body_font, fill="black")
-        draw.text((value_x, y), value, font=fitted, fill="black")
+        paste_shaped_text(
+            image,
+            (margin, y),
+            label,
+            font_path=font_path,
+            font_size=body_font.size,
+        )
+        paste_shaped_text(
+            image,
+            (value_x, y),
+            value,
+            font_path=font_path,
+            font_size=fitted.size,
+        )
         line_y = y + round(row_height * 0.60)
         draw.line(
             (value_x, line_y, width - margin, line_y),
@@ -524,9 +607,10 @@ def _render_form(
         y += row_height
 
     footer = _footer(
-        draw,
+        image,
         page_id,
         meta_font,
+        font_path,
         height=height,
         margin=margin,
     )

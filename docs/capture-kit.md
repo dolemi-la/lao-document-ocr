@@ -94,7 +94,7 @@ project-authored-lao-v1.collector.zip
 project-authored-lao-v1.collector.zip.sha256
 ```
 
-The workflow installs the Noto Lao font, regenerates all 60 pages from the project-authored corpus, verifies the suite/collector contents and checksums, binds the kit to `github.sha`, and uploads it with 30-day artifact retention. Repository permissions are read-only.
+The workflow downloads and SHA-256 verifies pinned Phetsarath OT v4.103, regenerates all 60 pages with strict glyph coverage and HarfBuzz-backed shaping, verifies the suite/collector contents and checksums, binds the kit to `github.sha`, and uploads it with 30-day artifact retention. Repository permissions are read-only.
 
 Workflow source: `.github/workflows/capture-kit.yml`.
 

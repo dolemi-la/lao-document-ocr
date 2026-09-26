@@ -164,6 +164,20 @@ def test_generate_synthetic_lines_store_grayscale_pngs(tmp_path) -> None:
         assert image.mode == "L"
 
 
+
+
+def test_generate_synthetic_lines_strict_font_rejects_missing_glyph(tmp_path) -> None:
+    with pytest.raises(ValueError, match="missing .*required character"):
+        generate_synthetic_lines(
+            ["OCR", chr(0x10FFFF)],
+            tmp_path / "strict-font",
+            [_font_path()],
+            min_font_size=24,
+            max_font_size=24,
+            require_complete_font=True,
+        )
+
+
 def test_generate_synthetic_lines_rejects_missing_font(tmp_path) -> None:
     with pytest.raises(FileNotFoundError):
         generate_synthetic_lines(

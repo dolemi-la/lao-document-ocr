@@ -17,11 +17,18 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install Lao font
+      - name: Prepare pinned Phetsarath OT v4.103
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-noto-core
-          test -f /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf
+          set -euo pipefail
+          FONT_DIR="$RUNNER_TEMP/PhetsarathOT-v4.103"
+          FONT_ZIP="$RUNNER_TEMP/PhetsarathOT-v4.103.zip"
+          curl -L --fail --silent --show-error             https://phetsarath.mts.la/downloads/PhetsarathOT-v4.103.zip             -o "$FONT_ZIP"
+          echo "a97a317eb1e95c5338a38233176189f63e5b23f29a19630ec317aedee0ce8381  $FONT_ZIP"             | sha256sum -c -
+          rm -rf "$FONT_DIR"
+          mkdir -p "$FONT_DIR"
+          unzip -q "$FONT_ZIP" -d "$FONT_DIR"
+          echo "8dd0fa55de186b051433255d80217007b4026dfc38e2781659424ad7058bbd6e  $FONT_DIR/PhetsarathOT-Regular.ttf"             | sha256sum -c -
+
 
       - name: Install project
         run: |
@@ -39,13 +46,14 @@ jobs:
           lao-ocr generate-capture-suite \
             --corpus resources/corpora/project-authored-lao-v1.txt \
             --output "$OUTPUT_DIR/suite" \
-            --font /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf \
+            --font "$RUNNER_TEMP/PhetsarathOT-v4.103/PhetsarathOT-Regular.ttf" \
             --suite-id project-authored-lao-v1 \
             --text-license Apache-2.0 \
             --text-provenance "Project-authored Lao capture corpus v1; resources/corpora/project-authored-lao-v1.meta.json" \
             --dpi 150 \
             --lines-per-page 8 \
-            --max-pages-per-template 10
+            --max-pages-per-template 10 \
+            --require-complete-font
 
           lao-ocr build-capture-kit \
             --suite-manifest "$OUTPUT_DIR/suite/capture-suite.json" \
@@ -110,6 +118,7 @@ jobs:
                   archive.read("capture-kit.json")
               )
               assert manifest["page_count"] == 60
+              assert manifest["font"] == "PhetsarathOT-Regular.ttf"
               assert manifest["excludes_ground_truth"] is True
               assert manifest["excludes_digital_page_images"] is True
               assert manifest["excludes_internal_suite_paths"] is True

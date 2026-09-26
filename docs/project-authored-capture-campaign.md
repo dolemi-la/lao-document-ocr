@@ -11,6 +11,9 @@ resources/corpora/project-authored-lao-v1.meta.json
 
 It is distributed under the repository Apache-2.0 license and contains no real personal records.
 
+
+The canonical v1 printable campaign uses Phetsarath OT v4.103 Regular. The build pins and verifies the release/font SHA-256, requires complete coverage for every corpus/template character, and renders text with HarfBuzz-backed shaping. This avoids silent fallback/tofu rectangles and matches the project Lao official-document font policy.
+
 ## Generate the printable suite
 
 Build the CPU training image once if needed:

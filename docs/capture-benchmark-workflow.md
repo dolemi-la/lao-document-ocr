@@ -25,7 +25,7 @@ HPLT's bounded sampler is useful for model-development/training text, but HPLT's
 lao-ocr generate-capture-pack \
   --corpus training/data/capture-lines.txt \
   --output benchmarks/capture-packs/baseline-v1 \
-  --font /path/to/NotoSansLao-Regular.ttf \
+  --font /path/to/PhetsarathOT-Regular.ttf \
   --pack-id baseline-v1 \
   --text-license Apache-2.0 \
   --text-provenance "Project-authored Lao benchmark text released Apache-2.0" \
@@ -51,7 +51,7 @@ Example:
 lao-ocr generate-capture-pack \
   --corpus training/data/capture-lines.txt \
   --output benchmarks/capture-packs/multi-column-v1 \
-  --font /path/to/NotoSansLao-Regular.ttf \
+  --font /path/to/PhetsarathOT-Regular.ttf \
   --pack-id multi-column-v1 \
   --text-license Apache-2.0 \
   --text-provenance "Project-authored Lao benchmark text released Apache-2.0" \

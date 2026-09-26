@@ -20,7 +20,17 @@ def test_capture_kit_workflow_is_manual_and_read_only() -> None:
 def test_capture_kit_workflow_builds_and_verifies_safe_artifact() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "fonts-noto-core" in text
+    assert "PhetsarathOT-v4.103.zip" in text
+    assert (
+        "a97a317eb1e95c5338a38233176189f63e5b23f29a19630ec317aedee0ce8381"
+        in text
+    )
+    assert (
+        "8dd0fa55de186b051433255d80217007b4026dfc38e2781659424ad7058bbd6e"
+        in text
+    )
+    assert "--require-complete-font" in text
+    assert 'assert manifest["font"] == "PhetsarathOT-Regular.ttf"' in text
     assert "generate-capture-suite" in text
     assert "build-capture-kit" in text
     assert 'assert "ground_truth" not in collector_sheet' in text

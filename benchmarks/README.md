@@ -64,7 +64,7 @@ lao-ocr benchmark \
 
 The repository also includes a deterministic smoke generator. It exists to verify the OCR/benchmark pipeline, not to estimate real-world accuracy.
 
-The Docker API image includes Noto Sans Lao and Noto Sans from Debian's `fonts-noto-core` package.
+Canonical Lao smoke/capture rendering uses the pinned Phetsarath OT v4.103 font from the private ignored font cache. The renderer verifies font coverage and uses HarfBuzz-backed shaping; Noto is not the default.
 
 Build the image:
 

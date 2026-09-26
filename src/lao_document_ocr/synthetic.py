@@ -10,7 +10,9 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageFilter
+
+from lao_document_ocr.shaped_text import shaped_text_image, validate_font_coverage
 
 
 class AugmentationProfile(StrEnum):
@@ -129,18 +131,17 @@ def render_text_line(
     padding_x: int = 32,
     padding_y: int = 20,
 ) -> Image.Image:
-    font = ImageFont.truetype(str(font_path), size=font_size)
-    probe = Image.new("L", (16, 16), 255)
-    draw = ImageDraw.Draw(probe)
-    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-    width = max(1, right - left)
-    height = max(1, bottom - top)
-
-    canvas = Image.new("L", (width + padding_x * 2, height + padding_y * 2), 255)
-    draw = ImageDraw.Draw(canvas)
-    draw.text((padding_x - left, padding_y - top), text, font=font, fill=0)
-    return canvas
-
+    rendered = shaped_text_image(font_path, font_size, text)
+    canvas = Image.new(
+        "RGB",
+        (
+            rendered.width + padding_x * 2,
+            rendered.height + padding_y * 2,
+        ),
+        "white",
+    )
+    canvas.paste(rendered, (padding_x, padding_y), rendered)
+    return canvas.convert("L")
 
 def _apply_perspective(
     array: np.ndarray,
@@ -369,6 +370,7 @@ def generate_synthetic_lines(
     max_font_size: int = 56,
     max_samples: int | None = None,
     start_line: int = 0,
+    require_complete_font: bool = False,
     augmentation: AugmentationConfig | None = None,
     augmentation_profile: AugmentationProfile | str = AugmentationProfile.DEFAULT,
 ) -> Path:
@@ -393,6 +395,13 @@ def generate_synthetic_lines(
     missing = [str(path) for path in fonts if not path.is_file()]
     if missing:
         raise FileNotFoundError(f"Missing font files: {', '.join(missing)}")
+    if require_complete_font:
+        for font in fonts:
+            validate_font_coverage(
+                font,
+                tuple(corpus_lines),
+                label=f"Synthetic font {font.name}",
+            )
 
     sizes = _font_sizes(min_font_size, max_font_size)
     output = Path(output_dir)

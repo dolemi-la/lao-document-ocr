@@ -57,7 +57,7 @@ Open:
 - API docs: http://localhost:8000/docs
 - Health: http://localhost:8000/health
 
-The API image installs Tesseract Lao/English data plus Noto Lao fonts for reproducible smoke tests.
+The API image installs Tesseract Lao/English data. Canonical Lao raster fixtures use the separately pinned Phetsarath OT v4.103 font with checksum verification.
 
 ## Local development
 
@@ -72,7 +72,7 @@ Requirements:
 On Ubuntu 24.04:
 
 ```bash
-sudo apt install tesseract-ocr tesseract-ocr-lao tesseract-ocr-eng fonts-noto-core
+sudo apt install tesseract-ocr tesseract-ocr-lao tesseract-ocr-eng
 ```
 
 On macOS, install Tesseract with your package manager, then make sure both `lao.traineddata` and `eng.traineddata` are available in Tesseract's tessdata directory.
@@ -261,7 +261,7 @@ This lets DOCX, Markdown, TXT, JSON, HTML, search indexing, and future RAG integ
 DOCX output uses:
 
 - language metadata: `lo-LA`
-- default font: `Noto Sans Lao`
+- default editable-document font: Phetsarath OT
 
 The project does not bundle Phetsarath OT. If the font is legally installed on the machine opening the document, the exporter can be configured to use `Phetsarath OT` instead.
 

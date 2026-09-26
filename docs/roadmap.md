@@ -94,7 +94,8 @@ Status: started
 
 - [x] synthetic Lao text generator
 - [x] bounded HPLT v3 Lao text sampler with provenance metadata
-- [x] font inventory and licensing review (initial Noto Lao path)
+- [x] canonical Phetsarath OT v4.103 font policy + pinned license/hash review
+- [x] HarfBuzz-shaped capture rendering + strict no-tofu glyph coverage gate
 - [x] deterministic augmentation pipeline
 - [x] deterministic chunked synthetic generation for large corpora
 - [x] decorrelate balanced synthetic font and capture-profile schedules

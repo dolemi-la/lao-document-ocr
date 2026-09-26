@@ -39,9 +39,10 @@ After preparing a corpus, render deterministic labeled line images with one or m
 lao-ocr generate-synthetic \
   --corpus training/data/lao-lines.txt \
   --output training/generated/v1 \
-  --font /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf \
+  --font /path/to/PhetsarathOT-Regular.ttf \
   --variants-per-line 3 \
-  --seed 20260921
+  --seed 20260921 \
+  --require-complete-font
 ```
 
 Each generated sample records its source text, font, font size, deterministic seed, augmentation parameters, relative image path, and SHA-256. Current augmentations include small rotation, brightness jitter, Gaussian blur, and image noise.

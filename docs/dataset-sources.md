@@ -6,13 +6,23 @@ A repository being public is not enough. We only ingest material when redistribu
 
 ## Approved for synthetic rendering
 
-### Noto Lao
+### Phetsarath OT — canonical Lao font
+
+- Source: https://phetsarath.mts.la/
+- Pinned release: Phetsarath OT v4.103
+- License: SIL Open Font License 1.1
+- Status: canonical font for Lao capture packs, generated DOCX defaults, and new recognizer-development rendering
+- Use: official/government-style Lao document rendering and synthetic OCR data
+- Reproducibility: the canonical capture workflow verifies both the v4.103 ZIP SHA-256 and PhetsarathOT-Regular.ttf SHA-256 before rendering.
+- Notes: Phetsarath OT is the standard font used for Lao official documents. Canonical capture generation also requires complete glyph coverage and uses HarfBuzz-backed shaping through PyMuPDF rather than Pillow BASIC layout.
+
+### Noto Lao — optional historical/development font
 
 - Source: https://github.com/notofonts/lao
 - License: SIL Open Font License 1.1
-- Status: approved for synthetic rendering
-- Use: Lao glyph rendering for generated OCR fixtures/training data
-- Notes: the project does not need to vendor the font binary; Debian's `fonts-noto-core` package provides Noto Sans Lao and Noto Looped Lao.
+- Status: approved but no longer the project default
+- Use: historical experiments and optional font-diversity studies only
+- Notes: earlier synthetic recognizer experiments used Noto Lao variants. Keep those results labeled as historical development evidence; new canonical Lao rendering should prefer Phetsarath OT.
 
 ### Noto Sans
 

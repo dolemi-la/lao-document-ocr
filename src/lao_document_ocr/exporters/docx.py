@@ -13,7 +13,7 @@ from docx.shared import Inches, Pt
 from lao_document_ocr.header_footer import repeated_role_texts
 from lao_document_ocr.models import Block, BlockType, Document
 
-DEFAULT_FONT = "Noto Sans Lao"
+DEFAULT_FONT = "Phetsarath OT"
 DEFAULT_LANGUAGE = "lo-LA"
 
 

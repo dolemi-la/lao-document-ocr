@@ -36,7 +36,7 @@ def convert_document_to_outputs(
     *,
     engine: OcrEngine,
     max_pages: int = 60,
-    font_name: str = "Noto Sans Lao",
+    font_name: str = "Phetsarath OT",
     reading_order_resolver: ReadingOrderResolver | None = None,
     auto_orient_right_angles: bool = False,
 ) -> ConversionOutputs:

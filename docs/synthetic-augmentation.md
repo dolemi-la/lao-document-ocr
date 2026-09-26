@@ -68,9 +68,10 @@ When multiple fonts are supplied, balanced scheduling also rotates font choice a
 lao-ocr generate-synthetic \
   --corpus training/data/lao-lines.txt \
   --output training/generated/balanced-v1 \
-  --font /path/to/NotoSansLao-Regular.ttf \
+  --font /path/to/PhetsarathOT-Regular.ttf \
   --variants-per-line 3 \
   --augmentation-profile balanced \
+  --require-complete-font \
   --seed 20260921
 ```
 

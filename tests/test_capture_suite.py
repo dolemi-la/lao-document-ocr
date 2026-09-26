@@ -31,6 +31,25 @@ def _font_path() -> Path:
     pytest.skip("No TrueType font available for capture suite test")
 
 
+
+
+def test_capture_suite_strict_font_coverage_rejects_missing_glyph(tmp_path) -> None:
+    with pytest.raises(ValueError, match="missing .*required character"):
+        generate_capture_suite(
+            ["Lao OCR", "􏿿"],
+            tmp_path / "strict-suite",
+            _font_path(),
+            suite_id="strict",
+            text_license="CC0-1.0",
+            text_provenance="Unit-test corpus",
+            templates=[CaptureTemplate.PLAIN],
+            dpi=96,
+            lines_per_page=2,
+            max_pages_per_template=1,
+            require_complete_font=True,
+        )
+
+
 def test_generate_capture_suite_builds_combined_pdf(tmp_path) -> None:
     manifest_path = generate_capture_suite(
         [

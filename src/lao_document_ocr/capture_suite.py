@@ -9,7 +9,11 @@ from pathlib import Path
 import pymupdf
 
 from lao_document_ocr.capture_pack import generate_capture_pack, load_capture_pack
-from lao_document_ocr.capture_templates import CaptureTemplate
+from lao_document_ocr.capture_templates import (
+    CAPTURE_TEMPLATE_FONT_PROBE,
+    CaptureTemplate,
+)
+from lao_document_ocr.shaped_text import validate_font_coverage
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
@@ -78,6 +82,7 @@ def generate_capture_suite(
     dpi: int = 150,
     lines_per_page: int = 8,
     max_pages_per_template: int | None = None,
+    require_complete_font: bool = False,
 ) -> Path:
     if not suite_id.strip():
         raise ValueError("suite_id must not be empty")
@@ -96,6 +101,17 @@ def generate_capture_suite(
     output.mkdir(parents=True, exist_ok=True)
 
     font = Path(font_path)
+    if require_complete_font:
+        validate_font_coverage(
+            font,
+            [
+                *corpus_lines,
+                CAPTURE_TEMPLATE_FONT_PROBE,
+                suite_id,
+            ],
+            label=f"Capture font {font.name}",
+        )
+
     packs: list[CaptureSuitePack] = []
     pack_pdfs: list[Path] = []
     worksheet_rows: list[dict[str, str | int]] = []

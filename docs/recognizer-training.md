@@ -51,8 +51,11 @@ lao-ocr prepare-corpus   --input source.jsonl   --format jsonl   --field text   
 ## 3. Render labeled lines
 
 ```bash
-lao-ocr generate-synthetic   --corpus training/data/lao-lines.txt   --output training/generated/v1   --font /usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf   --variants-per-line 3   --augmentation-profile balanced
+lao-ocr generate-synthetic   --corpus training/data/lao-lines.txt   --output training/generated/v1   --font /path/to/PhetsarathOT-Regular.ttf   --variants-per-line 3   --augmentation-profile balanced \
+  --require-complete-font
 ```
+
+When using Phetsarath with --require-complete-font, the renderer rejects unsupported mixed-script characters before generating images. The broader model-development corpus may contain Vietnamese diacritics, symbols, CJK, or emoji outside Phetsarath coverage; filter or partition those lines into a deliberately separate font strategy instead of allowing tofu glyphs.
 
 The generated manifest is `training/generated/v1/manifest.jsonl`. For augmentation profiles and their reproducibility metadata, see [synthetic-augmentation.md](synthetic-augmentation.md).
 

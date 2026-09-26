@@ -14,7 +14,6 @@ RUN apt-get update \
        tesseract-ocr \
        tesseract-ocr-lao \
        tesseract-ocr-eng \
-       fonts-noto-core \
        libgl1 \
        libglib2.0-0 \
        libgomp1 \
