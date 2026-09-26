@@ -48,6 +48,20 @@ HPLT's CC0 statement applies to dataset packaging, not automatic ownership of th
 lao-ocr prepare-corpus   --input source.jsonl   --format jsonl   --field text   --output training/data/lao-lines.txt   --min-lao-ratio 0.5
 ```
 
+### Phetsarath-compatible training subset
+
+For canonical Phetsarath-first rendering, filter the prepared corpus before synthetic generation:
+
+```bash
+lao-ocr prepare-corpus \
+  --input training/data/lao-lines.txt \
+  --output training/data/lao-lines-phetsarath.txt \
+  --font-compatible-with benchmarks/private/fonts/PhetsarathOT-v4.103/PhetsarathOT-Regular.ttf \
+  --font-coverage-report training/data/lao-lines-phetsarath.meta.json
+```
+
+On the current 10,073-line model-development corpus, Phetsarath OT v4.103 Regular covers 9,694 lines (96.24%) and excludes 379 lines. The largest excluded group contains Lao U+0EBA (຺); a smaller number contain Vietnamese, Greek, CJK, symbols, or emoji. Keep those lines out of the canonical Phetsarath synthetic run unless a separate font is explicitly reviewed for that subset. Do not allow silent fallback/tofu rectangles.
+
 ## 3. Render labeled lines
 
 ```bash

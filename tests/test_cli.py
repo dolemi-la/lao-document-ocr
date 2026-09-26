@@ -64,6 +64,81 @@ def test_prepare_corpus_cli(tmp_path, monkeypatch, capsys) -> None:
     assert "Lines: 2" in captured.out
 
 
+def test_prepare_corpus_cli_filters_for_font_coverage(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    source = tmp_path / "source-font.txt"
+    output = tmp_path / "corpus-font.txt"
+    report = tmp_path / "font-report.json"
+    font = _cli_font_path()
+    source.write_text(
+        "Lao OCR 123\n" + "bad " + chr(0x10FFFF) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "prepare-corpus",
+            "--input",
+            str(source),
+            "--output",
+            str(output),
+            "--min-chars",
+            "1",
+            "--min-lao-ratio",
+            "0",
+            "--font-compatible-with",
+            str(font),
+            "--font-coverage-report",
+            str(report),
+        ],
+    )
+
+    assert main() == 0
+    assert output.read_text(encoding="utf-8").splitlines() == ["Lao OCR 123"]
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["input_lines"] == 2
+    assert payload["compatible_lines"] == 1
+    assert payload["excluded_lines"] == 1
+    assert payload["missing_codepoints"][0]["codepoint"] == "U+10FFFF"
+    captured = capsys.readouterr()
+    assert "Font-compatible lines: 1/2 (excluded 1)" in captured.out
+
+
+def test_prepare_corpus_cli_requires_font_for_coverage_report(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    source = tmp_path / "source.txt"
+    output = tmp_path / "corpus.txt"
+    source.write_text("OCR\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "lao-ocr",
+            "prepare-corpus",
+            "--input",
+            str(source),
+            "--output",
+            str(output),
+            "--font-coverage-report",
+            str(tmp_path / "report.json"),
+        ],
+    )
+
+    assert main() == 1
+    assert (
+        "--font-coverage-report requires --font-compatible-with"
+        in capsys.readouterr().err
+    )
+
+
 def test_add_dataset_sample_cli(tmp_path, monkeypatch, capsys) -> None:
     image = tmp_path / "page.png"
     truth = tmp_path / "page.txt"

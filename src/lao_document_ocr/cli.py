@@ -656,6 +656,19 @@ def _parser() -> argparse.ArgumentParser:
     corpus.add_argument("--min-lao-ratio", type=float, default=0.5)
     corpus.add_argument("--limit", type=int)
     corpus.add_argument("--keep-duplicates", action="store_true")
+    corpus.add_argument(
+        "--font-compatible-with",
+        type=Path,
+        help=(
+            "Keep only prepared lines fully covered by this font. "
+            "Useful for canonical Phetsarath-first synthetic training."
+        ),
+    )
+    corpus.add_argument(
+        "--font-coverage-report",
+        type=Path,
+        help="Optional JSON report for --font-compatible-with filtering.",
+    )
 
     char_lm = subparsers.add_parser(
         "train-char-lm",
@@ -1667,6 +1680,9 @@ def _sample_hplt_lao(args: argparse.Namespace) -> int:
 
 
 def _prepare_corpus(args: argparse.Namespace) -> int:
+    if args.font_coverage_report is not None and args.font_compatible_with is None:
+        raise ValueError("--font-coverage-report requires --font-compatible-with")
+
     if args.format == "jsonl":
         source = iter_jsonl(args.input, field=args.field)
     else:
@@ -1679,6 +1695,28 @@ def _prepare_corpus(args: argparse.Namespace) -> int:
         deduplicate=not args.keep_duplicates,
     )
     lines = prepare_corpus(source, config, limit=args.limit)
+    if args.font_compatible_with is not None:
+        from lao_document_ocr.corpus import (
+            filter_font_compatible_lines,
+            write_font_coverage_report,
+        )
+
+        lines, report = filter_font_compatible_lines(
+            lines,
+            args.font_compatible_with,
+        )
+        print(
+            "Font-compatible lines: "
+            f"{report['compatible_lines']}/{report['input_lines']} "
+            f"(excluded {report['excluded_lines']})"
+        )
+        if args.font_coverage_report is not None:
+            report_path = write_font_coverage_report(
+                report,
+                args.font_coverage_report,
+            )
+            print(f"Font coverage report: {report_path}")
+
     output = write_corpus(lines, args.output)
     print(f"Corpus: {output}")
     print(f"Lines: {len(lines)}")

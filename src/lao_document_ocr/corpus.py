@@ -3,9 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections import Counter
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
+import pymupdf
 
 from lao_document_ocr.normalization import normalize_lao_text
 
@@ -101,6 +104,64 @@ def prepare_corpus(
             break
 
     return output
+
+
+
+
+def filter_font_compatible_lines(
+    lines: Iterable[str],
+    font_path: str | Path,
+) -> tuple[list[str], dict]:
+    font_file = Path(font_path)
+    if not font_file.is_file():
+        raise FileNotFoundError(f"Font not found: {font_file}")
+
+    font = pymupdf.Font(fontfile=str(font_file))
+    compatible: list[str] = []
+    missing_line_counts: Counter[int] = Counter()
+    total = 0
+
+    for text in lines:
+        total += 1
+        missing = {
+            ord(char)
+            for char in text
+            if char not in {"\n", "\r", "\t"}
+            and font.has_glyph(ord(char)) == 0
+        }
+        if missing:
+            missing_line_counts.update(missing)
+            continue
+        compatible.append(text)
+
+    digest = hashlib.sha256(font_file.read_bytes()).hexdigest()
+    report = {
+        "schema_version": "1",
+        "font": font_file.name,
+        "font_sha256": digest,
+        "input_lines": total,
+        "compatible_lines": len(compatible),
+        "excluded_lines": total - len(compatible),
+        "missing_codepoints": [
+            {
+                "codepoint": f"U+{codepoint:04X}",
+                "character": chr(codepoint),
+                "affected_lines": missing_line_counts[codepoint],
+            }
+            for codepoint in sorted(missing_line_counts)
+        ],
+    }
+    return compatible, report
+
+
+def write_font_coverage_report(report: dict, path: str | Path) -> Path:
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return destination
 
 
 def write_corpus(lines: Iterable[str], path: str | Path) -> Path:
