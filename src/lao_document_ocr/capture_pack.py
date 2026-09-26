@@ -10,10 +10,12 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from lao_document_ocr.capture_templates import (
+    CAPTURE_TEMPLATE_FONT_PROBE,
     CaptureTemplate,
     render_capture_page,
 )
 from lao_document_ocr.normalization import normalize_lao_text
+from lao_document_ocr.shaped_text import validate_font_coverage
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
@@ -227,6 +229,7 @@ def generate_capture_pack(
     lines_per_page: int = 10,
     max_pages: int | None = None,
     template: CaptureTemplate = CaptureTemplate.PLAIN,
+    require_complete_font: bool = False,
 ) -> Path:
     if not corpus_lines:
         raise ValueError("corpus is empty")
@@ -256,6 +259,15 @@ def generate_capture_pack(
     ]
     if not normalized:
         raise ValueError("corpus contains no usable lines")
+
+    if require_complete_font:
+        # Check the text that will actually be drawn, including generated labels.
+        # Fail before creating or changing any capture output.
+        validate_font_coverage(
+            font,
+            [*normalized, CAPTURE_TEMPLATE_FONT_PROBE, pack_id],
+            label=f"Capture font {font.name}",
+        )
 
     output = Path(output_dir)
     pages_dir = output / "pages"

@@ -17,7 +17,7 @@ plus one combined PDF.
 
 ```bash
 lao-ocr generate-capture-suite \
-  --corpus training/data/lao-lines.txt \
+  --corpus training/data/capture-lines.txt \
   --output benchmarks/capture-packs/baseline-suite-v1 \
   --font /path/to/PhetsarathOT-Regular.ttf \
   --suite-id baseline-suite-v1 \
@@ -25,10 +25,14 @@ lao-ocr generate-capture-suite \
   --text-provenance "independently cleared Lao corpus" \
   --dpi 150 \
   --lines-per-page 8 \
-  --max-pages-per-template 20
+  --max-pages-per-template 20 \
+  --require-complete-font
 ```
 
-By default all available templates are included.
+By default all available templates are included. Use independently rights-cleared
+capture text, not the broader HPLT development corpus. The strict font flag checks
+normalized text and generated labels before any suite output is created, and is
+also passed to each pack generator. See [capture-benchmark-workflow.md](capture-benchmark-workflow.md).
 
 ## Generate selected templates
 
@@ -36,14 +40,15 @@ Repeat `--template`:
 
 ```bash
 lao-ocr generate-capture-suite \
-  --corpus training/data/lao-lines.txt \
+  --corpus training/data/capture-lines.txt \
   --output benchmarks/capture-packs/forms-and-receipts-v1 \
   --font /path/to/PhetsarathOT-Regular.ttf \
   --suite-id forms-and-receipts-v1 \
   --text-license CC0-1.0 \
   --text-provenance "Reviewed CC0 Lao corpus" \
   --template receipt \
-  --template form
+  --template form \
+  --require-complete-font
 ```
 
 ## Output layout

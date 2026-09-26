@@ -177,3 +177,57 @@ def test_combined_capture_pdf_is_byte_reproducible(tmp_path) -> None:
 
     assert first_pdf.read_bytes() == second_pdf.read_bytes()
     assert b"/ID[" not in first_pdf.read_bytes()
+
+
+
+def test_strict_suite_failure_does_not_create_output(tmp_path) -> None:
+    output = tmp_path / "rejected-suite"
+    with pytest.raises(ValueError, match="missing .*required character"):
+        generate_capture_suite(
+            ["OCR " + chr(0x10FFFF)],
+            output,
+            _font_path(),
+            suite_id="strict-suite",
+            text_license="CC0-1.0",
+            text_provenance="Unit-test corpus",
+            require_complete_font=True,
+        )
+    assert not output.exists()
+
+
+def test_strict_suite_checks_normalized_text_and_propagates_to_packs(
+    tmp_path, monkeypatch,
+) -> None:
+    import lao_document_ocr.capture_pack as pack_module
+    import lao_document_ocr.capture_suite as suite_module
+
+    checked_texts = []
+    pack_options = []
+    real_generate_pack = suite_module.generate_capture_pack
+
+    def check(font_path, texts, *, label):
+        checked_texts.append(texts)
+
+    def generate(*args, **kwargs):
+        pack_options.append(kwargs)
+        return real_generate_pack(*args, **kwargs)
+
+    monkeypatch.setattr(suite_module, "validate_font_coverage", check)
+    monkeypatch.setattr(pack_module, "validate_font_coverage", check)
+    monkeypatch.setattr(suite_module, "generate_capture_pack", generate)
+    generate_capture_suite(
+        ["e\u0301 OCR"],
+        tmp_path / "suite-propagation",
+        _font_path(),
+        suite_id="normalized",
+        text_license="CC0-1.0",
+        text_provenance="Unit-test corpus",
+        templates=[CaptureTemplate.PLAIN],
+        dpi=96,
+        require_complete_font=True,
+    )
+
+    assert len(pack_options) == 1
+    assert pack_options[0]["require_complete_font"] is True
+    assert len(checked_texts) == 2
+    assert all("é OCR" in texts for texts in checked_texts)

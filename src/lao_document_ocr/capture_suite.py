@@ -13,6 +13,7 @@ from lao_document_ocr.capture_templates import (
     CAPTURE_TEMPLATE_FONT_PROBE,
     CaptureTemplate,
 )
+from lao_document_ocr.normalization import normalize_lao_text
 from lao_document_ocr.shaped_text import validate_font_coverage
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -98,19 +99,19 @@ def generate_capture_suite(
         raise ValueError("Capture suite templates must be unique")
 
     output = Path(output_dir)
-    output.mkdir(parents=True, exist_ok=True)
-
     font = Path(font_path)
     if require_complete_font:
         validate_font_coverage(
             font,
             [
-                *corpus_lines,
+                *(normalize_lao_text(line) for line in corpus_lines),
                 CAPTURE_TEMPLATE_FONT_PROBE,
                 suite_id,
             ],
             label=f"Capture font {font.name}",
         )
+
+    output.mkdir(parents=True, exist_ok=True)
 
     packs: list[CaptureSuitePack] = []
     pack_pdfs: list[Path] = []
@@ -131,6 +132,7 @@ def generate_capture_suite(
             lines_per_page=lines_per_page,
             max_pages=max_pages_per_template,
             template=template,
+            require_complete_font=require_complete_font,
         )
         _, manifest = load_capture_pack(manifest_path)
         pdf_path = pack_dir / f"{pack_id}.pdf"

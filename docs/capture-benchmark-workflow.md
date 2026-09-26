@@ -31,8 +31,18 @@ lao-ocr generate-capture-pack \
   --text-provenance "Project-authored Lao benchmark text released Apache-2.0" \
   --dpi 150 \
   --lines-per-page 10 \
-  --max-pages 100
+  --max-pages 100 \
+  --require-complete-font
 ```
+
+Use `--require-complete-font` for canonical Phetsarath capture material. Both
+`generate-capture-pack` and `generate-capture-suite` check normalized corpus text,
+generated template labels, and identifiers before writing capture files. A missing
+glyph rejects the run without changing existing capture output. Suites propagate
+the same strict setting to each individual pack. The low-level flag remains
+opt-in for compatibility with explicitly noncanonical rendering experiments;
+the canonical campaign script always enables it. Glyph coverage is a font
+preflight, not proof of correct layout or real optical provenance.
 
 ## Structured capture templates
 
@@ -55,7 +65,8 @@ lao-ocr generate-capture-pack \
   --pack-id multi-column-v1 \
   --text-license Apache-2.0 \
   --text-provenance "Project-authored Lao benchmark text released Apache-2.0" \
-  --template two-column
+  --template two-column \
+  --require-complete-font
 ```
 
 Every page records its template and benchmark tags. For example, a captured two-column phone photo can carry all of:

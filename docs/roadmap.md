@@ -96,6 +96,7 @@ Status: started
 - [x] bounded HPLT v3 Lao text sampler with provenance metadata
 - [x] canonical Phetsarath OT v4.103 font policy + pinned license/hash review
 - [x] HarfBuzz-shaped capture rendering + strict no-tofu glyph coverage gate
+- [x] normalized strict font checks on individual capture packs + suite propagation before output writes
 - [x] deterministic augmentation pipeline
 - [x] deterministic chunked synthetic generation for large corpora
 - [x] decorrelate balanced synthetic font and capture-profile schedules

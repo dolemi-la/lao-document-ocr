@@ -727,6 +727,14 @@ def _parser() -> argparse.ArgumentParser:
     capture_pack.add_argument("--lines-per-page", type=int, default=10)
     capture_pack.add_argument("--max-pages", type=int)
     capture_pack.add_argument(
+        "--require-complete-font",
+        action="store_true",
+        help=(
+            "Reject the capture font when normalized corpus/template characters "
+            "are missing, before writing any capture output."
+        ),
+    )
+    capture_pack.add_argument(
         "--template",
         choices=[
             "plain",
@@ -1779,6 +1787,7 @@ def _generate_capture_pack(args: argparse.Namespace) -> int:
         lines_per_page=args.lines_per_page,
         max_pages=args.max_pages,
         template=CaptureTemplate(args.template),
+        require_complete_font=args.require_complete_font,
     )
     print(f"Capture pack: {manifest}")
     print(f"Printable PDF: {manifest.parent / (args.pack_id + '.pdf')}")

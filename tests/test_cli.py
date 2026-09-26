@@ -2713,3 +2713,33 @@ def test_evaluate_remote_suite_cli_returns_nonzero_on_partial_failure(
     )
 
     assert cli.main() == 1
+
+
+
+def test_generate_capture_pack_cli_forwards_strict_font_guard(
+    tmp_path, monkeypatch, capsys,
+) -> None:
+    import lao_document_ocr.capture_pack as module
+
+    source = tmp_path / "corpus.txt"
+    source.write_text("OCR\n", encoding="utf-8")
+    output = tmp_path / "must-not-exist"
+    seen = {}
+
+    def reject(*args, **kwargs):
+        seen.update(kwargs)
+        raise ValueError("Test font is missing 1 required character(s)")
+
+    monkeypatch.setattr(module, "generate_capture_pack", reject)
+    monkeypatch.setattr(sys, "argv", [
+        "lao-ocr", "generate-capture-pack",
+        "--corpus", str(source), "--output", str(output),
+        "--font", str(tmp_path / "font.ttf"),
+        "--pack-id", "strict-cli", "--text-license", "CC0-1.0",
+        "--text-provenance", "Unit-test corpus", "--require-complete-font",
+    ])
+
+    assert main() == 1
+    assert seen["require_complete_font"] is True
+    assert "missing 1 required character" in capsys.readouterr().err
+    assert not output.exists()
