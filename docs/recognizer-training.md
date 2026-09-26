@@ -70,6 +70,8 @@ The default recurrent encoder remains the bidirectional `crnn-ctc-v2` model for 
 
 The training default `--max-width 768` is sized for the current bounded model-development corpus (up to 180 normalized characters); narrower custom widths remain available for shorter-line datasets.
 
+Train and dev batches are now padded to that configured fixed width rather than only to each batch maximum. This matches the fixed-width exported inference path for bidirectional v2, so the backward LSTM sees the same right-padding regime during development evaluation and deployment. The padding semantics are versioned as `fixed-max-width-v1` and are part of the strict resumable-training state contract.
+
 The output directory contains:
 
 - `recognizer.pt` — training checkpoint
@@ -164,6 +166,22 @@ A small local sanity run was used to verify that the training code can actually 
 - several generated Lao lines were recognized exactly
 
 These figures are **not model accuracy claims**. The text set is tiny, synthetic, and contains multiple augmented variants of the same phrases. Its only purpose is a training-pipeline sanity check.
+
+### Larger synthetic development run
+
+A later bounded development run used 900 unique normalized text lines from the approved local model-development corpus, three reviewed Noto Lao font families, and the balanced clean/noisy/phone augmentation schedule. This remains synthetic development evidence only.
+
+For the bidirectional `crnn-ctc-v2` candidate on its deterministic 92-line dev split:
+
+- epoch-80 greedy CER: about `0.2083`
+- epoch-80 greedy WER: about `0.6932`
+- beam width 10 without a language model changed CER only slightly to about `0.2054`
+- character 3-gram shallow fusion improved the selected dev configuration to about `0.1799` CER / `0.5841` WER at language-model weight `0.4` and token bonus `+0.05`
+- the matching confidence calibration changed mean absolute confidence error only slightly, from about `0.0618` to `0.0616`
+
+The opt-in unidirectional `crnn-ctc-v3` architecture was also run on the same 900-line dataset for 20 epochs. Its best dev CER remained about `0.9830`, so this experiment does not support replacing v2 with v3. The v3 path remains experimental while its padding-invariance benefit is weighed against the current quality gap.
+
+Do not compare these numbers with Tesseract as publishable accuracy. The real-model decision still waits for the frozen rights-clear optical benchmark and its published Tesseract baseline.
 
 An earlier initialization collapsed entirely to CTC blank predictions even while loss decreased. `crnn-ctc-v2` therefore initializes the blank-class output bias negatively. Keep an explicit blank-collapse sanity test when changing the recognizer architecture or loss setup.
 

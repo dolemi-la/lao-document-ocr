@@ -9,8 +9,10 @@ from PIL import Image
 
 from lao_document_ocr.recognizer_training import (
     MODEL_VERSION,
+    TRAINING_PADDING_STRATEGY,
     UNIDIRECTIONAL_MODEL_VERSION,
     TrainingConfig,
+    _collate,
     _model_version_for_config,
     _training_samples_checksum,
     ctc_required_timesteps,
@@ -72,6 +74,57 @@ def test_ctc_required_timesteps_counts_adjacent_repeats() -> None:
     assert ctc_required_timesteps([]) == 0
     assert ctc_required_timesteps([1, 2, 3]) == 3
     assert ctc_required_timesteps([1, 1, 2, 2, 2]) == 8
+
+
+
+
+def test_collate_can_pad_to_configured_fixed_width() -> None:
+    torch = pytest.importorskip("torch")
+    batch = [
+        {
+            "id": "a",
+            "image": torch.ones((1, 16, 20), dtype=torch.float32),
+            "width": 20,
+            "target": torch.tensor([1, 2], dtype=torch.long),
+            "text": "ab",
+        },
+        {
+            "id": "b",
+            "image": torch.ones((1, 16, 12), dtype=torch.float32),
+            "width": 12,
+            "target": torch.tensor([2], dtype=torch.long),
+            "text": "b",
+        },
+    ]
+
+    collated = _collate(batch, padded_width=32)
+
+    assert collated["images"].shape == (2, 1, 16, 32)
+    assert collated["widths"].tolist() == [20, 12]
+    assert torch.all(collated["images"][0, :, :, :20] == 1)
+    assert torch.all(collated["images"][0, :, :, 20:] == 0)
+    assert torch.all(collated["images"][1, :, :, :12] == 1)
+    assert torch.all(collated["images"][1, :, :, 12:] == 0)
+
+
+def test_collate_rejects_too_small_fixed_width() -> None:
+    torch = pytest.importorskip("torch")
+    batch = [
+        {
+            "id": "a",
+            "image": torch.ones((1, 16, 20), dtype=torch.float32),
+            "width": 20,
+            "target": torch.tensor([1], dtype=torch.long),
+            "text": "a",
+        }
+    ]
+
+    with pytest.raises(ValueError, match="padded_width"):
+        _collate(batch, padded_width=19)
+
+
+def test_training_padding_strategy_is_versioned() -> None:
+    assert TRAINING_PADDING_STRATEGY == "fixed-max-width-v1"
 
 
 def test_training_samples_checksum_binds_order_text_and_image_hash(tmp_path) -> None:

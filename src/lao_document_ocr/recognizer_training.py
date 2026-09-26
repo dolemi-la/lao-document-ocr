@@ -6,6 +6,7 @@ import math
 import random
 import warnings
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ from lao_document_ocr.vocabulary import CharacterVocabulary
 MODEL_VERSION = "crnn-ctc-v2"
 UNIDIRECTIONAL_MODEL_VERSION = "crnn-ctc-v3"
 DEV_EVALUATION_VERSION = "valid-timestep-v1"
+TRAINING_PADDING_STRATEGY = "fixed-max-width-v1"
 
 
 def _model_version_for_config(model_config) -> str:
@@ -291,11 +293,18 @@ def _build_dataset_type():
     return LineDataset
 
 
-def _collate(batch: list[dict[str, Any]]) -> dict[str, Any]:
+def _collate(
+    batch: list[dict[str, Any]],
+    *,
+    padded_width: int | None = None,
+) -> dict[str, Any]:
     torch, _, _, _ = _require_torch()
     height = batch[0]["image"].shape[1]
-    max_width = max(int(item["width"]) for item in batch)
-    images = torch.zeros((len(batch), 1, height, max_width), dtype=torch.float32)
+    batch_max_width = max(int(item["width"]) for item in batch)
+    output_width = batch_max_width if padded_width is None else int(padded_width)
+    if output_width < batch_max_width:
+        raise ValueError("padded_width cannot be smaller than a sample width")
+    images = torch.zeros((len(batch), 1, height, output_width), dtype=torch.float32)
 
     targets: list[Any] = []
     target_lengths: list[int] = []
@@ -421,12 +430,13 @@ def train_recognizer(
     generator = torch.Generator()
     generator.manual_seed(training_config.seed)
 
+    fixed_width_collate = partial(_collate, padded_width=model_config.max_width)
     train_loader = DataLoader(
         train_dataset,
         batch_size=training_config.batch_size,
         shuffle=True,
         num_workers=training_config.num_workers,
-        collate_fn=_collate,
+        collate_fn=fixed_width_collate,
         generator=generator,
     )
     dev_loader = DataLoader(
@@ -434,7 +444,7 @@ def train_recognizer(
         batch_size=training_config.batch_size,
         shuffle=False,
         num_workers=training_config.num_workers,
-        collate_fn=_collate,
+        collate_fn=fixed_width_collate,
     )
 
     from lao_document_ocr.recognizer_inference import resolve_torch_device
@@ -485,6 +495,15 @@ def train_recognizer(
             raise ValueError(
                 "Resume training state dev-evaluation version mismatch "
                 f"({previous_eval_version!r} != {DEV_EVALUATION_VERSION!r})"
+            )
+        previous_padding_strategy = checkpoint.get("training_padding_strategy")
+        if (
+            resume_artifact_type == "recognizer-training-state"
+            and previous_padding_strategy != TRAINING_PADDING_STRATEGY
+        ):
+            raise ValueError(
+                "Resume training state padding strategy mismatch "
+                f"({previous_padding_strategy!r} != {TRAINING_PADDING_STRATEGY!r})"
             )
 
         previous_samples_checksum = checkpoint.get("training_samples_checksum")
@@ -640,6 +659,11 @@ def train_recognizer(
             "completed_epoch": completed_epoch,
             "previous_dev_evaluation_version": previous_eval_version,
             "dev_evaluation_version": DEV_EVALUATION_VERSION,
+            "training_padding_strategy_verified": (
+                previous_padding_strategy == TRAINING_PADDING_STRATEGY
+                if isinstance(previous_padding_strategy, str)
+                else False
+            ),
             "baseline_dev_cer_recomputed": baseline_dev_cer_recomputed,
             "training_samples_checksum_verified": (
                 previous_samples_checksum == training_samples_checksum
@@ -705,6 +729,7 @@ def train_recognizer(
             "training_config": training_config.to_dict(),
             "split_strategy": SPLIT_STRATEGY,
             "dev_evaluation_version": DEV_EVALUATION_VERSION,
+            "training_padding_strategy": TRAINING_PADDING_STRATEGY,
             "training_samples_checksum": training_samples_checksum,
             "resolved_device": str(device),
             "vocabulary": vocabulary.to_dict(),
@@ -734,6 +759,7 @@ def train_recognizer(
         "training_config": training_config.to_dict(),
         "split_strategy": SPLIT_STRATEGY,
         "dev_evaluation_version": DEV_EVALUATION_VERSION,
+        "training_padding_strategy": TRAINING_PADDING_STRATEGY,
         "training_samples_checksum": training_samples_checksum,
         "resolved_device": str(device),
         "vocabulary": vocabulary.to_dict(),
@@ -758,6 +784,7 @@ def train_recognizer(
         "training_config": training_config.to_dict(),
         "split_strategy": SPLIT_STRATEGY,
         "dev_evaluation_version": DEV_EVALUATION_VERSION,
+        "training_padding_strategy": TRAINING_PADDING_STRATEGY,
         "training_samples_checksum": training_samples_checksum,
         "train_samples": len(train_samples),
         "dev_samples": len(dev_samples),

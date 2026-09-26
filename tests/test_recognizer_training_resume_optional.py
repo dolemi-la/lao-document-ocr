@@ -11,6 +11,7 @@ torch = pytest.importorskip("torch")
 import lao_document_ocr.recognizer_model as recognizer_model_module  # noqa: E402
 from lao_document_ocr.recognizer_training import (  # noqa: E402
     DEV_EVALUATION_VERSION,
+    TRAINING_PADDING_STRATEGY,
     TrainingConfig,
     _greedy_decode,
     train_recognizer,
@@ -155,6 +156,7 @@ def test_resumed_training_matches_uninterrupted_training(tmp_path) -> None:
         == full_state["training_samples_checksum"]
     )
     assert resumed_state["completed_epoch"] == 2
+    assert resumed_state["training_padding_strategy"] == TRAINING_PADDING_STRATEGY
     for key, tensor in full_state["latest_state_dict"].items():
         assert torch.equal(resumed_state["latest_state_dict"][key], tensor), key
 
@@ -163,9 +165,38 @@ def test_resumed_training_matches_uninterrupted_training(tmp_path) -> None:
     assert resume["completed_epoch"] == 1
     assert resume["training_samples_checksum_verified"] is True
     assert resume["resolved_device_verified"] is True
+    assert resume["training_padding_strategy_verified"] is True
     assert resume["optimizer_state_restored"] is True
     assert resume["data_loader_generator_state_restored"] is True
     assert resume["rng_state_restored"] is True
+
+
+
+
+def test_resume_rejects_missing_padding_strategy(tmp_path) -> None:
+    samples = _samples(tmp_path)
+    partial = train_recognizer(
+        samples,
+        tmp_path / "padding-partial",
+        training_config=_config(epochs=1),
+    )
+
+    state = torch.load(
+        partial["training_state"],
+        map_location="cpu",
+        weights_only=False,
+    )
+    state.pop("training_padding_strategy")
+    legacy = tmp_path / "legacy-padding-training-state.pt"
+    torch.save(state, legacy)
+
+    with pytest.raises(ValueError, match="padding strategy mismatch"):
+        train_recognizer(
+            samples,
+            tmp_path / "padding-resume",
+            training_config=_config(epochs=2),
+            resume_from=legacy,
+        )
 
 
 def test_resume_rejects_different_training_samples(tmp_path) -> None:
