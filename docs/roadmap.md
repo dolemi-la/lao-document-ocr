@@ -118,6 +118,7 @@ Status: started
 - [x] exported-recognizer regression benchmark pipeline
 - [x] fixed-set owned-vs-Tesseract benchmark comparison gate
 - [x] optional character n-gram shallow fusion for CTC beam decoding
+- [x] repeatable normalized held-out-text exclusions for LM training + no-text exclusion fingerprints
 
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 

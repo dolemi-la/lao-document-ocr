@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,7 @@ from lao_document_ocr.normalization import normalize_lao_text
 from lao_document_ocr.vocabulary import CharacterVocabulary
 
 _BOS_ID = -1
+_TEXT_EXCLUSION_STRATEGY = "normalized-exact-text-v1"
 
 
 def _context_key(context: tuple[int, ...]) -> str:
@@ -32,12 +34,45 @@ def _sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def _text_exclusion_metadata(texts: set[str], excluded_lines: int) -> dict[str, Any]:
+    # Length framing prevents concatenation ambiguity; ordering and duplicates
+    # in the supplied exclusion corpora do not change the fingerprint.
+    digest = hashlib.sha256()
+    for text in sorted(texts):
+        encoded = text.encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+    return {
+        "strategy": _TEXT_EXCLUSION_STRATEGY,
+        "sha256": digest.hexdigest(),
+        "unique_texts": len(texts),
+        "excluded_lines": excluded_lines,
+    }
+
+
+def _validate_text_exclusion_metadata(value: Any) -> None:
+    if value is None:
+        return
+    fields = {"strategy", "sha256", "unique_texts", "excluded_lines"}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ValueError("Invalid language model text exclusion metadata")
+    if value["strategy"] != _TEXT_EXCLUSION_STRATEGY:
+        raise ValueError("Unsupported language model text exclusion strategy")
+    checksum = value["sha256"]
+    if not isinstance(checksum, str) or not re.fullmatch(r"[0-9a-f]{64}", checksum):
+        raise ValueError("Invalid language model text exclusion checksum")
+    for name, minimum in (("unique_texts", 1), ("excluded_lines", 0)):
+        if type(value[name]) is not int or value[name] < minimum:
+            raise ValueError(f"Invalid language model text exclusion {name}")
+
+
 @dataclass(frozen=True)
 class LanguageModelTrainingStats:
     total_lines: int
     used_lines: int
     skipped_lines: int
     tokens: int
+    excluded_lines: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return {
@@ -45,6 +80,7 @@ class LanguageModelTrainingStats:
             "used_lines": self.used_lines,
             "skipped_lines": self.skipped_lines,
             "tokens": self.tokens,
+            "excluded_lines": self.excluded_lines,
         }
 
 
@@ -58,8 +94,10 @@ class CharacterNgramLanguageModel:
     totals: dict[tuple[int, ...], int]
     artifact_sha256: str | None = None
     training_stats: dict[str, int] | None = None
+    text_exclusions: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
+        _validate_text_exclusion_metadata(self.text_exclusions)
         if self.order < 1:
             raise ValueError("language model order must be at least 1")
         if self.alpha <= 0:
@@ -110,6 +148,7 @@ class CharacterNgramLanguageModel:
             "vocabulary_size": self.vocabulary_size,
             "sha256": self.artifact_sha256,
             "training_stats": self.training_stats,
+            "text_exclusions": self.text_exclusions,
         }
 
     @classmethod
@@ -164,6 +203,7 @@ class CharacterNgramLanguageModel:
             counts=counts,
             totals=totals,
             artifact_sha256=_sha256_file(source),
+            text_exclusions=payload.get("text_exclusions"),
             training_stats=(
                 dict(payload["training_stats"])
                 if isinstance(payload.get("training_stats"), dict)
@@ -178,21 +218,33 @@ def train_character_ngram_language_model(
     *,
     order: int = 3,
     alpha: float = 0.1,
+    exclude_texts: list[str] | None = None,
 ) -> tuple[CharacterNgramLanguageModel, LanguageModelTrainingStats]:
     if order < 1 or order > 6:
         raise ValueError("language model order must be in [1, 6]")
     if alpha <= 0:
         raise ValueError("language model alpha must be positive")
 
+    excluded_texts = {
+        text for raw in (exclude_texts or [])
+        if (text := normalize_lao_text(raw))
+    }
+    if exclude_texts is not None and not excluded_texts:
+        raise ValueError("Text exclusion corpus must contain non-empty normalized text")
+
     context_counts: dict[tuple[int, ...], Counter[int]] = defaultdict(Counter)
     total_lines = len(lines)
     used_lines = 0
     skipped_lines = 0
+    excluded_lines = 0
     token_count = 0
 
     for raw in lines:
         text = normalize_lao_text(raw)
         if not text:
+            continue
+        if text in excluded_texts:
+            excluded_lines += 1
             continue
         try:
             tokens = vocabulary.encode(text)
@@ -230,6 +282,7 @@ def train_character_ngram_language_model(
         used_lines=used_lines,
         skipped_lines=skipped_lines,
         tokens=token_count,
+        excluded_lines=excluded_lines,
     )
     return (
         CharacterNgramLanguageModel(
@@ -240,6 +293,10 @@ def train_character_ngram_language_model(
             counts=counts,
             totals=totals,
             training_stats=stats.to_dict(),
+            text_exclusions=(
+                _text_exclusion_metadata(excluded_texts, excluded_lines)
+                if exclude_texts is not None else None
+            ),
         ),
         stats,
     )
@@ -271,6 +328,8 @@ def save_language_model(
         "training_stats": model.training_stats,
         "contexts": contexts,
     }
+    if model.text_exclusions is not None:
+        payload["text_exclusions"] = model.text_exclusions
     destination.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

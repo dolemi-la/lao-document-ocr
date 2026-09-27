@@ -195,8 +195,10 @@ For the bidirectional `crnn-ctc-v2` candidate on its deterministic 92-line dev s
 - epoch-80 greedy CER: about `0.2083`
 - epoch-80 greedy WER: about `0.6932`
 - beam width 10 without a language model changed CER only slightly to about `0.2054`
-- character 3-gram shallow fusion improved the selected dev configuration to about `0.1799` CER / `0.5841` WER at language-model weight `0.4` and token bonus `+0.05`
-- the matching confidence calibration changed mean absolute confidence error only slightly, from about `0.0618` to `0.0616`
+- historical character 3-gram fusion reported about `0.1799` CER / `0.5841` WER at language-model weight `0.4` and token bonus `+0.05`, but this result is **contaminated**, not held-out LM evidence
+- the historical confidence MAE `0.0618 -> 0.0616` was measured on the same report used to fit calibration; it is an in-sample fit diagnostic, not independent calibration performance
+
+A subsequent audit reconstructed the historical LM counts from the unsplit 10,073-line corpus and found all 92 dev labels in that LM training text. The recognizer's own normalized-text train/dev split did not protect its separately trained language model. Preserve the old reports for audit, but do not use their LM improvement or calibration figures for model selection or release. Retrain the LM with every dev/calibration/test text group excluded, regenerate reports, and refit calibration before further comparison. Unchanged greedy/plain-beam results are still synthetic development measurements, not real-document accuracy.
 
 The opt-in unidirectional `crnn-ctc-v3` architecture was also run on the same 900-line dataset for 20 epochs. Its best dev CER remained about `0.9830`, so this experiment does not support replacing v2 with v3. The v3 path remains experimental while its padding-invariance benefit is weighed against the current quality gap.
 
@@ -247,10 +249,14 @@ After the recognizer vocabulary is frozen, you can train an optional character n
 
 ```bash
 lao-ocr train-char-lm \
-  --corpus training/data/lao-lines.txt \
+  --corpus training/data/lao-lines-phetsarath.txt \
+  --exclude-corpus training/data/dev-labels.txt \
+  --exclude-corpus training/data/calibration-labels.txt \
   --vocabulary training/runs/crnn-v2/vocab.json \
   --output training/runs/crnn-v2/char-lm.json
 ```
+
+The exclusion files must contain the actual normalized labels of the corresponding held-out splits. Include frozen test labels as another exclusion corpus when a test set exists. Do not create placeholder or empty exclusion files. See [language-model.md](language-model.md) for split extraction and the exact-match limitation.
 
 Use it only with beam decoding and tune fusion parameters on held-out dev data. Confidence calibration must be refit for the exact LM checksum/weight/token bonus. See [language-model.md](language-model.md).
 

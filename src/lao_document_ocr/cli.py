@@ -679,6 +679,13 @@ def _parser() -> argparse.ArgumentParser:
     char_lm.add_argument("--output", required=True, type=Path)
     char_lm.add_argument("--order", type=int, default=3)
     char_lm.add_argument("--alpha", type=float, default=0.1)
+    char_lm.add_argument(
+        "--exclude-corpus", type=Path, action="append", default=[],
+        help=(
+            "Exclude every normalized exact-text match from a held-out plain-text "
+            "corpus before LM training. Repeat for dev, calibration, and test text."
+        ),
+    )
 
     synthetic = subparsers.add_parser(
         "generate-synthetic",
@@ -1738,12 +1745,28 @@ def _train_char_lm(args: argparse.Namespace) -> int:
     )
     from lao_document_ocr.vocabulary import CharacterVocabulary
 
+    excluded_texts: list[str] | None = None
+    if args.exclude_corpus:
+        excluded_texts = []
+        for path in args.exclude_corpus:
+            lines = load_corpus(path)
+            if not lines:
+                raise ValueError(f"Text exclusion corpus must contain non-empty text: {path}")
+            excluded_texts.extend(lines)
+    else:
+        print(
+            "Warning: no held-out text exclusions supplied; "
+            "LM train/dev/test separation is unverified.",
+            file=sys.stderr,
+        )
+
     vocabulary = CharacterVocabulary.load(args.vocabulary)
     model, stats = train_character_ngram_language_model(
         load_corpus(args.corpus),
         vocabulary,
         order=args.order,
         alpha=args.alpha,
+        exclude_texts=excluded_texts,
     )
     output = save_language_model(model, args.output)
     print(f"Language model: {output}")
