@@ -131,6 +131,14 @@ completed its recorded 720-update budget per arm. Final normalized dev CER was
 an unfavorable synthetic-development result, not real-data validation or a model
 promotion. The recognizer exit condition remains unmet.
 
+A separately recorded [fixed-data optimization-budget study](recognizer-budget-study.md)
+then continued only the 288-image expanded model to 80 total epochs / 2,880
+updates. Final training CER was 0% and final normalized dev CER was 15.56%
+(35/225), versus 77.33% at its earlier 720-update endpoint. This uses four times
+the compute budget and the same repeatedly inspected 12-image synthetic dev set;
+it does not overturn the equal-update comparison or establish optical accuracy.
+The best-on-dev local export remains a development candidate, not a promoted model.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction

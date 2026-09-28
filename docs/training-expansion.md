@@ -182,3 +182,13 @@ and collectors were not replaced. The recorded matched budget is now complete.
 Preserve these states and reports; a future optimization-budget study must
 identify its new budget and limitations explicitly rather than relabel this
 comparison.
+
+## Separate optimization-budget follow-up
+
+The [fixed-data budget study](recognizer-budget-study.md) resumed a separate copy
+of the expanded model to 80 total epochs / 2,880 updates. Its final training CER
+was 0% and final normalized dev CER was 35/225 (15.56%). That is four times the
+expanded arm's original compute budget, not a replacement for the completed
+720-update comparison above. The original states, reports, and all input
+identities remain unchanged. The follow-up has no independent test, source-level
+isolation proof, or real optical validation, and no model was promoted.

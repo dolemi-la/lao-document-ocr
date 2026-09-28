@@ -311,3 +311,18 @@ These results come from a single-seed, repeatedly inspected synthetic-developmen
 comparison, not an independent test or evidence of a real-document improvement. No model,
 collector kit, or production default was replaced. The next budget experiment
 must preserve this completed report rather than move its stopping point.
+
+## Completed fixed-data budget continuation — 2026-09-28
+
+A [separate recorded budget study](recognizer-budget-study.md) continued the
+288-image expanded model from its preserved 20-epoch state to 80 total epochs,
+without changing any image, label, split, vocabulary, or training setting besides
+the total epoch target. It used 2,880 total optimizer updates versus 720 before.
+Final training CER was 0/5,719 and final normalized dev CER was 35/225 (15.56%),
+with no raw-empty predictions. The selected best-on-dev checkpoint was epoch 72
+at 31/225 (13.78%); CPU and MPS exported predictions matched on all 12 dev images.
+
+The model now fits the fixed synthetic training set. It still has a train/dev
+gap, and the tiny dev set has been inspected repeatedly. This is not independent
+accuracy evidence, a real optical benchmark, or a reason to replace production
+OCR. The old equal-update comparison remains unchanged and separately reported.
