@@ -112,6 +112,15 @@ Example: `lao-ocr train-recognizer --manifest training/generated/v1/manifest.jso
 
 A legacy/final `recognizer.pt` can also be used as a weights-only fallback. In that case optimizer, shuffle-generator, and RNG state cannot be restored; metadata records that limitation and continuation starts from the best stored epoch rather than pretending to restore a later state.
 
+### Watch predictions, not only training loss
+
+Each new epoch records no-text `dev_prediction_diagnostics`: empty decoded
+strings, predicted/reference character totals, and blank-token counts restricted
+to valid timesteps. An all-empty development set emits a warning without changing
+training or model selection. Missing diagnostics in legacy epochs remain unknown.
+See [recognizer-training-health.md](recognizer-training-health.md) for the field
+contract and the bounded Phetsarath overfit investigation.
+
 ## 5. Export for portable inference
 
 ```bash

@@ -352,3 +352,52 @@ def test_exact_resume_records_dev_evaluation_version(tmp_path) -> None:
         row["dev_evaluation_version"] == DEV_EVALUATION_VERSION
         for row in state["history"]
     )
+
+
+def test_all_blank_training_warns_and_persists_health(tmp_path, monkeypatch) -> None:
+    class BlankRecognizer(_TinyRecognizer):
+        def __init__(self, num_classes, config):
+            super().__init__(num_classes, config)
+            with torch.no_grad():
+                self.projection.weight.zero_()
+                self.projection.bias.zero_()
+                self.projection.bias[0] = 20.0
+
+    monkeypatch.setattr(recognizer_model_module, "LaoCrnnRecognizer", BlankRecognizer)
+    with pytest.warns(RuntimeWarning, match="all .* development predictions are empty"):
+        output = train_recognizer(
+            _samples(tmp_path), tmp_path / "blank", training_config=_config(epochs=1),
+        )
+    metadata = json.loads(output["metadata"].read_text(encoding="utf-8"))
+    state = torch.load(output["training_state"], map_location="cpu", weights_only=False)
+    checkpoint = torch.load(output["checkpoint"], map_location="cpu", weights_only=False)
+    health = metadata["history"][-1]["dev_prediction_diagnostics"]
+    assert health["samples"] == metadata["dev_samples"]
+    assert health["empty_predictions"] == health["samples"]
+    assert health["empty_prediction_ratio"] == 1.0
+    assert health["predicted_characters"] == 0
+    assert health["blank_timestep_ratio"] == 1.0
+    assert state["history"][-1]["dev_prediction_diagnostics"] == health
+    assert checkpoint["history"][-1]["dev_prediction_diagnostics"] == health
+    json.dumps(health, allow_nan=False)
+
+
+def test_resume_does_not_invent_legacy_prediction_health(tmp_path) -> None:
+    samples = _samples(tmp_path)
+    partial = train_recognizer(
+        samples, tmp_path / "health-partial", training_config=_config(epochs=1),
+    )
+    state = torch.load(partial["training_state"], map_location="cpu", weights_only=False)
+    for row in state["history"]:
+        row.pop("dev_prediction_diagnostics")
+    legacy = tmp_path / "legacy-health-state.pt"
+    torch.save(state, legacy)
+    resumed = train_recognizer(
+        samples, tmp_path / "health-resumed", training_config=_config(epochs=2),
+        resume_from=legacy,
+    )
+    metadata = json.loads(resumed["metadata"].read_text(encoding="utf-8"))
+    assert "dev_prediction_diagnostics" not in metadata["history"][0]
+    health = metadata["history"][1]["dev_prediction_diagnostics"]
+    assert health["samples"] == metadata["dev_samples"]
+    assert metadata["resume"]["rng_state_restored"] is True

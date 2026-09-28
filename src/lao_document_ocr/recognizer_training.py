@@ -25,6 +25,7 @@ MODEL_VERSION = "crnn-ctc-v2"
 UNIDIRECTIONAL_MODEL_VERSION = "crnn-ctc-v3"
 DEV_EVALUATION_VERSION = "valid-timestep-v1"
 TRAINING_PADDING_STRATEGY = "fixed-max-width-v1"
+PREDICTION_DIAGNOSTICS_VERSION = "valid-timestep-greedy-v1"
 
 
 def _model_version_for_config(model_config) -> str:
@@ -428,27 +429,61 @@ def _edit_distance(reference: str, hypothesis: str) -> int:
     return previous[-1]
 
 
-def evaluate(model, loader, vocabulary: CharacterVocabulary, device) -> dict[str, float]:
+def evaluate(model, loader, vocabulary: CharacterVocabulary, device) -> dict[str, Any]:
     torch, _, _, _ = _require_torch()
     model.eval()
     edits = 0
     characters = 0
+    samples = 0
+    empty_predictions = 0
+    predicted_characters = 0
+    blank_timesteps = 0
+    valid_timesteps = 0
     with torch.no_grad():
         for batch in loader:
             images = batch["images"].to(device)
             log_probs = model(images)
             input_lengths = model.output_lengths(batch["widths"])
             input_lengths = input_lengths.clamp(max=log_probs.shape[0])
+            cpu_log_probs = log_probs.cpu()
             predictions = _greedy_decode(
-                log_probs.cpu(),
+                cpu_log_probs,
                 vocabulary,
                 input_lengths=input_lengths,
             )
+            paths = cpu_log_probs.argmax(dim=-1)
+            for index, length in enumerate(input_lengths.tolist()):
+                valid_timesteps += length
+                blank_timesteps += int((paths[:length, index] == 0).sum().item())
             for reference, hypothesis in zip(batch["texts"], predictions, strict=True):
                 edits += _edit_distance(reference, hypothesis)
                 characters += len(reference)
+                samples += 1
+                empty_predictions += int(not hypothesis)
+                predicted_characters += len(hypothesis)
     cer = edits / characters if characters else 0.0
-    return {"cer": cer, "character_edits": edits, "characters": characters}
+    # Counts are aggregated across batches; padded tails never contribute.
+    # Keep labels, hypotheses, and sample identifiers out of this telemetry.
+    diagnostics = {
+        "version": PREDICTION_DIAGNOSTICS_VERSION,
+        "samples": samples,
+        "empty_predictions": empty_predictions,
+        "empty_prediction_ratio": empty_predictions / samples if samples else None,
+        "predicted_characters": predicted_characters,
+        "reference_characters": characters,
+        "predicted_to_reference_character_ratio": (
+            predicted_characters / characters if characters else None
+        ),
+        "blank_timesteps": blank_timesteps,
+        "valid_timesteps": valid_timesteps,
+        "blank_timestep_ratio": blank_timesteps / valid_timesteps if valid_timesteps else None,
+    }
+    return {
+        "cer": cer,
+        "character_edits": edits,
+        "characters": characters,
+        "prediction_diagnostics": diagnostics,
+    }
 
 
 def train_recognizer(
@@ -531,7 +566,7 @@ def train_recognizer(
     output.mkdir(parents=True, exist_ok=True)
     training_state_path = output / "training-state.pt"
 
-    history: list[dict[str, float | int]] = []
+    history: list[dict[str, Any]] = []
     best_cer = math.inf
     best_state: dict[str, Any] | None = None
     start_epoch = 1
@@ -783,8 +818,18 @@ def train_recognizer(
             "train_loss": total_loss / max(1, batches),
             "dev_cer": dev_metrics["cer"],
             "dev_evaluation_version": DEV_EVALUATION_VERSION,
+            "dev_prediction_diagnostics": dev_metrics["prediction_diagnostics"],
         }
         history.append(epoch_record)
+        health = dev_metrics["prediction_diagnostics"]
+        if health["samples"] and health["empty_predictions"] == health["samples"]:
+            warnings.warn(
+                f"Recognizer epoch {epoch}: all {health['samples']} development "
+                "predictions are empty (CTC blank output); falling loss alone "
+                "does not establish OCR learning.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
         if dev_metrics["cer"] < best_cer:
             best_cer = dev_metrics["cer"]
