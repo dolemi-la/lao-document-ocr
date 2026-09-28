@@ -98,9 +98,9 @@ The output directory contains:
 - `vocab.json` — exact character vocabulary
 - `training-state.pt` — atomic latest/best training state for exact long-run resume
 
-The train/dev split is deterministic from sample IDs.
+The train/dev split is deterministic from normalized text groups; augmented variants of one label stay on the same side.
 
-Development CER decoding is width-aware: each sample is decoded only through its valid CTC timesteps, excluding batch padding exactly like exported recognizer inference. The current metric semantics are recorded as `valid-timestep-v1` in training state/checkpoints. When an older weights-only checkpoint lacks that version, its baseline dev CER is recomputed before new best-checkpoint decisions are made.
+Development CER decodes only valid timesteps, then normalizes both reference and prediction with `normalize_lao_text`, matching the exported recognizer benchmark. New state/checkpoint history records `normalized-valid-timestep-v2`. Old `valid-timestep-v1` exact training states require explicit `--recompute-resume-metrics` migration: retained latest and best weights are rescored without rewriting old history. All other resume guards remain enforced. See [recognizer-metric-normalization.md](recognizer-metric-normalization.md) for migration, weights-only compatibility, and the Phetsarath audit.
 
 Long runs also write `training-state.pt` atomically after every completed epoch. It contains the latest weights, best weights, optimizer state, deterministic shuffle-generator state, Python/NumPy/Torch RNG state, training history, the exact ordered training-sample checksum, and the resolved runtime device. To continue, set `--epochs` to the new total epoch target and pass `--resume-from`.
 
@@ -115,8 +115,8 @@ A legacy/final `recognizer.pt` can also be used as a weights-only fallback. In t
 ### Watch predictions, not only training loss
 
 Each new epoch records no-text `dev_prediction_diagnostics`: empty decoded
-strings, predicted/reference character totals, and blank-token counts restricted
-to valid timesteps. An all-empty development set emits a warning without changing
+strings, raw predicted/reference character totals, and blank-token counts restricted
+to valid timesteps. These raw diagnostics are intentionally distinct from normalized CER. An all-empty development set emits a warning without changing
 training or model selection. Missing diagnostics in legacy epochs remain unknown.
 See [recognizer-training-health.md](recognizer-training-health.md) for the field
 contract and the bounded Phetsarath overfit investigation.
@@ -137,6 +137,7 @@ The sidecar `recognizer.pt2.json` contains:
 - vocabulary
 - vocabulary checksum
 - artifact SHA-256
+- checkpoint evaluation version, selected best epoch, and retained-state metric-migration trail
 - image dimensions
 - width downsample factor
 

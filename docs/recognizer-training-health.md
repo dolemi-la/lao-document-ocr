@@ -37,6 +37,19 @@ collapse remains visible in the counts without an arbitrary acceptance threshold
 A high blank-timestep ratio alone is not a release decision: CTC blank tokens can
 also be part of valid alignments.
 
+## Raw health versus normalized selection CER
+
+Prediction health retains its raw `valid-timestep-greedy-v1` semantics. New
+checkpoint-selection CER uses `normalized-valid-timestep-v2`, which normalizes
+references and predictions like the exported benchmark. Raw health character
+counts are not a substitute for the normalized CER denominator. A spaces-only
+prediction is raw nonempty output, not evidence of CTC blank output.
+
+See [recognizer-metric-normalization.md](recognizer-metric-normalization.md) for
+explicit migration of old training states, unchanged history, and the retained
+height-48/64 checkpoint audit. Earlier measurements below remain historical and
+are not retroactively normalized.
+
 ## Resume compatibility
 
 This is additive observational metadata, not a change to CER, padding, model

@@ -108,6 +108,7 @@ Status: started
 - [x] recognizer training device selection (CPU/CUDA/Apple MPS/auto)
 - [x] atomic per-epoch recognizer training state + resumable long runs
 - [x] width-aware dev decoding aligned with exported recognizer inference
+- [x] normalized training/benchmark CER parity + explicit retained-state metric migration and best-epoch provenance
 - [x] fixed-width train/dev padding aligned with exported bidirectional inference
 - [x] upfront CTC-capacity preflight + persisted capacity diagnostics
 - [x] shared line-resize planning + no-text width-cap/effective-dimension preflight

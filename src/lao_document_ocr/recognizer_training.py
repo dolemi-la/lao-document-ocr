@@ -23,7 +23,7 @@ from lao_document_ocr.vocabulary import CharacterVocabulary
 
 MODEL_VERSION = "crnn-ctc-v2"
 UNIDIRECTIONAL_MODEL_VERSION = "crnn-ctc-v3"
-DEV_EVALUATION_VERSION = "valid-timestep-v1"
+DEV_EVALUATION_VERSION = "normalized-valid-timestep-v2"
 TRAINING_PADDING_STRATEGY = "fixed-max-width-v1"
 PREDICTION_DIAGNOSTICS_VERSION = "valid-timestep-greedy-v1"
 
@@ -478,6 +478,7 @@ def evaluate(model, loader, vocabulary: CharacterVocabulary, device) -> dict[str
     model.eval()
     edits = 0
     characters = 0
+    raw_reference_characters = 0
     samples = 0
     empty_predictions = 0
     predicted_characters = 0
@@ -500,12 +501,16 @@ def evaluate(model, loader, vocabulary: CharacterVocabulary, device) -> dict[str
                 valid_timesteps += length
                 blank_timesteps += int((paths[:length, index] == 0).sum().item())
             for reference, hypothesis in zip(batch["texts"], predictions, strict=True):
-                edits += _edit_distance(reference, hypothesis)
-                characters += len(reference)
+                # Match benchmark_recognizer's NFC/whitespace policy for model selection.
+                normalized_reference = normalize_lao_text(reference)
+                normalized_hypothesis = normalize_lao_text(hypothesis)
+                edits += _edit_distance(normalized_reference, normalized_hypothesis)
+                characters += len(normalized_reference)
+                raw_reference_characters += len(reference)
                 samples += 1
                 empty_predictions += int(not hypothesis)
                 predicted_characters += len(hypothesis)
-    cer = edits / characters if characters else 0.0
+    cer = edits / characters if characters else (0.0 if edits == 0 else 1.0)
     # Counts are aggregated across batches; padded tails never contribute.
     # Keep labels, hypotheses, and sample identifiers out of this telemetry.
     diagnostics = {
@@ -514,9 +519,9 @@ def evaluate(model, loader, vocabulary: CharacterVocabulary, device) -> dict[str
         "empty_predictions": empty_predictions,
         "empty_prediction_ratio": empty_predictions / samples if samples else None,
         "predicted_characters": predicted_characters,
-        "reference_characters": characters,
+        "reference_characters": raw_reference_characters,
         "predicted_to_reference_character_ratio": (
-            predicted_characters / characters if characters else None
+            predicted_characters / raw_reference_characters if raw_reference_characters else None
         ),
         "blank_timesteps": blank_timesteps,
         "valid_timesteps": valid_timesteps,
@@ -536,7 +541,10 @@ def train_recognizer(
     *,
     training_config: TrainingConfig | None = None,
     resume_from: str | Path | None = None,
+    recompute_resume_metrics: bool = False,
 ) -> dict:
+    if recompute_resume_metrics and resume_from is None:
+        raise ValueError("--recompute-resume-metrics requires --resume-from")
     training_config = training_config or TrainingConfig()
     torch, nn, DataLoader, _ = _require_torch()
 
@@ -607,11 +615,12 @@ def train_recognizer(
     loss_fn = nn.CTCLoss(blank=0, zero_infinity=True)
 
     output = Path(output_dir)
-    output.mkdir(parents=True, exist_ok=True)
     training_state_path = output / "training-state.pt"
 
     history: list[dict[str, Any]] = []
     best_cer = math.inf
+    best_epoch: int | None = None
+    metric_migrations: list[dict[str, Any]] = []
     best_state: dict[str, Any] | None = None
     start_epoch = 1
     resume_metadata: dict[str, Any] | None = None
@@ -640,14 +649,30 @@ def train_recognizer(
 
         resume_artifact_type = checkpoint.get("artifact_type")
         previous_eval_version = checkpoint.get("dev_evaluation_version")
+        known_metric_versions = {
+            None, "legacy-unbounded-padding-v0", "valid-timestep-v1", DEV_EVALUATION_VERSION,
+        }
+        if (
+            previous_eval_version is not None and not isinstance(previous_eval_version, str)
+        ) or previous_eval_version not in known_metric_versions:
+            raise ValueError("Unsupported resume checkpoint dev-evaluation version")
         if (
             resume_artifact_type == "recognizer-training-state"
             and previous_eval_version != DEV_EVALUATION_VERSION
+            and not (recompute_resume_metrics and previous_eval_version == "valid-timestep-v1")
         ):
             raise ValueError(
                 "Resume training state dev-evaluation version mismatch "
-                f"({previous_eval_version!r} != {DEV_EVALUATION_VERSION!r})"
+                f"({previous_eval_version!r} != {DEV_EVALUATION_VERSION!r}). "
+                "Use --recompute-resume-metrics to explicitly migrate valid-timestep-v1 "
+                "scores; unknown or unversioned training states cannot be migrated."
             )
+        migrations = checkpoint.get("metric_migrations", [])
+        if not isinstance(migrations, list) or not all(
+            isinstance(item, dict) for item in migrations
+        ):
+            raise ValueError("Resume checkpoint metric migrations must be a list of objects")
+        metric_migrations = [dict(item) for item in migrations]
         previous_padding_strategy = checkpoint.get("training_padding_strategy")
         if (
             resume_artifact_type == "recognizer-training-state"
@@ -734,24 +759,29 @@ def train_recognizer(
             default=0,
         )
         best_cer = float(checkpoint.get("best_dev_cer", math.inf))
-        if not has_latest_state and history and math.isfinite(best_cer):
+        saved_best_epoch = checkpoint.get("best_epoch")
+        if saved_best_epoch is not None:
+            if type(saved_best_epoch) is not int or not 1 <= saved_best_epoch <= completed_epoch:
+                raise ValueError("Resume checkpoint best_epoch is outside its history")
+            best_epoch = saved_best_epoch
+        elif history and math.isfinite(best_cer):
             matching_best_epochs = [
                 int(item.get("epoch", 0))
                 for item in history
-                if math.isclose(
-                    float(item.get("dev_cer", math.inf)),
-                    best_cer,
-                    rel_tol=1e-12,
-                    abs_tol=1e-12,
+                if item.get("dev_evaluation_version") == history_version
+                and math.isclose(
+                    float(item.get("dev_cer", math.inf)), best_cer,
+                    rel_tol=1e-12, abs_tol=1e-12,
                 )
             ]
             if matching_best_epochs:
-                completed_epoch = max(matching_best_epochs)
-                history = [
-                    item
-                    for item in history
-                    if int(item.get("epoch", 0)) <= completed_epoch
-                ]
+                # Strict improvement retains the FIRST minimum, not the last tie.
+                best_epoch = min(matching_best_epochs)
+        if not has_latest_state and history:
+            if best_epoch is None:
+                raise ValueError("Cannot identify the retained checkpoint epoch from its history")
+            completed_epoch = best_epoch
+            history = [item for item in history if int(item.get("epoch", 0)) <= completed_epoch]
 
         if training_config.epochs <= completed_epoch:
             raise ValueError(
@@ -778,17 +808,6 @@ def train_recognizer(
             checkpoint.get("rng_state"),
         )
 
-        baseline_dev_cer_recomputed = None
-        if previous_eval_version != DEV_EVALUATION_VERSION:
-            baseline_dev_cer_recomputed = evaluate(
-                model,
-                dev_loader,
-                vocabulary,
-                device,
-            )["cer"]
-            best_cer = baseline_dev_cer_recomputed
-            best_state = _cpu_state_dict(model.state_dict())
-
         if resume_artifact_type == "recognizer-training-state":
             missing_state = [
                 name
@@ -805,6 +824,53 @@ def train_recognizer(
                     + ", ".join(missing_state)
                 )
 
+        baseline_dev_cer_recomputed = None
+        if previous_eval_version != DEV_EVALUATION_VERSION:
+            if resume_artifact_type == "recognizer-training-state" and best_state is None:
+                raise ValueError("Resume training state is incomplete: retained best weights")
+            # Evaluate only retained states: unavailable historical weights cannot be rescored.
+            # Iterating a DataLoader may consume RNG state even in evaluation mode.
+            saved_rng = _capture_rng_state(torch, device)
+            saved_generator = generator.get_state().clone()
+            saved_mode = model.training
+            latest_weights = _cpu_state_dict(model.state_dict())
+            try:
+                latest_cer = evaluate(model, dev_loader, vocabulary, device)["cer"]
+                retained_best_cer = None
+                if has_latest_state and best_state is not None:
+                    model.load_state_dict(best_state)
+                    retained_best_cer = evaluate(model, dev_loader, vocabulary, device)["cer"]
+                if not math.isfinite(latest_cer) or (
+                    retained_best_cer is not None and not math.isfinite(retained_best_cer)
+                ):
+                    raise ValueError("Cannot migrate non-finite resume metrics")
+                if retained_best_cer is not None and retained_best_cer <= latest_cer:
+                    best_cer = retained_best_cer
+                    selected = "retained-best"
+                else:
+                    best_cer = latest_cer
+                    best_state = latest_weights
+                    best_epoch = completed_epoch
+                    selected = "latest" if has_latest_state else "weights-only"
+                baseline_dev_cer_recomputed = best_cer
+            finally:
+                model.load_state_dict(latest_weights)
+                model.train(saved_mode)
+                generator.set_state(saved_generator)
+                _restore_rng_state(torch, device, saved_rng)
+            metric_migrations.append({
+                "source_sha256": _sha256_file(resume_path),
+                "completed_epoch": completed_epoch,
+                "from_version": history_version,
+                "to_version": DEV_EVALUATION_VERSION,
+                "selection_scope": "retained-states-only",
+                "latest_dev_cer": latest_cer,
+                "retained_best_dev_cer": retained_best_cer,
+                "selected_state": selected,
+                "selected_epoch": best_epoch,
+                "historical_scores_rewritten": False,
+            })
+
         resume_metadata = {
             "source": str(resume_path),
             "source_sha256": _sha256_file(resume_path),
@@ -817,6 +883,7 @@ def train_recognizer(
                 else False
             ),
             "baseline_dev_cer_recomputed": baseline_dev_cer_recomputed,
+            "metric_migration_performed": baseline_dev_cer_recomputed is not None,
             "training_samples_checksum_verified": (
                 previous_samples_checksum == training_samples_checksum
                 if isinstance(previous_samples_checksum, str)
@@ -832,6 +899,7 @@ def train_recognizer(
             "rng_state_restored": rng_restored,
         }
 
+    output.mkdir(parents=True, exist_ok=True)
     for epoch in range(start_epoch, training_config.epochs + 1):
         model.train()
         total_loss = 0.0
@@ -877,6 +945,7 @@ def train_recognizer(
 
         if dev_metrics["cer"] < best_cer:
             best_cer = dev_metrics["cer"]
+            best_epoch = epoch
             best_state = _cpu_state_dict(model.state_dict())
 
         if best_state is None:
@@ -904,6 +973,8 @@ def train_recognizer(
             "rng_state": _capture_rng_state(torch, device),
             "history": history,
             "best_dev_cer": best_cer,
+            "best_epoch": best_epoch,
+            "metric_migrations": metric_migrations,
             "completed_epoch": epoch,
         }
         _atomic_torch_save(torch, training_state, training_state_path)
@@ -931,6 +1002,8 @@ def train_recognizer(
         "state_dict": model.state_dict(),
         "history": history,
         "best_dev_cer": best_cer,
+        "best_epoch": best_epoch,
+        "metric_migrations": metric_migrations,
         "resume": resume_metadata,
     }
     torch.save(checkpoint, checkpoint_path)
@@ -954,6 +1027,8 @@ def train_recognizer(
         "train_samples": len(train_samples),
         "dev_samples": len(dev_samples),
         "best_dev_cer": best_cer,
+        "best_epoch": best_epoch,
+        "metric_migrations": metric_migrations,
         "device": str(device),
         "history": history,
         "training_state": training_state_path.name,
@@ -1020,6 +1095,9 @@ def export_recognizer(
         "vocabulary_checksum": checkpoint["vocabulary_checksum"],
         "model_config": checkpoint["model_config"],
         "split_strategy": checkpoint.get("split_strategy", "legacy-sample-id-sha256"),
+        "dev_evaluation_version": checkpoint.get("dev_evaluation_version"),
+        "best_epoch": checkpoint.get("best_epoch"),
+        "metric_migrations": checkpoint.get("metric_migrations", []),
         "width_downsample_factor": model.width_downsample_factor,
     }
     destination.with_suffix(destination.suffix + ".json").write_text(

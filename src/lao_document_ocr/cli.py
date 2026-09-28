@@ -1020,6 +1020,13 @@ def _parser() -> argparse.ArgumentParser:
         default="auto",
     )
     train.add_argument("--resume-from", type=Path)
+    train.add_argument(
+        "--recompute-resume-metrics", action="store_true",
+        help=(
+            "Explicitly migrate valid-timestep-v1 training states by recomputing "
+            "normalized CER for retained latest/best weights; preserve historical scores."
+        ),
+    )
     train.add_argument("--unidirectional", action="store_true")
     train.add_argument("--no-hash-check", action="store_true")
 
@@ -2196,6 +2203,7 @@ def _train_recognizer(args: argparse.Namespace) -> int:
         args.output,
         training_config=config,
         resume_from=args.resume_from,
+        recompute_resume_metrics=args.recompute_resume_metrics,
     )
     print(f"Checkpoint: {result['checkpoint']}")
     print(f"Training state: {result['training_state']}")
