@@ -54,13 +54,18 @@ def _kit(tmp_path, *, corrupt=False, unsafe=False):
 
     path = tmp_path / "collector.zip"
     with zipfile.ZipFile(path, "w") as archive:
+        def write_member(name, data):
+            # Match the deterministic identity expected of a collector kit.
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            archive.writestr(info, data)
+
         for name, data in payloads.items():
             if corrupt and name == "capture-worksheet.csv":
                 data = data + b"tampered"
-            archive.writestr(name, data)
-        archive.writestr("SHA256SUMS", sums)
+            write_member(name, data)
+        write_member("SHA256SUMS", sums)
         if unsafe:
-            archive.writestr("../escape.txt", b"bad")
+            write_member("../escape.txt", b"bad")
     return path
 
 
@@ -495,3 +500,17 @@ def test_collector_exports_verified_capture_submission(tmp_path) -> None:
     assert submission.capture_id == "phone-export"
     assert submission.mode == "phone-photo"
     assert submission.captured_pages == 1
+
+
+def test_collector_fixture_identity_does_not_depend_on_wall_clock(tmp_path, monkeypatch):
+    # ZIP filename-based writes otherwise use the current clock, so rebuilding
+    # this fixture across a two-second ZIP timestamp boundary changes its hash.
+    monkeypatch.setattr(
+        zipfile.time, "localtime", lambda *_: (2026, 9, 28, 1, 2, 0, 0, 271, -1),
+    )
+    first = _kit(tmp_path).read_bytes()
+    monkeypatch.setattr(
+        zipfile.time, "localtime", lambda *_: (2026, 9, 28, 1, 2, 4, 0, 271, -1),
+    )
+    second = _kit(tmp_path).read_bytes()
+    assert first == second
