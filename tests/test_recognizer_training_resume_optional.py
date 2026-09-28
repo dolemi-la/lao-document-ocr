@@ -401,3 +401,20 @@ def test_resume_does_not_invent_legacy_prediction_health(tmp_path) -> None:
     health = metadata["history"][1]["dev_prediction_diagnostics"]
     assert health["samples"] == metadata["dev_samples"]
     assert metadata["resume"]["rng_state_restored"] is True
+
+
+
+def test_resize_preflight_persists_in_all_training_artifacts(tmp_path) -> None:
+    output = train_recognizer(
+        _samples(tmp_path), tmp_path / "resize-preflight", training_config=_config(epochs=1),
+    )
+    metadata = json.loads(output["metadata"].read_text(encoding="utf-8"))
+    state = torch.load(output["training_state"], map_location="cpu", weights_only=False)
+    checkpoint = torch.load(output["checkpoint"], map_location="cpu", weights_only=False)
+    report = metadata["ctc_preflight"]
+    assert report == state["ctc_preflight"] == checkpoint["ctc_preflight"]
+    assert report["input_image_height"] == 16
+    assert report["input_max_width"] == 64
+    assert report["width_capped_samples"] == 0
+    assert report["min_resized_height"] == report["max_resized_height"] == 16
+    assert report["min_resized_width"] == report["max_resized_width"] == 48

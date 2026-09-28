@@ -148,19 +148,60 @@ def _restore_rng_state(torch, device, state: dict[str, Any] | None) -> bool:
     return True
 
 
+@dataclass(frozen=True)
+class LineResizePlan:
+    width: int
+    height: int
+    offset_y: int
+    width_capped: bool
+
+
+def plan_line_resize(
+    source_width: int,
+    source_height: int,
+    *,
+    image_height: int,
+    max_width: int,
+) -> LineResizePlan:
+    """Describe the existing aspect-preserving resize, not glyph/ink quality."""
+    dimensions = (source_width, source_height, image_height, max_width)
+    if any(type(value) is not int or value < 1 for value in dimensions):
+        raise ValueError("Line image dimensions must be positive integers")
+    target_width = max(1, int(round(source_width * (image_height / source_height))))
+    width_capped = target_width > max_width
+    if width_capped:
+        target_width = max_width
+        target_height = max(1, int(round(source_height * (max_width / source_width))))
+    else:
+        target_height = image_height
+    return LineResizePlan(
+        width=target_width,
+        height=target_height,
+        offset_y=max(0, (image_height - target_height) // 2),
+        width_capped=width_capped,
+    )
+
+
+def _prepared_line_geometry(
+    path: str | Path,
+    *,
+    image_height: int,
+    max_width: int,
+) -> LineResizePlan:
+    with Image.open(path) as source:
+        image = ImageOps.exif_transpose(source)
+        return plan_line_resize(
+            image.width, image.height, image_height=image_height, max_width=max_width,
+        )
+
+
 def _prepared_line_width(
     path: str | Path,
     *,
     image_height: int,
     max_width: int,
 ) -> int:
-    with Image.open(path) as source:
-        image = ImageOps.exif_transpose(source)
-        if image.width < 1 or image.height < 1:
-            raise ValueError("Invalid image dimensions")
-        scale = image_height / image.height
-        target_width = max(1, int(round(image.width * scale)))
-        return min(max_width, target_width)
+    return _prepared_line_geometry(path, image_height=image_height, max_width=max_width).width
 
 
 def preflight_ctc_capacity(
@@ -178,16 +219,22 @@ def preflight_ctc_capacity(
     max_available = 0
     first_failure: tuple[str, int, int] | None = None
     failures = 0
+    width_capped_samples = 0
+    resized_heights: list[int] = []
+    resized_widths: list[int] = []
 
     for sample in samples:
         target = vocabulary.encode(sample.text)
         required = ctc_required_timesteps(target)
-        width = _prepared_line_width(
+        geometry = _prepared_line_geometry(
             sample.image,
             image_height=image_height,
             max_width=max_width,
         )
-        available = max(1, width // 4)
+        width_capped_samples += int(geometry.width_capped)
+        resized_heights.append(geometry.height)
+        resized_widths.append(geometry.width)
+        available = max(1, geometry.width // 4)
         margin = available - required
         min_margin = margin if min_margin is None else min(min_margin, margin)
         max_required = max(max_required, required)
@@ -202,8 +249,9 @@ def preflight_ctc_capacity(
         raise ValueError(
             f"CTC capacity preflight failed for {failures} sample(s); "
             f"first failure {sample_id} requires {required} timesteps "
-            f"but only {available} are available. Increase --max-width "
-            "or shorten the training line."
+            f"but only {available} are available. Increase --image-height for "
+            "uncapped lines or --max-width for width-capped lines, or regenerate "
+            "shorter source lines with matching labels."
         )
 
     return {
@@ -212,6 +260,13 @@ def preflight_ctc_capacity(
         "min_timestep_margin": int(min_margin or 0),
         "max_required_timesteps": max_required,
         "max_available_timesteps": max_available,
+        "input_image_height": image_height,
+        "input_max_width": max_width,
+        "width_capped_samples": width_capped_samples,
+        "min_resized_height": min(resized_heights),
+        "max_resized_height": max(resized_heights),
+        "min_resized_width": min(resized_widths),
+        "max_resized_width": max(resized_widths),
     }
 
 
@@ -276,28 +331,17 @@ def prepare_line_pil_image(
 ) -> tuple[np.ndarray, int]:
     image = ImageOps.exif_transpose(image).convert("L")
 
-    if image.width < 1 or image.height < 1:
-        raise ValueError("Invalid image dimensions")
+    geometry = plan_line_resize(
+        image.width, image.height, image_height=image_height, max_width=max_width,
+    )
+    image = image.resize((geometry.width, geometry.height), Image.Resampling.LANCZOS)
 
-    scale = image_height / image.height
-    target_width = max(1, int(round(image.width * scale)))
-
-    if target_width > max_width:
-        scale = max_width / image.width
-        target_width = max_width
-        target_height = max(1, int(round(image.height * scale)))
-    else:
-        target_height = image_height
-
-    image = image.resize((target_width, target_height), Image.Resampling.LANCZOS)
-
-    canvas = Image.new("L", (target_width, image_height), 255)
-    offset_y = max(0, (image_height - target_height) // 2)
-    canvas.paste(image, (0, offset_y))
+    canvas = Image.new("L", (geometry.width, image_height), 255)
+    canvas.paste(image, (0, geometry.offset_y))
 
     array = np.asarray(canvas, dtype=np.float32)
     array = 1.0 - (array / 255.0)
-    return array[None, :, :], target_width
+    return array[None, :, :], geometry.width
 
 
 def prepare_line_image(

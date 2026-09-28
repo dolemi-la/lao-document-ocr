@@ -150,6 +150,18 @@ This command is for cropped-line model development. An experimental full-page en
 
 ## CTC capacity
 
+Successful CTC preflight also records `input_image_height`, `input_max_width`,
+`width_capped_samples`, `min_resized_height`, `max_resized_height`,
+`min_resized_width`, and `max_resized_width` in the existing `ctc_preflight`
+object in training state, checkpoint, and final metadata. These are the actual
+aspect-preserving image dimensions before vertical padding, not glyph-height
+measurements or a recognition-quality guarantee. A line capped by `--max-width`
+can remain small even when `--image-height` is increased. The preflight and
+training/inference pixel preparation share the same resize plan, including EXIF
+orientation and integer rounding. No preprocessing default or pixel policy has
+changed. Older artifacts without these additional fields remain unknown.
+
+
 A target needs at least one timestep per character, plus an extra timestep where identical adjacent characters require a separating blank. Training rejects samples that cannot fit the available sequence width rather than silently producing invalid CTC targets.
 
 ## Accuracy

@@ -110,6 +110,7 @@ Status: started
 - [x] width-aware dev decoding aligned with exported recognizer inference
 - [x] fixed-width train/dev padding aligned with exported bidirectional inference
 - [x] upfront CTC-capacity preflight + persisted capacity diagnostics
+- [x] shared line-resize planning + no-text width-cap/effective-dimension preflight
 - [x] no-text per-epoch prediction-health diagnostics + all-empty development warnings
 - [x] model export for CPU inference (`torch.export`)
 - [x] device-portable exported recognizer LSTM state for CPU/CUDA/MPS inference

@@ -185,3 +185,99 @@ and input manifests without recording reference/predicted text. Historical
 images, checkpoints, collectors, and the frozen-data blockers remain unchanged.
 Next investigate a bounded short-line curriculum or image-resolution control
 using correctly rendered inputs and an unchanged, leakage-safe held-out split.
+
+
+## Short-line resolution control — 2026-09-28
+
+Starting from `cd5c6a3`, a fresh experiment selected all 84 corrected Phetsarath
+images whose normalized labels contain 3–32 characters, in their original order.
+The original normalized-text split memberships were preserved: 72 training
+images and 12 development images, with zero exact label overlap. These are
+synthetic development samples, not a frozen optical benchmark or independent
+test set. Selection was based on label length, not observed recognition scores.
+
+Two arms used identical source images, labels, 93-class vocabulary (including
+blank), initial model-weight hash, seed 20260928, bidirectional CRNN, batch size
+8, fixed padded width 768, AdamW learning rate 0.001, and MPS. Only configured
+image height differed: 48 or 64. The vocabulary is a shared known character
+inventory derived from the selected corpus; no language model was used. Neither
+short-line arm was width-capped, and both passed CTC preflight.
+
+The initial equal 20-epoch budget yielded 100% dev CER in both arms. The plan was
+then explicitly extended to 80 epochs for **both** arms (720 optimizer updates
+each), before continuing either arm. The saved plan and epoch-20 summary retain
+that exploratory decision; this is not a preregistered confirmatory experiment.
+
+| Input height | Latest train CER | Latest dev CER | Best recorded dev CER | Best epoch |
+| --- | ---: | ---: | ---: | ---: |
+| 48 | 0.016031 | 0.520000 | 0.462222 | 79 |
+| 64 | 0.756489 | 0.875556 | 0.862222 | 78 |
+
+All values in this table use the existing training evaluator's raw greedy
+strings. Neither latest model has empty dev predictions at epoch 80, but
+nonempty output is not equivalent to accurate recognition. In particular,
+the 48-pixel model's 1.60% training CER versus 52.00% dev CER indicates a large
+generalization gap on this small split. The 64-pixel arm learns more slowly in
+this run; this single-seed result does not establish a universal resolution rule.
+
+Both selected best checkpoints were exported and evaluated on CPU and MPS. All
+12 raw predictions matched across those devices for each artifact. The exported
+benchmark normalizes predictions before CER: its best-checkpoint CER is 0.462222
+at height 48 and **0.866667** at height 64. Normalization changed one height-64
+prediction, increasing edit count from 194 to 195 out of 225 reference characters.
+This accounts for the difference from the raw training-selection value 0.862222;
+do not silently equate the two metric conventions. Checkpoint-selection
+normalization should be aligned with benchmark normalization in a separately
+versioned change before further model selection.
+
+The equal-budget controls demonstrate that the short-line model can leave the
+blank-output regime with more optimization steps, not that it has become a
+useful general Lao recognizer. No font, production model, decoder, input-height
+default, optical dataset, or collector artifact was replaced. No beam/LM tuning
+was performed on these 12 development labels.
+
+### Width cap and effective image resolution
+
+A dimension-only audit of all 300 corrected images found:
+
+| Configured height | Width-capped images | Minimum resized image height | Images resized below 32 pixels tall |
+| --- | ---: | ---: | ---: |
+| 48 | 45 / 300 | 20 | 17 / 300 |
+| 64 | 85 / 300 | 20 | 17 / 300 |
+
+The width limit remains 768. Once width-limited, increasing the padded input
+height alone does not enlarge that image's actual resized content. These are
+**whole image dimensions**, including source margins and augmentation canvas,
+not measured glyph/ink heights or a visual quality score. CTC capacity and
+legibility are separate questions.
+
+Preflight and pixel preparation now share `plan_line_resize(...)`. The existing
+resize and centering policy is unchanged: old/new arrays were compared exactly
+on all 300 corrected images at both heights, in addition to pixel-identity,
+EXIF-orientation, and rounding-boundary regression tests. Training after the
+observational refactor therefore used unchanged prepared pixel arrays.
+Successful `ctc_preflight` reports also persist configured dimensions,
+width-capped count, and min/max resized dimensions. No labels, hypotheses, IDs,
+or image paths are added to that aggregate report. Legacy checkpoint fields
+remain historical; strict resume behavior is unchanged.
+
+Local, Git-ignored artifacts:
+
+```text
+training/runs/short-resolution-cd5c6a3/
+  experiment-plan.json
+  epoch20.summary.json
+  short-lines.jsonl
+  preprocessing.summary.json
+  comparison.summary.json
+  h48/{training-state.pt,recognizer.pt,recognizer.pt2,metadata.json}
+  h64/{training-state.pt,recognizer.pt,recognizer.pt2,metadata.json}
+```
+
+The selected input manifest SHA-256 is
+`8ff7a7990e3c6780696340912508f810378fd55bb60eccdb241fd6dba39390e2`.
+Both initial model-state hashes are
+`2ef596b76aa51d895105310813ec3a004279da1a3461fdfea07180876863971c`.
+The comparison summary fingerprints the selected checkpoints and retains final
+and selected-best measurements rather than replacing final values with a
+favorable intermediate result.
