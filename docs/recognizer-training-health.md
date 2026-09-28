@@ -294,3 +294,20 @@ Both initial model-state hashes are
 The comparison summary fingerprints the selected checkpoints and retains final
 and selected-best measurements rather than replacing final values with a
 favorable intermediate result.
+
+## Completed matched coverage expansion — 2026-09-28
+
+The separately recorded [training-expansion experiment](training-expansion.md)
+now completed 720 optimizer updates and 5,760 sample presentations in both arms,
+after the disk-space interruption. It retained the same 12-image development set,
+93-class vocabulary, seed, initial weights, and normalized metric policy.
+
+At the final epoch the 72-image baseline had 1.60% training CER and 52.44% dev
+CER; the 288-image expanded model had 74.66% training CER and 77.33% dev CER.
+Both had zero raw-empty dev predictions, showing why nonempty output alone is
+not a quality gate. The expanded arm was still poor on its own training images;
+the baseline's much better training fit did not transfer to a low dev error.
+These results come from a single-seed, repeatedly inspected synthetic-development
+comparison, not an independent test or evidence of a real-document improvement. No model,
+collector kit, or production default was replaced. The next budget experiment
+must preserve this completed report rather than move its stopping point.

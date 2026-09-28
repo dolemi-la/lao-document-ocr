@@ -125,6 +125,12 @@ Status: started
 - [x] optional character n-gram shallow fusion for CTC beam decoding
 - [x] repeatable normalized held-out-text exclusions for LM training + no-text exclusion fingerprints
 
+Development evidence: the [matched Phetsarath coverage expansion](training-expansion.md)
+completed its recorded 720-update budget per arm. Final normalized dev CER was
+52.44% for the 72-image baseline and 77.33% for the 288-image expansion. This is
+an unfavorable synthetic-development result, not real-data validation or a model
+promotion. The recognizer exit condition remains unmet.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction

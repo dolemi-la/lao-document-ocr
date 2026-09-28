@@ -93,22 +93,63 @@ mean different repetitions of each training example. Best-on-dev checkpoint
 selection also has different numbers of epoch evaluations; final-epoch scores
 are the primary comparison, not cherry-picked minima.
 
-Only the first **180 updates per arm** completed in this session. The baseline
-reached epoch 20 with normalized dev CER 1.0 and 10/12 raw-empty predictions. The
-expanded arm reached epoch 5 with dev CER 224/225 (approximately 0.995556) and
-0/12 raw-empty predictions. Nonempty output is not useful recognition: these
-partial values do not establish an improvement from broader coverage.
+### Paused stages and completed continuation
 
-Before the next stage, available disk space fell below the runner's 1.5 GiB
-floor. The guard refused to start more training. After space briefly recovered,
-the baseline completed epoch 40 (360 updates, dev CER approximately 0.977778),
-but the guard blocked the expanded arm again before epoch 6. The final saved
-stages are therefore **baseline: 360 updates; expanded: 180 updates**. Do not
-compare those unequal-budget scores as evidence for or against broader coverage.
-The earlier equal-180-update summary is preserved separately. Both checkpoints
-are saved, and the planned 720-update comparison remains **incomplete**. No
-production model was promoted. Resume the expanded arm to epoch 10 first, once
-storage permits, rather than silently changing the recorded comparison budget.
+The first session reached 180 updates per arm before the 1.5 GiB disk guard
+interrupted further training. After space briefly recovered, the baseline reached
+360 updates while the expanded arm remained at 180. Those unequal checkpoints
+were not used to claim an accuracy change. The paused status and equal-180-update
+summary are preserved, rather than overwritten as though the interruption never
+happened.
+
+The continuation resumed the saved expanded state to 360 updates first, preserved
+matched summaries at 360 and 540 updates, and completed the unchanged planned
+budget of **720 updates / 5,760 sample presentations in each arm**. All original
+training/dev identities, source image pins, vocabulary, initial-weight hash,
+training settings, and the recorded plan were rechecked. No samples were added,
+removed, regenerated, or moved between splits during continuation.
+
+### Final normalized results
+
+The following are final-epoch measurements, not the best intermediate results.
+Both arms use `normalized-valid-timestep-v2` CER and greedy decoding without an LM.
+Each development measurement has 225 reference characters across the same 12
+images. Training measurements use each arm's own training set.
+
+| Arm | Training images | Epochs | Updates | Final training CER | Final dev CER | Raw-empty dev predictions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline | 72 | 80 | 720 | 21/1,310 = 0.016031 | 118/225 = 0.524444 | 0/12 |
+| Expanded | 288 | 20 | 720 | 4,270/5,719 = 0.746634 | 174/225 = 0.773333 | 0/12 |
+
+The expanded arm's final dev CER is **24.8889 percentage points higher**, not an
+improvement. The baseline fits its training images closely but has a large
+training/development gap. The expanded model has high error even on its training
+images: 1,009/1,310 (0.770229) on the original 72 and 3,261/4,409 (0.739623) on the
+216 additions. This is consistent with underfitting under this budget; it does
+not prove a single cause, that the additional data are useless, or that more
+training will necessarily solve the problem.
+
+Retained best-on-dev checkpoints are reported separately. The baseline selected
+epoch 79 at CER 104/225 (0.462222); the expanded run selected epoch 20 at 174/225
+(0.773333). These selections had 80 versus 20 epoch evaluations and are not the
+primary equal-update comparison. Both selected checkpoints exported successfully.
+For each artifact, CPU and MPS produced identical normalized predictions on all
+12 dev images, and exported-benchmark CER matched the selected training score.
+This verifies export/scoring consistency, not independent model accuracy.
+
+The same tiny development set has been examined repeatedly. There is one seed,
+no independent test, no verified document/source separation, and no real optical
+benchmark. Equal sample presentations are not equal repetitions per image or an
+equal character-token budget. Do not turn this result into a general claim that
+more data hurts OCR or use it to change a production default. **No model was
+promoted.** The next optimization-budget experiment must be recorded separately;
+it must not silently extend this completed 720-update comparison.
+
+The aggregate-only completion report is `completed-720.summary.json`, SHA-256:
+`f56b87806d4bfa0b50afedc46fae6aee1bdfc292a7837d6157a480383b2a97c8`.
+It fingerprints the plan, audit runner, input identities, final training states,
+selected checkpoints, and exports without publishing labels or predictions.
+The audit confirmed source checkpoint bytes were unchanged during evaluation.
 
 Local, Git-ignored artifacts:
 
@@ -121,13 +162,23 @@ training/runs/expansion-7022f3b/
   expanded.jsonl
   preflight.summary.json
   cli-audit.summary.json
+  progress-disk-pause.summary.json
+  progress-180-updates.summary.json
+  matched-360.summary.json
+  matched-540.summary.json
+  completed-720.summary.json
+  complete.py
   progress.summary.json
   baseline/training-state.pt
   expanded/training-state.pt
+  baseline/recognizer.pt2
+  expanded/recognizer.pt2
 ```
 
 The development identity fingerprint is
 `65508a69d60af13692ed6e41099b849496de2fb82c0b4c6fd36a6b7bf69b725d`.
 The parent manifest, historical models, production OCR defaults, capture kits,
-and collectors were not replaced. A future continuation should use these saved
-states and the unchanged recorded budget, not silently start a larger experiment.
+and collectors were not replaced. The recorded matched budget is now complete.
+Preserve these states and reports; a future optimization-budget study must
+identify its new budget and limitations explicitly rather than relabel this
+comparison.
