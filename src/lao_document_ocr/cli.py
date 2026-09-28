@@ -1000,6 +1000,15 @@ def _parser() -> argparse.ArgumentParser:
     reading_order_export.add_argument("--checkpoint", required=True, type=Path)
     reading_order_export.add_argument("--output", required=True, type=Path)
 
+    expansion = subparsers.add_parser(
+        "audit-training-expansion",
+        help="Verify training-only expansion with unchanged dev images and vocabulary.",
+    )
+    expansion.add_argument("--baseline-manifest", type=Path, required=True)
+    expansion.add_argument("--expanded-manifest", type=Path, required=True)
+    expansion.add_argument("--dev-ratio", type=float, default=0.1)
+    expansion.add_argument("--output", type=Path, required=True)
+
     train = subparsers.add_parser(
         "train-recognizer",
         help="Train the CRNN+CTC Lao line recognizer.",
@@ -2175,6 +2184,27 @@ def _export_reading_order(args: argparse.Namespace) -> int:
     return 0
 
 
+def _audit_training_expansion(args: argparse.Namespace) -> int:
+    from lao_document_ocr.training_expansion import audit_training_expansion
+
+    if args.output.exists():
+        raise ValueError("Training expansion report already exists; use a new output path")
+    baseline = load_training_manifest(args.baseline_manifest, verify_hashes=True)
+    expanded = load_training_manifest(args.expanded_manifest, verify_hashes=True)
+    report = audit_training_expansion(baseline, expanded, dev_ratio=args.dev_ratio)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with args.output.open("x", encoding="utf-8") as destination:
+            json.dump(report, destination, ensure_ascii=False, indent=2, allow_nan=False)
+            destination.write(chr(10))
+    except FileExistsError as exc:
+        raise ValueError("Training expansion report already exists") from exc
+    print(f"Expansion audit: {args.output}")
+    print(f"Training images: {report['baseline_train_samples']} -> "
+          f"{report['expanded_train_samples']}; unchanged dev: {report['fixed_dev_samples']}")
+    return 0
+
+
 def _train_recognizer(args: argparse.Namespace) -> int:
     try:
         from lao_document_ocr.recognizer_training import TrainingConfig, train_recognizer
@@ -2394,6 +2424,8 @@ def main() -> int:
             return _train_reading_order(args)
         if args.command == "export-reading-order":
             return _export_reading_order(args)
+        if args.command == "audit-training-expansion":
+            return _audit_training_expansion(args)
         if args.command == "train-recognizer":
             return _train_recognizer(args)
         if args.command == "export-recognizer":

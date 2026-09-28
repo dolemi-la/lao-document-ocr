@@ -103,6 +103,7 @@ Status: started
 - [x] storage-efficient grayscale synthetic training images
 - [x] full-canvas synthetic geometry + saturated pixel conversion with versioned dimensions
 - [x] leakage-safe normalized-text-group train/dev splitting
+- [x] matched training-only expansion audit with pinned images, fixed dev/vocabulary, and no-text identities
 - [x] clean/noisy/phone synthetic augmentation profiles
 - [x] line recognizer training pipeline (CRNN + CTC)
 - [x] recognizer training device selection (CPU/CUDA/Apple MPS/auto)

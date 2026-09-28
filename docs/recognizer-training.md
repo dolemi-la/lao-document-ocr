@@ -304,3 +304,14 @@ dev:   line-0001 variant B -> "ສະບາຍດີ"
 which would make dev CER look better without testing generalization to unseen text.
 
 At least two unique normalized text groups are required. Tiny datasets containing multiple images of only one text string are rejected instead of manufacturing a leaked dev split.
+
+## Matched training-data expansion
+
+Before comparing a broader training set with an existing run, use
+`audit-training-expansion` to verify unchanged ordered development images/labels,
+retained baseline samples, fixed vocabulary, and no cross-split exact-label or
+image overlap. The audit rechecks pinned image bytes and emits counts and
+fingerprints without labels or paths. It is an explicit pre-run command, not an
+automatic training or document-level leakage guarantee.
+See [training-expansion.md](training-expansion.md) for usage and the bounded
+Phetsarath expansion experiment.
