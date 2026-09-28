@@ -143,6 +143,49 @@ def render_text_line(
     canvas.paste(rendered, (padding_x, padding_y), rendered)
     return canvas.convert("L")
 
+
+def _warp_full_canvas(array: np.ndarray, matrix: np.ndarray) -> np.ndarray:
+    """Keep the complete transformed source rectangle, including edge glyphs."""
+    height, width = array.shape
+    affine = matrix.shape == (2, 3)
+    transform = (
+        np.vstack((matrix, [0.0, 0.0, 1.0]))
+        if affine else np.asarray(matrix, dtype=np.float64)
+    )
+    corners = np.array(
+        [[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]],
+        dtype=np.float64,
+    )
+    denominators = np.column_stack((corners, np.ones(4))) @ transform[2]
+    if (
+        not np.isfinite(transform).all()
+        or np.any(np.abs(denominators) < 1e-12)
+        or (np.any(denominators < 0) and np.any(denominators > 0))
+    ):
+        raise ValueError("Synthetic transform crosses a projective singularity")
+    projected = cv2.perspectiveTransform(corners[None], transform)[0]
+    if not np.isfinite(projected).all():
+        raise ValueError("Synthetic transform has non-finite bounds")
+
+    # Two extra pixels accommodate the cubic interpolation footprint. Translate
+    # rather than rescale: enlarging the canvas must not distort the glyphs.
+    lower = np.floor(projected.min(axis=0)).astype(int) - 2
+    upper = np.ceil(projected.max(axis=0)).astype(int) + 2
+    output_size = tuple(int(value) for value in upper - lower + 1)
+    translated = transform.copy()
+    translated[0] -= lower[0] * transform[2]
+    translated[1] -= lower[1] * transform[2]
+    warp = cv2.warpAffine if affine else cv2.warpPerspective
+    return warp(
+        array,
+        translated[:2] if affine else translated,
+        output_size,
+        flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=255,
+    )
+
+
 def _apply_perspective(
     array: np.ndarray,
     rng: np.random.Generator,
@@ -152,6 +195,8 @@ def _apply_perspective(
         return array, 0.0
 
     height, width = array.shape
+    if height < 2 or width < 2:
+        return array, 0.0
     max_x = max(1.0, width * jitter)
     max_y = max(1.0, height * min(jitter * 1.5, 0.12))
     source = np.float32(
@@ -170,14 +215,7 @@ def _apply_perspective(
     ).astype(np.float32)
     target = source + offsets
     matrix = cv2.getPerspectiveTransform(source, target)
-    warped = cv2.warpPerspective(
-        array,
-        matrix,
-        (width, height),
-        flags=cv2.INTER_CUBIC,
-        borderMode=cv2.BORDER_CONSTANT,
-        borderValue=255,
-    )
+    warped = _warp_full_canvas(array, matrix)
     return warped, float(np.max(np.abs(offsets[:, 0])) / max(1, width))
 
 
@@ -272,21 +310,16 @@ def augment_scan(
         height, width = array.shape
         center = (width / 2, height / 2)
         matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-        array = cv2.warpAffine(
-            array,
-            matrix,
-            (width, height),
-            flags=cv2.INTER_CUBIC,
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=255,
-        )
+        array = _warp_full_canvas(array, matrix)
 
     array, perspective = _apply_perspective(
         array,
         rng,
         config.perspective_jitter,
     )
-    output = Image.fromarray(array.astype(np.uint8))
+    # Cubic interpolation can overshoot [0, 255]. Casting without clipping
+    # wraps white highlights to dark pixels (and negative ink values to white).
+    output = Image.fromarray(np.rint(np.clip(array, 0, 255)).astype(np.uint8))
 
     if blur > 0.01:
         output = output.filter(ImageFilter.GaussianBlur(radius=blur))
@@ -300,6 +333,11 @@ def augment_scan(
     )
 
     metadata: dict[str, float | int] = {
+        "geometry_version": 2,
+        "source_width": image.width,
+        "source_height": image.height,
+        "output_width": output.width,
+        "output_height": output.height,
         "rotation_degrees": angle,
         "brightness": brightness,
         "contrast": contrast,

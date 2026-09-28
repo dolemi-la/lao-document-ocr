@@ -8,7 +8,7 @@ These profiles improve training diversity. They are **not** substitutes for the 
 
 ### `default`
 
-Backward-compatible mild augmentation:
+Mild augmentation parameters:
 
 - small rotation
 - light Gaussian noise
@@ -66,7 +66,7 @@ When multiple fonts are supplied, balanced scheduling also rotates font choice a
 
 ```bash
 lao-ocr generate-synthetic \
-  --corpus training/data/lao-lines.txt \
+  --corpus training/data/lao-lines-phetsarath.txt \
   --output training/generated/balanced-v1 \
   --font /path/to/PhetsarathOT-Regular.ttf \
   --variants-per-line 3 \
@@ -92,7 +92,41 @@ Each manifest entry records:
 - seed
 - output image SHA-256
 
-The same corpus/fonts/options/seed produce the same profile schedule and augmentation metadata.
+Within the same generator revision and dependency environment, the same corpus/fonts/options/seed produce the same profile schedule and augmentation metadata.
+
+## Geometry and pixel-range integrity (version 2)
+
+Rotation and perspective transforms expand and translate the output canvas to
+contain the complete transformed source rectangle, with a small interpolation
+margin. They do not deliberately crop edge characters or rescale the geometry
+to force it back into the old dimensions. A no-op transform keeps the input size.
+Degenerate one-pixel-wide/high inputs skip perspective distortion. A transform
+crossing a projective singularity is rejected rather than producing invalid bounds.
+
+Cubic interpolation can create values outside the grayscale range. Before
+serialization, values are clamped to `[0, 255]` and rounded to the nearest integer.
+This prevents unsigned-byte conversion from wrapping bright pixels to dark and
+negative values to white. Rounding also prevents floating-point noise around
+pure white from introducing artificial gray backgrounds.
+
+New augmentation metadata contains `geometry_version: 2`, `source_width`,
+`source_height`, `output_width`, and `output_height`. Old unversioned images must
+not be relabeled as version 2. Regenerating images with this implementation can
+change dimensions and hashes; retain old artifacts for audit and use a separate
+output directory. Chunk/full-run determinism is still tested within this version.
+
+Preserving a long rotated line can increase the canvas height. Re-run strict
+font coverage, image hash checks, and CTC capacity checks on new datasets. Do not
+shorten labels or accept impossible CTC alignments to hide a capacity failure.
+The corrected 300-image Phetsarath diagnostic set has two capacity failures at
+height 48 / max width 768; at height 64 / max width 768 all 300 pass. That is a
+capacity observation, not a trained-model quality result. A changed image size
+or dataset requires a new compatible training run, not an exact resume from the
+old dataset/checkpoint.
+
+The measured defects and paired training diagnostics are recorded in
+[recognizer-training-health.md](recognizer-training-health.md). Correcting
+augmentation integrity is not itself evidence of higher OCR accuracy.
 
 ## Benchmark policy
 
