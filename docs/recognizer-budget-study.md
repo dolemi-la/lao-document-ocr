@@ -158,3 +158,13 @@ blindly adding epochs is not the next priority. Preserve the candidate and asses
 a separately defined, larger unseen evaluation set with reviewed provenance,
 while continuing the genuine optical-capture campaign. Any further development
 must retain this endpoint and distinguish new experiments from this one.
+
+## Follow-up: frozen-model challenge
+
+The [separate synthetic evaluation](recognizer-fresh-evaluation.md) freezes this
+study's selected epoch-72 artifact and evaluates new exact-label groups without
+retraining or parameter tuning. It scored 1,036/10,062 character edits (10.30%)
+on 160 text groups rendered in three profiles. This uses a new denominator,
+not a revision of the 12-image development result above. Whole-line correctness
+was 123/480; source/document independence and real optical performance remain
+unverified. The candidate remains local and experimental.

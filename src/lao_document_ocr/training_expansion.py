@@ -120,3 +120,66 @@ def audit_training_expansion(
         "document_source_separation": "unverified",
         "training_rights": "not-assessed",
     }
+
+
+def audit_recognizer_holdout(
+    excluded_manifests: list[list[TrainingSample]],
+    evaluation: list[TrainingSample],
+    vocabulary: CharacterVocabulary,
+) -> dict[str, Any]:
+    """Verify exact-label/image isolation against every supplied prior manifest.
+
+    This is an explicit input audit, not proof of unseen documents, complete
+    model-training provenance, source rights, or independent test performance.
+    Repeated labels with distinct images are allowed and counted as one group.
+    """
+    if not excluded_manifests:
+        raise ValueError("Holdout audit requires at least one exclusion manifest")
+    if not evaluation or any(not samples for samples in excluded_manifests):
+        raise ValueError("Holdout and exclusion manifests must be non-empty")
+
+    excluded_texts: set[str] = set()
+    excluded_images: set[str] = set()
+    excluded_identities: list[dict[str, Any]] = []
+    for samples in excluded_manifests:
+        identities = _verified_identities(samples)
+        excluded_texts.update(text for text, _ in identities.values())
+        excluded_images.update(image for _, image in identities.values())
+        excluded_identities.append({
+            "samples": len(samples),
+            "identity_sha256": _fingerprint(samples, identities),
+        })
+
+    identities = _verified_identities(evaluation)
+    texts = {text for text, _ in identities.values()}
+    images = {image for _, image in identities.values()}
+    if texts & excluded_texts:
+        raise ValueError("Evaluation has normalized label overlap with supplied exclusions")
+    if images & excluded_images:
+        raise ValueError("Evaluation has image overlap with supplied exclusions")
+    if len(images) != len(evaluation):
+        raise ValueError("Holdout contains a duplicate evaluation image")
+    allowed = set(vocabulary.characters)
+    if any(set(text) - allowed for text in texts):
+        raise ValueError("Evaluation text contains characters outside the supplied vocabulary")
+
+    return {
+        "schema_version": "1",
+        "type": "recognizer-holdout-audit",
+        "identity_strategy": "ordered-id-normalized-text-image-sha256-v1",
+        "evaluation_samples": len(evaluation),
+        "evaluation_text_groups": len(texts),
+        "evaluation_identity_sha256": _fingerprint(evaluation, identities),
+        "excluded_manifest_count": len(excluded_manifests),
+        "excluded_text_groups": len(excluded_texts),
+        "excluded_unique_images": len(excluded_images),
+        "excluded_manifests": excluded_identities,
+        "vocabulary_checksum": vocabulary.checksum(),
+        "vocabulary_size": vocabulary.size,
+        "image_hashes_verified": True,
+        "normalized_label_overlap": 0,
+        "image_overlap": 0,
+        "exclusion_coverage": "caller-supplied-manifests-only",
+        "document_source_separation": "unverified",
+        "source_rights": "not-assessed",
+    }

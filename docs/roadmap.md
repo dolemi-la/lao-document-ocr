@@ -104,6 +104,7 @@ Status: started
 - [x] full-canvas synthetic geometry + saturated pixel conversion with versioned dimensions
 - [x] leakage-safe normalized-text-group train/dev splitting
 - [x] matched training-only expansion audit with pinned images, fixed dev/vocabulary, and no-text identities
+- [x] explicit fresh-evaluation audit against supplied prior manifests, pinned images, and vocabulary
 - [x] clean/noisy/phone synthetic augmentation profiles
 - [x] line recognizer training pipeline (CRNN + CTC)
 - [x] recognizer training device selection (CPU/CUDA/Apple MPS/auto)
@@ -138,6 +139,12 @@ updates. Final training CER was 0% and final normalized dev CER was 15.56%
 the compute budget and the same repeatedly inspected 12-image synthetic dev set;
 it does not overturn the equal-update comparison or establish optical accuracy.
 The best-on-dev local export remains a development candidate, not a promoted model.
+
+A [frozen-model synthetic challenge](recognizer-fresh-evaluation.md) subsequently
+evaluated 160 new exact-label groups in 480 correlated variants. The unchanged
+candidate scored 10.30% CER versus 46.41% for the older baseline, but only
+123/480 lines were exact. This is restricted short-line synthetic evidence,
+not document-independent optical accuracy or a production promotion.
 
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 

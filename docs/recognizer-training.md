@@ -315,3 +315,15 @@ fingerprints without labels or paths. It is an explicit pre-run command, not an
 automatic training or document-level leakage guarantee.
 See [training-expansion.md](training-expansion.md) for usage and the bounded
 Phetsarath expansion experiment.
+
+## Auditing a separate evaluation set
+
+Use `audit-recognizer-holdout` before scoring a frozen candidate on new text.
+Supply all relevant training, calibration, and previously inspected manifests
+with repeated `--exclude-manifest` arguments. The audit checks actual pinned
+image bytes, normalized exact-label separation, and a supplied frozen vocabulary.
+It emits no-text counts and identities, refuses duplicate evaluation images,
+and never overwrites existing reports. It is an explicit command, not an
+automatic training guard or proof of document independence. See
+[recognizer-fresh-evaluation.md](recognizer-fresh-evaluation.md) for its contract
+and the frozen-candidate 160-text / 480-image experiment.

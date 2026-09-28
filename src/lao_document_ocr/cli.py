@@ -1009,6 +1009,15 @@ def _parser() -> argparse.ArgumentParser:
     expansion.add_argument("--dev-ratio", type=float, default=0.1)
     expansion.add_argument("--output", type=Path, required=True)
 
+    holdout = subparsers.add_parser(
+        "audit-recognizer-holdout",
+        help="Verify evaluation isolation from supplied training/prior-evaluation manifests.",
+    )
+    holdout.add_argument("--manifest", type=Path, required=True)
+    holdout.add_argument("--exclude-manifest", type=Path, action="append", required=True)
+    holdout.add_argument("--vocabulary", type=Path, required=True)
+    holdout.add_argument("--output", type=Path, required=True)
+
     train = subparsers.add_parser(
         "train-recognizer",
         help="Train the CRNN+CTC Lao line recognizer.",
@@ -2205,6 +2214,29 @@ def _audit_training_expansion(args: argparse.Namespace) -> int:
     return 0
 
 
+def _audit_recognizer_holdout(args: argparse.Namespace) -> int:
+    from lao_document_ocr.training_expansion import audit_recognizer_holdout
+    from lao_document_ocr.vocabulary import CharacterVocabulary
+
+    if args.output.exists():
+        raise ValueError("Holdout report already exists; use a new output path")
+    excluded = [load_training_manifest(path) for path in args.exclude_manifest]
+    evaluation = load_training_manifest(args.manifest)
+    vocabulary = CharacterVocabulary.load(args.vocabulary)
+    report = audit_recognizer_holdout(excluded, evaluation, vocabulary)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with args.output.open("x", encoding="utf-8") as destination:
+            json.dump(report, destination, indent=2, allow_nan=False)
+            destination.write(chr(10))
+    except FileExistsError as exc:
+        raise ValueError("Holdout report already exists") from exc
+    print(f"Holdout audit: {args.output}")
+    print(f"Evaluation images: {report['evaluation_samples']}; "
+          f"unique text groups: {report['evaluation_text_groups']}")
+    return 0
+
+
 def _train_recognizer(args: argparse.Namespace) -> int:
     try:
         from lao_document_ocr.recognizer_training import TrainingConfig, train_recognizer
@@ -2424,6 +2456,8 @@ def main() -> int:
             return _train_reading_order(args)
         if args.command == "export-reading-order":
             return _export_reading_order(args)
+        if args.command == "audit-recognizer-holdout":
+            return _audit_recognizer_holdout(args)
         if args.command == "audit-training-expansion":
             return _audit_training_expansion(args)
         if args.command == "train-recognizer":
