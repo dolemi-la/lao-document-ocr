@@ -186,3 +186,16 @@ for regression evidence and a deliberately limited synthetic-development control
 No fresh Tesseract remote-suite comparison was run for this correction because
 the local executable was unavailable. Earlier suite measurements remain historical.
 Future comparisons must pin the preprocessing revision and identical source pages.
+
+
+## Pinned Tesseract deskew A/B — 2026-09-29
+
+The [real-scan deskew comparison](tesseract-real-deskew-comparison.md) records
+Tesseract 5.5.3 with explicit Lao/English traineddata hashes and paired old/new
+preprocessing over identical transient source bytes. Both auto-orientation-off
+and auto-orientation-on conditions were fixed, with extra diagnostic probes off.
+Only seven of nine planned pages were reachable. The PTC character-loss warning
+shows why higher confidence is not sufficient evidence of OCR improvement.
+The reports preserve failures, page coverage, counts, and hashes without storing
+native/OCR strings or retaining the remote documents. This is not the optical
+benchmark or published Tesseract accuracy baseline.

@@ -34,6 +34,7 @@ Status: in progress
 - [x] Tesseract OSD orientation hint cross-check against exhaustive rotation diagnostics
 - [x] opt-in coordinate-safe right-angle auto-orientation for document conversion + remote A/B diagnostics
 - [x] bounded small-angle deskew direction correction with signed-angle and pipeline regressions
+- [ ] reliable text-skew proposals and text-retention safeguards — tracked in [#17](https://github.com/dolemi-la/lao-document-ocr/issues/17)
 - [x] rotate preserved embedded-image payloads with auto-oriented PDF page geometry
 - [x] opt-in right-angle auto-orientation exposed through sync API + async single/batch jobs
 - [x] opt-in right-angle auto-orientation exposed for focused remote-source CLI/workflow diagnostics
@@ -88,6 +89,13 @@ Tracking: real optical collection + registration is tracked in [#14](https://git
 - [ ] Tesseract baseline report — tracked in [#15](https://github.com/dolemi-la/lao-document-ocr/issues/15)
 
 Exit condition: every model change can be measured on a fixed, legal, documented dataset.
+
+Current real-scan diagnostic warning: the [pinned Tesseract deskew A/B](tesseract-real-deskew-comparison.md)
+completed seven of nine pages, with two Census TLS failures. Corrected deskew
+reduced the PTC page-1 recognized count from 1,321 to 280; a no-deskew control
+returned 1,390. These counts are not accuracy labels. Reliable deskew proposals
+and text-retention safeguards remain unvalidated; do not treat the direction
+fix or higher confidence as a full real-scan quality pass.
 
 ## Phase 2 — own recognizer
 

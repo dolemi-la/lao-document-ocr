@@ -141,3 +141,19 @@ synthetic controls do not replace optical evidence. No document was downloaded,
 no production model was promoted, and capture kits/collector sessions were not
 modified. A future real-suite comparison must pin the preprocessing revision
 as well as the same source pages and OCR settings.
+
+
+## Subsequent Tesseract real-scan comparison — 2026-09-29
+
+Tesseract Lao/English was subsequently restored and tested using pinned language
+models. The [paired remote comparison](tesseract-real-deskew-comparison.md)
+completed four sources / seven pinned pages; two Census downloads failed TLS
+negotiation. It found a PTC page-1 warning: corrected deskew returned 280
+characters versus 1,321 with old deskew, despite higher mean confidence. Disabling
+only deskew in a separately recorded control returned 1,390 characters.
+
+This is not a full-suite quality pass or ground-truth accuracy result. The
+known-rotation direction fix does not establish reliable text-skew proposals
+for every page. Proposal/retention safeguards need further investigation before
+claiming broad real-document improvement. The earlier synthetic results above
+remain historical and unchanged; no new production setting was enabled.
