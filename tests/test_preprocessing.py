@@ -86,6 +86,8 @@ def test_equivalent_rectangle_angle_conventions_use_same_correction(
 ):
     image = _printed_rows()
     recorded = {}
+    # Isolate the direction convention from the separate image-evidence gate.
+    monkeypatch.setattr(preprocessing, "_deskew_evidence", lambda *args: {"accepted": True})
     monkeypatch.setattr(preprocessing.cv2, "minAreaRect", lambda _: ((0, 0), (100, 10), reported))
 
     def warp(array, matrix, size, **kwargs):

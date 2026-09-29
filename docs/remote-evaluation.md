@@ -199,3 +199,13 @@ shows why higher confidence is not sufficient evidence of OCR improvement.
 The reports preserve failures, page coverage, counts, and hashes without storing
 native/OCR strings or retaining the remote documents. This is not the optical
 benchmark or published Tesseract accuracy baseline.
+
+## Conservative deskew evidence follow-up
+
+The [image-evidence guard](deskew-evidence-guard.md) now vetoes a small-angle
+proposal if threshold foreground would cross the page boundary or horizontal
+row alignment does not improve. A new same-byte Tesseract comparison reproduces
+PTC output at 1,390 rather than 280 characters, but has mixed results elsewhere
+and incomplete source coverage. No ground-truth accuracy claim is made. Issue
+#17 remains open, including MAF page-1 retention and KPMG page-21 orientation
+review. Historical measurements in this document are not overwritten.

@@ -34,6 +34,7 @@ Status: in progress
 - [x] Tesseract OSD orientation hint cross-check against exhaustive rotation diagnostics
 - [x] opt-in coordinate-safe right-angle auto-orientation for document conversion + remote A/B diagnostics
 - [x] bounded small-angle deskew direction correction with signed-angle and pipeline regressions
+- [x] conservative small-angle image-evidence veto for clipping/unsupported alignment; real accuracy validation remains open
 - [ ] reliable text-skew proposals and text-retention safeguards — tracked in [#17](https://github.com/dolemi-la/lao-document-ocr/issues/17)
 - [x] rotate preserved embedded-image payloads with auto-oriented PDF page geometry
 - [x] opt-in right-angle auto-orientation exposed through sync API + async single/batch jobs
@@ -206,3 +207,12 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] local/public/S3 deployment presets
 
 The open-source core remains usable locally without authentication or billing.
+
+## Deskew guard validation follow-up
+
+The [image-evidence guard](deskew-evidence-guard.md) prevents the observed PTC
+output collapse without additional OCR calls. The same-byte check completed
+four sources / seven pinned pages; all five proposed rotations were rejected.
+MAF page 1 returns fewer characters and KPMG page 21 changes its right-angle
+selection. Issue #17 stays open for those reviews, missing Census sources, and
+the genuine capture pilot. This is not a ground-truth accuracy pass.

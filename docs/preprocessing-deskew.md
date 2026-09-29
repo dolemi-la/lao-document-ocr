@@ -157,3 +157,13 @@ known-rotation direction fix does not establish reliable text-skew proposals
 for every page. Proposal/retention safeguards need further investigation before
 claiming broad real-document improvement. The earlier synthetic results above
 remain historical and unchanged; no new production setting was enabled.
+
+## Conservative deskew evidence follow-up
+
+The [image-evidence guard](deskew-evidence-guard.md) now vetoes a small-angle
+proposal if threshold foreground would cross the page boundary or horizontal
+row alignment does not improve. A new same-byte Tesseract comparison reproduces
+PTC output at 1,390 rather than 280 characters, but has mixed results elsewhere
+and incomplete source coverage. No ground-truth accuracy claim is made. Issue
+#17 remains open, including MAF page-1 retention and KPMG page-21 orientation
+review. Historical measurements in this document are not overwritten.
