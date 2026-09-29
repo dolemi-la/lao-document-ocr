@@ -12,10 +12,12 @@ def _deskew(gray: np.ndarray) -> np.ndarray:
     if points is None or len(points) < 50:
         return gray
 
-    angle = cv2.minAreaRect(points)[-1]
-    if angle < -45:
-        angle = 90 + angle
-    angle = -angle
+    # Rectangle axes are equivalent modulo 90 degrees. Normalize signed and
+    # unsigned angle conventions to the nearest horizontal/vertical axis. In
+    # image coordinates this is already the correction for getRotationMatrix2D;
+    # negating it doubles the existing tilt instead of cancelling it.
+    rectangle_angle = float(cv2.minAreaRect(points)[-1])
+    angle = (rectangle_angle + 45.0) % 90.0 - 45.0
 
     if abs(angle) < 0.15 or abs(angle) > 12:
         return gray

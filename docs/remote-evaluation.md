@@ -175,3 +175,14 @@ The GitHub workflow exposes the same control as `diagnostic_rotation_probes` (de
 
 - baseline: `auto_orient_right_angles=false`, `diagnostic_rotation_probes=false`;
 - auto-orient: `auto_orient_right_angles=true`, `diagnostic_rotation_probes=false`.
+
+
+## Small-angle cleanup revision
+
+The shared page-cleanup path now corrects, rather than compounds, the signed
+small-angle deskew estimate. This is separate from opt-in right-angle orientation;
+no orientation default changed. See [preprocessing-deskew.md](preprocessing-deskew.md)
+for regression evidence and a deliberately limited synthetic-development control.
+No fresh Tesseract remote-suite comparison was run for this correction because
+the local executable was unavailable. Earlier suite measurements remain historical.
+Future comparisons must pin the preprocessing revision and identical source pages.

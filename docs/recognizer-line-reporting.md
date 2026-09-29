@@ -188,3 +188,14 @@ fingerprinted. All 519 protected input/code files were verified unchanged.
 
 No training was started. Production models, OCR defaults, font policy, capture
 kits, and collector sessions were not modified.
+
+
+## Subsequent page-cleanup correction
+
+A separate [deskew investigation](preprocessing-deskew.md) found that existing
+page cleanup could compound small tilt rather than undo it. The angle correction
+is now covered by pixel and pipeline regressions. Its old-development-data
+comparison reduced overall errors relative to old cleanup, but did not improve
+the phone subset; direct line inference still had fewer character errors than
+either cleanup path. No page preprocessing was added to exported line inference,
+and the frozen challenge was not used for this investigation.
