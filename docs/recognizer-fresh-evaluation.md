@@ -174,3 +174,13 @@ needs a separately isolated evaluation set. Longer lines, additional character
 coverage, source-level separation, and genuine reviewed optical captures remain
 unvalidated. The real benchmark and published Tesseract baseline are still open
 requirements, not satisfied by this result.
+
+## Separate decoder development control
+
+A subsequent [whole-line/decoder study](recognizer-line-reporting.md) used only
+the old twelve development labels and their regenerated profiles, not the frozen
+challenge above. Greedy and plain beam-width-10 decoding produced identical
+normalized predictions on all 48 development images, with no language model or
+training. The challenge artifacts and results remained unchanged. This supplies
+no reason to switch the production decoder and must not be called a fresh test
+on this already measured challenge.

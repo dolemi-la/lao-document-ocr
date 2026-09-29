@@ -180,6 +180,17 @@ lao-ocr benchmark-recognizer \
 
 The report includes aggregate CER/WER plus per-sample hypotheses, timing, and the raw probability score. Raw confidence is diagnostic only until calibrated on a held-out development set.
 
+### Exact lines and aggregate-only reports
+
+Recognizer benchmarks now report normalized exact-line and empty-prediction
+counts alongside CER/WER. A low character error rate is not a claim that most
+whole lines are correct. Add `--summary-only` to write aggregate metrics without
+reference/predicted text, sample IDs, paths, or arbitrary model metadata. Default
+detailed reports remain available for local error analysis and calibration;
+summary-only reports cannot fit calibration. Neither mode changes inference or
+checkpoint selection. See [recognizer-line-reporting.md](recognizer-line-reporting.md)
+for the metric/privacy contract and development-only decoder comparison.
+
 ## 8. Calibrate confidence on held-out dev data
 
 ```bash

@@ -122,6 +122,7 @@ Status: started
 - [x] optional CTC prefix beam-search decoder + decoder-specific calibration
 - [x] versioned checkpoints/artifact checksums
 - [x] exported-recognizer regression benchmark pipeline
+- [x] normalized whole-line benchmark metrics + aggregate-only report mode excluding arbitrary metadata
 - [x] fixed-set owned-vs-Tesseract benchmark comparison gate
 - [x] optional character n-gram shallow fusion for CTC beam decoding
 - [x] repeatable normalized held-out-text exclusions for LM training + no-text exclusion fingerprints

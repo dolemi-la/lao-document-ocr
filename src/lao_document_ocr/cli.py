@@ -1081,6 +1081,10 @@ def _parser() -> argparse.ArgumentParser:
     recognizer_benchmark.add_argument("--manifest", required=True, type=Path)
     recognizer_benchmark.add_argument("--model", required=True, type=Path)
     recognizer_benchmark.add_argument("--output", required=True, type=Path)
+    recognizer_benchmark.add_argument(
+        "--summary-only", action="store_true",
+        help="Write aggregate metrics only, without text, sample IDs, or model metadata.",
+    )
     recognizer_benchmark.add_argument("--no-hash-check", action="store_true")
     recognizer_benchmark.add_argument("--calibration", type=Path)
     recognizer_benchmark.add_argument(
@@ -2351,13 +2355,17 @@ def _benchmark_recognizer(args: argparse.Namespace) -> int:
         language_model_weight=args.language_model_weight,
         language_model_token_bonus=args.language_model_token_bonus,
     )
-    report = benchmark_recognizer(samples, recognizer)
+    report = benchmark_recognizer(samples, recognizer, summary_only=args.summary_only)
     output = write_recognizer_report(report, args.output)
     overall = report["overall"]
     print(f"Report: {output}")
     print(f"Samples: {overall['samples']}")
     print(f"CER: {overall['cer']:.4f}")
     print(f"WER: {overall['wer']:.4f}")
+    print(f"Exact lines: {overall['exact_lines']}/{overall['samples']}")
+    print(
+        f"Normalized-empty predictions: {overall['empty_predictions']}/{overall['samples']}"
+    )
     return 0
 
 
