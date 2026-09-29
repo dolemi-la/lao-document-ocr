@@ -25,6 +25,10 @@ from PIL import Image
 
 from lao_document_ocr.models import BlockType
 from lao_document_ocr.ocr.base import OcrEngine
+from lao_document_ocr.orientation_geometry import (
+    ORIENTATION_GEOMETRY_VERSION,
+    sanitized_orientation_geometry,
+)
 from lao_document_ocr.pipeline import DEFAULT_MAX_PAGE_PIXELS, process_document
 from lao_document_ocr.reading_order import ReadingOrderResolver
 
@@ -455,9 +459,14 @@ def _rotation_probe(
         orientation_confidence, recognized_characters, score = (
             _rotation_probe_metrics(ocr_stats)
         )
+        line_stats = ocr_stats.get("line_stats")
+        geometry = sanitized_orientation_geometry(
+            line_stats.get("orientation_geometry") if isinstance(line_stats, dict) else None
+        )
         variants.append(
             {
                 "degrees_clockwise": degrees_clockwise,
+                "orientation_geometry": geometry,
                 "score": score,
                 "orientation_confidence": orientation_confidence,
                 "recognized_characters": recognized_characters,
@@ -506,8 +515,14 @@ def _rotation_probe(
             finally:
                 rotated_path.unlink(missing_ok=True)
 
+    vetoed = [
+        item["degrees_clockwise"] for item in variants
+        if item["degrees_clockwise"] != 0
+        and isinstance(item["orientation_geometry"], dict)
+        and item["orientation_geometry"].get("sideways_dominant") is True
+    ]
     ranked = sorted(
-        variants,
+        [item for item in variants if item["degrees_clockwise"] not in vetoed],
         key=lambda item: (
             float(item["score"]),
             float(item["orientation_confidence"]),
@@ -541,6 +556,8 @@ def _rotation_probe(
         recommended = int(best["degrees_clockwise"])
 
     return {
+        "candidate_geometry_policy": ORIENTATION_GEOMETRY_VERSION,
+        "geometry_vetoed_degrees": vetoed,
         "scoring_basis": (
             "production-line-stats" if use_line_stats else "block-letter-fallback"
         ),

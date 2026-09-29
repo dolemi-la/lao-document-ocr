@@ -166,3 +166,17 @@ but two source failures, MAF page-1 output reduction, KPMG page-21 orientation
 review, and the six-page genuine capture pilot remain unresolved. The project
 still has no reviewed, frozen optical benchmark or published real Tesseract
 accuracy baseline. Do not substitute these heuristic diagnostics for those gates.
+
+
+## Right-angle line-axis follow-up
+
+The [orientation geometry follow-up](orientation-line-geometry.md) separately
+checks OCR line axes before ranking already-probed right-angle candidates.
+Tesseract can return confident text in vertical boxes; the new veto prevents
+those rotated candidates from winning purely on confidence/character count.
+It shares versioned numeric geometry with remote rotation probes, preserves the
+existing score thresholds and baseline skip rules, and adds no OCR calls.
+KPMG pages 8 and 21 change from 180 to 90 degrees, while page 15 remains at 90.
+Plain OCR and the deskew guard are unchanged. MAF transcription review, missing
+source coverage and the genuine optical pilot remain unresolved; see the linked
+report for the visual-review scope, same-result replay method and limitations.

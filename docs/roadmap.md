@@ -33,6 +33,7 @@ Status: in progress
 - [x] diagnostic 0/90/180/270 OCR rotation probe for selected raster pages
 - [x] Tesseract OSD orientation hint cross-check against exhaustive rotation diagnostics
 - [x] opt-in coordinate-safe right-angle auto-orientation for document conversion + remote A/B diagnostics
+- [x] no-text line-axis veto for sideways right-angle candidates, shared with remote probes
 - [x] bounded small-angle deskew direction correction with signed-angle and pipeline regressions
 - [x] conservative small-angle image-evidence veto for clipping/unsupported alignment; real accuracy validation remains open
 - [ ] reliable text-skew proposals and text-retention safeguards — tracked in [#17](https://github.com/dolemi-la/lao-document-ocr/issues/17)
@@ -216,3 +217,14 @@ four sources / seven pinned pages; all five proposed rotations were rejected.
 MAF page 1 returns fewer characters and KPMG page 21 changes its right-angle
 selection. Issue #17 stays open for those reviews, missing Census sources, and
 the genuine capture pilot. This is not a ground-truth accuracy pass.
+
+
+### Orientation follow-up
+
+The [line-geometry veto](orientation-line-geometry.md) addresses high-confidence
+sideways OCR candidates: KPMG pages 8/15/21 now select 90 degrees in the available
+same-byte diagnostic, matching public-page visual orientation. Plain OCR output
+is unchanged on the seven available pages. This is not transcription-accuracy
+validation. Two source failures, MAF's text-retention tradeoff and the genuine
+capture pilot keep issue #17 open. High-confidence baseline skip behavior is
+unchanged and remains a limitation of the current opt-in orientation path.

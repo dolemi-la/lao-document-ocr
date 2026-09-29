@@ -15,6 +15,10 @@ from lao_document_ocr.header_footer import mark_repeated_headers_footers
 from lao_document_ocr.models import BlockType, Document, Page
 from lao_document_ocr.ocr.base import OcrEngine, OcrEngineError
 from lao_document_ocr.ocr.tesseract import TesseractEngine
+from lao_document_ocr.orientation_geometry import (
+    ORIENTATION_GEOMETRY_VERSION,
+    orientation_line_geometry,
+)
 from lao_document_ocr.preprocessing import preprocess_image
 from lao_document_ocr.raster_regions import detect_raster_regions
 from lao_document_ocr.reading_order import (
@@ -281,6 +285,7 @@ def _recognize_with_right_angle_orientation(
         baseline_lao_ratio,
     ) = _orientation_line_stats(baseline_lines)
 
+    geometry = {0: orientation_line_geometry(baseline_lines)}
     probe_skip_reason = None
     if baseline_confidence >= DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE:
         probe_skip_reason = "high-confidence"
@@ -292,6 +297,7 @@ def _recognize_with_right_angle_orientation(
         probe_skip_reason = "lao-dominant-baseline"
 
     base_diagnostics: dict[str, object] = {
+        "candidate_geometry_policy": ORIENTATION_GEOMETRY_VERSION,
         "baseline_confidence": baseline_confidence,
         "baseline_characters": baseline_characters,
         "baseline_score": baseline_score,
@@ -317,6 +323,8 @@ def _recognize_with_right_angle_orientation(
                 "selected_characters": baseline_characters,
                 "selected_score": baseline_score,
                 "selected_lao_ratio": baseline_lao_ratio,
+                "geometry_vetoed_degrees": [],
+                "candidate_geometry": [{"degrees_clockwise": 0, "geometry": geometry[0]}],
                 "probe_skipped": True,
                 "probe_skip_reason": probe_skip_reason,
                 "probe_strategy": "skipped",
@@ -361,14 +369,19 @@ def _recognize_with_right_angle_orientation(
             lao_ratio,
         )
         candidates.append(candidate)
+        geometry[degrees] = orientation_line_geometry(lines)
         probed_degrees.append(degrees)
         return candidate
 
     for degrees in (90, 180, 270):
         probe(degrees)
 
+    # The unchanged baseline remains a safe fallback. Disqualify rotated
+    # candidates whose recognized multi-character lines are predominantly
+    # vertical in image coordinates, even when OCR confidence is high.
+    vetoed = [degrees for degrees in probed_degrees if geometry[degrees]["sideways_dominant"]]
     ranked_candidates = sorted(
-        candidates,
+        [candidate for candidate in candidates if candidate[0] not in vetoed],
         key=lambda item: (item[5], item[3], item[4]),
         reverse=True,
     )
@@ -421,6 +434,11 @@ def _recognize_with_right_angle_orientation(
             "selected_characters": best_characters,
             "selected_score": best_score,
             "selected_lao_ratio": best_lao_ratio,
+            "geometry_vetoed_degrees": vetoed,
+            "candidate_geometry": [
+                {"degrees_clockwise": candidate[0], "geometry": geometry[candidate[0]]}
+                for candidate in candidates
+            ],
             "probe_skipped": False,
             "probe_skip_reason": None,
             "probe_strategy": "exhaustive",
@@ -520,6 +538,7 @@ def process_document(
                     "recognized_characters": line_recognized_characters,
                     "score": line_score,
                     "lao_ratio": line_lao_ratio,
+                    "orientation_geometry": orientation_line_geometry(lines),
                 }
             )
 

@@ -209,3 +209,17 @@ PTC output at 1,390 rather than 280 characters, but has mixed results elsewhere
 and incomplete source coverage. No ground-truth accuracy claim is made. Issue
 #17 remains open, including MAF page-1 retention and KPMG page-21 orientation
 review. Historical measurements in this document are not overwritten.
+
+
+## Right-angle line-axis follow-up
+
+The [orientation geometry follow-up](orientation-line-geometry.md) separately
+checks OCR line axes before ranking already-probed right-angle candidates.
+Tesseract can return confident text in vertical boxes; the new veto prevents
+those rotated candidates from winning purely on confidence/character count.
+It shares versioned numeric geometry with remote rotation probes, preserves the
+existing score thresholds and baseline skip rules, and adds no OCR calls.
+KPMG pages 8 and 21 change from 180 to 90 degrees, while page 15 remains at 90.
+Plain OCR and the deskew guard are unchanged. MAF transcription review, missing
+source coverage and the genuine optical pilot remain unresolved; see the linked
+report for the visual-review scope, same-result replay method and limitations.
