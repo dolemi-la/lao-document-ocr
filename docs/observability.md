@@ -134,6 +134,8 @@ attempts, not individual provider requests or immediate cancellation deletes.
 They reset on API restart and include no job IDs, object keys, or document text.
 
 Metrics snapshots can trigger a due cleanup pass through the existing manager
-activity path. No scheduled retry service or server-side storage timeout is
-implied. Inspect persistent pending counts and retained-capacity saturation;
+activity path. The [idle cleanup worker](job-idle-cleanup.md) now also invokes
+passes without traffic, using the same per-task backoff. These metrics still
+do not imply restart-safe ownership, a deletion SLA, or storage I/O deadlines.
+Inspect persistent pending counts and retained-capacity saturation;
 raising the admission limit alone does not fix failed storage deletion.

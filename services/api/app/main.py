@@ -5,12 +5,15 @@ import os
 import tempfile
 import uuid
 import zipfile
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 
@@ -120,6 +123,7 @@ JOB_MAX_WORKERS = int(os.getenv("JOB_MAX_WORKERS", "2"))
 JOB_MAX_ACTIVE = int(os.getenv("JOB_MAX_ACTIVE", "8"))
 JOB_MAX_RETAINED = int(os.getenv("JOB_MAX_RETAINED", "1024"))
 JOB_RETENTION_SECONDS = int(os.getenv("JOB_RETENTION_SECONDS", "3600"))
+JOB_CLEANUP_INTERVAL_SECONDS = int(os.getenv("JOB_CLEANUP_INTERVAL_SECONDS", "30"))
 BATCH_MAX_FILES = int(os.getenv("BATCH_MAX_FILES", "10"))
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "0"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
@@ -135,7 +139,20 @@ ALLOWED_ORIGINS = [
 ]
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Capture this lifespan's owner; teardown must never shut down a replacement.
+    manager = JOB_MANAGER
+    try:
+        manager.start_cleanup_worker()
+        yield
+    finally:
+        # Joining cleanup or native conversion work must not block the ASGI loop.
+        await run_in_threadpool(manager.shutdown)
+
+
 app = FastAPI(
+    lifespan=_lifespan,
     title="Lao Document OCR",
     version="0.1.0",
     description="Open-source Lao-first document OCR and editable DOCX export.",
@@ -513,6 +530,7 @@ JOB_MANAGER = ConversionJobManager(
     max_active_jobs=JOB_MAX_ACTIVE,
     max_retained_jobs=JOB_MAX_RETAINED,
     retention_seconds=JOB_RETENTION_SECONDS,
+    cleanup_interval_seconds=JOB_CLEANUP_INTERVAL_SECONDS,
     artifact_exists=RESULT_STORAGE.exists,
     artifact_cleanup=RESULT_STORAGE.delete,
 )
@@ -563,6 +581,7 @@ def health() -> dict:
             "max_active_jobs": JOB_MAX_ACTIVE,
             "max_retained_jobs": JOB_MAX_RETAINED,
             "retention_seconds": JOB_RETENTION_SECONDS,
+            "cleanup_interval_seconds": JOB_CLEANUP_INTERVAL_SECONDS,
             "batch_max_files": BATCH_MAX_FILES,
         },
         "submission_rate_limit": SUBMISSION_RATE_LIMITER.snapshot(),

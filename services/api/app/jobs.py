@@ -15,6 +15,11 @@ from types import MappingProxyType
 
 from lao_document_ocr.orientation_review import OrientationReview
 from lao_document_ocr.page_rotations import validate_page_rotations
+from services.api.app.cleanup_worker import (
+    CLEANUP_SHUTDOWN_TIMEOUT_SECONDS,
+    DEFAULT_CLEANUP_INTERVAL_SECONDS,
+    IdleCleanupWorker,
+)
 from services.api.app.storage import StoredArtifact
 
 logger = logging.getLogger(__name__)
@@ -111,6 +116,7 @@ class ConversionJobManager:
         max_active_jobs: int = 8,
         retention_seconds: int = 3600,
         max_retained_jobs: int = DEFAULT_MAX_RETAINED_JOBS,
+        cleanup_interval_seconds: float = DEFAULT_CLEANUP_INTERVAL_SECONDS,
         artifact_exists: ArtifactExists | None = None,
         artifact_cleanup: ArtifactCleanup | None = None,
     ) -> None:
@@ -123,6 +129,12 @@ class ConversionJobManager:
 
         if type(max_retained_jobs) is not int or max_retained_jobs < max_active_jobs:
             raise ValueError("max_retained_jobs must be an integer >= max_active_jobs")
+
+        # Validate before allocating directories/executor; no thread starts here.
+        self._cleanup_worker = IdleCleanupWorker(
+            lambda: self.cleanup_expired(), interval_seconds=cleanup_interval_seconds,
+        )
+        self.cleanup_interval_seconds = cleanup_interval_seconds
 
         self.root_dir = Path(root_dir)
         self.root_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -513,5 +525,16 @@ class ConversionJobManager:
                 )
         return expired_count
 
+    def start_cleanup_worker(self) -> bool:
+        """Called by the API lifespan; ordinary manager construction stays inert."""
+        return self._cleanup_worker.start()
+
     def shutdown(self, *, wait: bool = True) -> None:
+        # Stop scheduling first. Never join while holding the job-manager lock:
+        # an in-flight cleanup needs that lock to record completed deletion work.
+        stopped = self._cleanup_worker.stop(
+            timeout=CLEANUP_SHUTDOWN_TIMEOUT_SECONDS if wait else 0,
+        )
+        if wait and not stopped:
+            logger.warning("Idle job cleanup still running after shutdown wait; stop requested.")
         self._executor.shutdown(wait=wait, cancel_futures=True)

@@ -140,6 +140,7 @@ Environment variables:
 JOB_MAX_WORKERS=2
 JOB_MAX_ACTIVE=8
 JOB_RETENTION_SECONDS=3600
+JOB_CLEANUP_INTERVAL_SECONDS=30
 JOB_ROOT=/tmp/lao-document-ocr-jobs
 ```
 
@@ -157,7 +158,8 @@ MAX_PAGES=60
 Public expiry and physical deletion are separate. Failed archive or workspace
 cleanup remains in a private, bounded-admission retry queue with 30-second
 exponential backoff capped at one hour. Each existing expiry pass claims at most
-eight due tasks; there is no new background cleanup worker. Job IDs remain
+eight due tasks. The [idle cleanup worker](job-idle-cleanup.md) invokes these
+passes without incoming requests, using the same backoff. Job IDs remain
 unavailable while deletion is pending. See [expiry cleanup](job-expiry-cleanup.md).
 
 `JOB_MAX_RETAINED=1024` limits all live/terminal records and pending-cleanup tasks
@@ -166,7 +168,12 @@ At capacity, single and batch submissions return HTTP 429 before allocating new
 job workspaces. Successful normal expiry or retry cleanup releases capacity.
 A restart still loses the in-memory retry queue; this is not guaranteed erasure.
 
-Terminal job workspaces are retained long enough for result download, then lazily cleaned when jobs are accessed/submitted.
+Terminal job workspaces are retained for result download, then cleaned by
+request activity or the API lifespan worker. `JOB_CLEANUP_INTERVAL_SECONDS=30`
+sets its default cadence; `0` disables periodic work. Construction/import starts
+no thread. Teardown requests stop and joins the idle worker for up to five
+seconds off the ASGI loop before shutting down the conversion executor. A stuck
+storage call is not forcibly terminated or reported as deleted.
 
 The default is one hour.
 

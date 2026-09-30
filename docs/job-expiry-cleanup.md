@@ -12,8 +12,9 @@ removal likewise had no retry owner. Regression tests reproduce these paths.
 
 Expiry now separates public availability from private cleanup ownership.
 **This is an in-memory retry queue, not restart-safe or guaranteed erasure.**
-There is no new database, persistent ledger, object-store account, scheduler,
-OCR run, training experiment, or document capture in this change.
+The initial queue change added no database, persistent ledger, object-store
+account, OCR run, training experiment, or document capture. Periodic scheduling
+is now supplied by the [idle cleanup follow-up](job-idle-cleanup.md).
 
 ## Expiry and ownership
 
@@ -74,10 +75,12 @@ not hold the lock needed to inspect unrelated jobs or reserve capacity. The
 existing cancellation-cleanup flag still prevents expiry from racing an
 immediate cancellation delete, including when retention is zero.
 
-**There is no autonomous cleanup worker.** Existing manager activity invokes
-expiry (reservation, status/record lookup, snapshots/metrics), or an embedding
-caller can invoke it directly. A due task waits for that activity. Storage and
-filesystem calls remain synchronous and have no new server-side I/O deadline.
+The API now runs the [lifespan-managed idle worker](job-idle-cleanup.md), by
+default every 30 seconds after each completed pass. Existing manager activity
+(reservation, status/record lookup, snapshots/metrics) and embedding callers can
+still invoke expiry directly. With the periodic worker disabled, a due task
+waits for that activity. Storage and filesystem calls remain synchronous and
+have no new server-side I/O deadline.
 A hung call can hold its claimed batch and delay the invoking request; the web
 request deadline neither terminates it nor certifies deletion.
 

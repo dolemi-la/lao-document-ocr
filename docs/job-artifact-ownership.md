@@ -60,8 +60,9 @@ cancellations do not create a new immediate-delete retry loop.
 
 **Cleanup remains best-effort, not durable deletion.** In particular:
 
-- Expiry is invoked by the existing manager activity, not a new scheduled worker.
-  A retained reference gets another deletion attempt only when expiry runs.
+- Expiry is invoked by manager activity and, in the API, the follow-up
+  [idle cleanup worker](job-idle-cleanup.md). Periodic passes use the same
+  eligibility and retry backoff; they do not provide restart durability.
 - The follow-up [expiry cleanup queue](job-expiry-cleanup.md) now hides expired
   public jobs while retaining unfinished artifact/workspace deletion for delayed
   retries in the same process. It does not add restart durability or a persistent ledger.

@@ -167,6 +167,9 @@ workspace for cleanup. Failed stages remain privately tracked for delayed,
 bounded [process-local retries](job-expiry-cleanup.md). A successful object
 deletion is not repeated solely because workspace removal failed. No restart-safe
 cleanup ledger is provided; expired status is not proof of physical deletion.
+The [API idle worker](job-idle-cleanup.md) invokes the same bounded cleanup
+pass on a configurable cadence, so an idle process no longer requires another
+request to start due deletion work.
 
 `JOB_MAX_RETAINED` (default 1024) bounds live/terminal records plus pending-cleanup
 tasks. Reaching the limit rejects new reservations instead of discarding deletion
@@ -177,9 +180,10 @@ result when cancellation wins before job success. Expiry cannot race that
 in-progress cancellation deletion. A failed immediate delete retains the private
 reference for the existing expiry pass. See [job artifact ownership](job-artifact-ownership.md).
 
-This is not durable cleanup: the existing expiry pass drops the in-memory job
-even if its deletion fails. Restarts and uploads that fail after storing bytes
-but before returning an artifact also require independent retention controls.
+This is not durable cleanup: public expiry removes the job while a private
+process-local task retains unfinished deletion. Restart still loses that task.
+Restarts and uploads that fail after storing bytes but before returning an
+artifact require independent retention controls.
 Local OCR workspaces are still retained until normal expiry, not erased as soon
 as cancellation is requested.
 
