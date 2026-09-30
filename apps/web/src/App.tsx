@@ -2,6 +2,7 @@ import { ChangeEvent, DragEvent, useEffect, useState } from "react";
 
 import { initialLocale, Locale, MESSAGES, persistLocale } from "./i18n";
 import { orientationReviewWarnings } from "./orientationReview";
+import { appendPageRotations, confirmsPageRotations, parsePageRotations } from "./pageRotations";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 const ACCEPTED = [".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"];
@@ -22,6 +23,7 @@ type ConversionJob = {
   error: string | null;
   download_ready: boolean;
   orientation_review?: unknown;
+  page_rotations?: unknown;
 };
 
 const sleep = (milliseconds: number) =>
@@ -33,9 +35,16 @@ function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [busy, setBusy] = useState(false);
   const [autoOrient, setAutoOrient] = useState(false);
+  const [manualRotations, setManualRotations] = useState("");
   const [message, setMessage] = useState("");
   const [job, setJob] = useState<ConversionJob | null>(null);
   const m = MESSAGES[locale];
+  const rotations = parsePageRotations(manualRotations, file?.name);
+  const rotationError = rotations.error ? {
+    syntax: m.manualRotationsSyntax,
+    duplicate: m.manualRotationsDuplicate,
+    imagePage: m.manualRotationsImagePage,
+  }[rotations.error] : "";
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -62,6 +71,7 @@ function App() {
       return;
     }
     setFile(next);
+    setManualRotations("");
     setJob(null);
     setMessage("");
   }
@@ -100,7 +110,7 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
-  async function pollJob(initial: ConversionJob, sourceFile: File) {
+  async function pollJob(initial: ConversionJob, sourceFile: File, expectedRotations: string[]) {
     let current = initial;
     setJob(current);
 
@@ -121,6 +131,9 @@ function App() {
     }
 
     if (current.status === "succeeded") {
+      if (!confirmsPageRotations(current.page_rotations, expectedRotations)) {
+        throw new Error(m.manualRotationsNotConfirmed);
+      }
       await downloadResult(current, sourceFile);
       setMessage(m.done);
       return;
@@ -134,6 +147,10 @@ function App() {
 
   async function convert() {
     if (!file || busy) return;
+    if (rotationError) {
+      setMessage(rotationError);
+      return;
+    }
     setBusy(true);
     setJob(null);
     setMessage(m.uploading);
@@ -141,6 +158,7 @@ function App() {
     try {
       const form = new FormData();
       form.append("file", file);
+      appendPageRotations(form, rotations);
       if (autoOrient) {
         form.append("auto_orient_right_angles", "true");
       }
@@ -154,7 +172,13 @@ function App() {
       }
 
       const created: ConversionJob = await response.json();
-      await pollJob(created, file);
+      if (!confirmsPageRotations(created.page_rotations, rotations.specs)) {
+        // A stale API can silently ignore an unknown form field. Never download
+        // that result as corrected; attempt to cancel only this submitted job.
+        await fetch(`${API_URL}/v1/jobs/${created.id}`, { method: "DELETE" }).catch(() => null);
+        throw new Error(m.manualRotationsNotConfirmed);
+      }
+      await pollJob(created, file, rotations.specs);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : m.conversionFailed);
     } finally {
@@ -276,10 +300,32 @@ function App() {
           </span>
         </label>
 
+        <div className="manualRotations">
+          <label htmlFor="manual-rotations">{m.manualRotationsTitle}</label>
+          <input
+            id="manual-rotations"
+            type="text"
+            dir="ltr"
+            value={manualRotations}
+            onChange={(event) => setManualRotations(event.target.value)}
+            placeholder={file && !file.name.toLowerCase().endsWith(".pdf") ? "1:270" : "1:0, 2:270"}
+            disabled={busy || !file}
+            maxLength={4096}
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={Boolean(rotationError)}
+            aria-describedby="manual-rotations-help manual-rotations-error"
+          />
+          <p id="manual-rotations-help">{m.manualRotationsHelp}</p>
+          <p id="manual-rotations-error" className="warning" role="status" aria-live="polite">
+            {rotationError}
+          </p>
+        </div>
+
         <div className="actions">
           <button
             type="button"
-            disabled={!file || busy || health?.ocr_ready === false}
+            disabled={!file || busy || Boolean(rotationError) || health?.ocr_ready === false}
             onClick={convert}
             aria-busy={busy}
           >

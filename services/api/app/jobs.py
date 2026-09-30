@@ -5,14 +5,16 @@ import shutil
 import threading
 import uuid
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
+from types import MappingProxyType
 
 from lao_document_ocr.orientation_review import OrientationReview
+from lao_document_ocr.page_rotations import validate_page_rotations
 from services.api.app.storage import StoredArtifact
 
 logger = logging.getLogger(__name__)
@@ -69,6 +71,11 @@ class JobRecord:
     future: Future | None = field(default=None, repr=False)
     terminal_recorded: bool = field(default=False, repr=False)
     orientation_review: OrientationReview | None = None
+    page_rotations: Mapping[int, int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Snapshot each job independently, retaining explicit zero overrides.
+        self.page_rotations = MappingProxyType(validate_page_rotations(self.page_rotations))
 
 
 JobRunner = Callable[[JobRecord, threading.Event], Path | StoredArtifact]
@@ -135,17 +142,18 @@ class ConversionJobManager:
         files: list[tuple[str, str]],
         *,
         auto_orient_right_angles: bool = False,
+        page_rotations: Mapping[int, int] | None = None,
     ) -> list[JobRecord]:
         if not files:
             raise ValueError("At least one job reservation is required")
+        rotations = validate_page_rotations(page_rotations)
         self.cleanup_expired()
         with self._lock:
             active = self._active_count()
             if active + len(files) > self.max_active_jobs:
                 available = max(0, self.max_active_jobs - active)
                 raise JobCapacityError(
-                    "Job capacity reached "
-                    f"({available} slot(s) available, {len(files)} requested)."
+                    f"Job capacity reached ({available} slot(s) available, {len(files)} requested)."
                 )
 
             records: list[JobRecord] = []
@@ -161,6 +169,7 @@ class ConversionJobManager:
                         workspace=workspace,
                         input_path=input_path,
                         auto_orient_right_angles=auto_orient_right_angles,
+                        page_rotations=rotations,
                     )
                     self._jobs[job_id] = record
                     records.append(record)
@@ -177,10 +186,12 @@ class ConversionJobManager:
         suffix: str,
         *,
         auto_orient_right_angles: bool = False,
+        page_rotations: Mapping[int, int] | None = None,
     ) -> JobRecord:
         return self.reserve_many(
             [(filename, suffix)],
             auto_orient_right_angles=auto_orient_right_angles,
+            page_rotations=page_rotations,
         )[0]
 
     def discard(self, job_id: str) -> None:
@@ -286,17 +297,17 @@ class ConversionJobManager:
             "id": record.id,
             "filename": record.filename,
             "auto_orient_right_angles": record.auto_orient_right_angles,
+            "page_rotations": [
+                {"page": page, "degrees_clockwise": angle}
+                for page, angle in record.page_rotations.items()
+            ],
             "status": record.status.value,
             "created_at": record.created_at.isoformat(),
             "started_at": (
-                record.started_at.isoformat()
-                if record.started_at is not None
-                else None
+                record.started_at.isoformat() if record.started_at is not None else None
             ),
             "completed_at": (
-                record.completed_at.isoformat()
-                if record.completed_at is not None
-                else None
+                record.completed_at.isoformat() if record.completed_at is not None else None
             ),
             "cancellation_requested": record.cancellation_requested,
             "error": record.error,

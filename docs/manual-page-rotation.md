@@ -8,11 +8,12 @@ output rather than make an unsupported guess. An operator who has inspected the
 input now has a separate, explicit correction path. No automatic confidence,
 score, geometry, or character-retention threshold is weakened.
 
-This slice exposes corrections in `convert-document`, `process_document(...)`,
-and `convert_document_to_outputs(...)`. The HTTP request schema and web UI do
-**not** yet accept manual corrections. Their automatic option and review warning
-behavior remain unchanged. Do not send a manual-rotation form field and assume
-that an existing endpoint will apply it.
+The core contract is available in `convert-document`, `process_document(...)`,
+and `convert_document_to_outputs(...)`. The subsequent
+[HTTP/web integration](manual-page-rotation-http.md) accepts repeated
+`rotate_page` multipart fields and exposes a bilingual manual-correction input.
+Older server versions may ignore that field; the new UI checks acknowledgement
+before downloading a manually corrected result.
 
 ## CLI
 
@@ -198,7 +199,7 @@ text. The plan retains local paths for integrity checks; hashes do not anonymize
 input content.
 
 Issue #17 remains open for automatic equal-confidence selection, MAF review,
-missing-source coverage, and genuine optical validation. HTTP and web manual
-controls are a separate follow-up, not part of this completed CLI/Python slice.
+missing-source coverage, and genuine optical validation. The later [HTTP/web integration](manual-page-rotation-http.md) carries this
+contract into all conversion endpoints and the bilingual web form.
 Phetsarath remains canonical. No model weights, corpus, capture kit, collector
 session, or default auto-orientation setting was changed.

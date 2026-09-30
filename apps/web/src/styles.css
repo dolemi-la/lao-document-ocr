@@ -384,3 +384,45 @@ footer {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Match the existing optional-control layout without affecting upload inputs. */
+.manualRotations {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.manualRotations label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.manualRotations input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #c9c5dd;
+  border-radius: 8px;
+  font: inherit;
+  background: white;
+}
+
+.manualRotations input:focus-visible {
+  outline: 3px solid rgba(91, 66, 232, 0.35);
+  outline-offset: 2px;
+}
+
+.manualRotations input[aria-invalid="true"] {
+  border-color: #9a631b;
+}
+
+.manualRotations input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.manualRotations p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}

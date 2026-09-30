@@ -112,3 +112,16 @@ See [orientation-review.md](orientation-review.md) for the contract and tests.
 Run `pnpm test` in `apps/web` for dependency-free Node tests of response
 validation, both message catalogs and live-region wiring. These tests are also
 part of the web CI job, separately from lint and the TypeScript/Vite build.
+
+
+## Manual corrections
+
+The [manual-correction field](manual-page-rotation-http.md) has a visible label,
+associated help/error IDs, `aria-invalid`, a live error message, focus styling,
+and disabled processing state. Both language catalogs provide local validation
+and server-acknowledgement messages. New file selection resets corrections and
+old result warnings. The original upload is used for every retry.
+
+The local headless-browser interaction check covered desktop/mobile widths,
+Lao validation, warning persistence and stale-server rejection using mocked
+HTTP responses. This is not a full visual or assistive-technology audit.

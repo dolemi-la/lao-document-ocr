@@ -47,6 +47,7 @@ Status: in progress
 - [x] bilingual web UI opt-in control for right-angle auto-orientation
 - [x] Lao-dominance probe-skip optimization + auto-orientation probe-state reporting
 - [x] no-text selected-orientation review summaries in conversion JSON, async jobs and bilingual web warnings
+- [x] strict manual rotation forms across sync/async/batch API + bilingual web recovery and acknowledgement checks
 - [x] explicit CLI/Python per-page cardinal overrides with validation, source/embedded geometry, EXIF normalization and separate review provenance
 - [x] retire production orientation-hint early exit after production-equivalent remote comparison
 - [x] plain-OCR vs auto-orient suite performance mode with diagnostic probes independently switchable

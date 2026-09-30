@@ -79,8 +79,9 @@ existing polite live region after a job succeeds. Sideways pages and unassessed
 pages have different wording. Conversion/download remains available; the UI
 does not imply the source was corrected merely because a ZIP was created.
 Switching language re-renders the warning, and starting another upload clears
-it with the previous job. There is no automatic rotation override or new manual
-rotation control in this slice.
+it with the previous job. This original reporting slice does not change automatic selection. The later
+[HTTP/web manual-correction integration](manual-page-rotation-http.md) adds a
+separate operator control without weakening automatic thresholds.
 
 The frontend validates the known version, status, page count and disjoint
 bounded integer arrays before constructing local messages. It never renders
@@ -157,5 +158,17 @@ are unchanged.
 [Manual page rotation](manual-page-rotation.md) adds CLI/Python `--rotate-page`
 and `page_rotations` overrides. It records the operator's correction separately
 and reviews the selected output without claiming the angle is correct. A bad
-manual choice can still trigger a sideways warning. HTTP/web manual request
-controls are not implemented in that slice; the warning workflow here remains.
+manual choice can still trigger a sideways warning. The later [HTTP/web integration](manual-page-rotation-http.md) adds the request
+controls and preserves warnings for manually corrected outputs.
+
+
+## HTTP/web manual-correction follow-up
+
+[Manual HTTP/web corrections](manual-page-rotation-http.md) now expose the same
+CLI/Python rules through multipart requests and the bilingual UI. For jobs with
+explicit overrides, the public review is recomputed from selected page geometry
+and matches `manual_page_rotations.review`, even when auto-orientation is off.
+Unspecified default-off pages remain unassessed. The earlier CLI-only scope
+statement describes that earlier implementation; it no longer describes the
+current request schema. No warning is treated as a verified transcription or
+certificate of correct operator choice.

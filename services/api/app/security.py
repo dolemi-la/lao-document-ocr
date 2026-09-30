@@ -61,7 +61,7 @@ def _validate_pdf(
     *,
     max_pages: int,
     max_page_pixels: int,
-) -> None:
+) -> int:
     with path.open("rb") as source:
         if source.read(5) != b"%PDF-":
             raise UploadValidationError("File content does not match the .pdf extension.")
@@ -77,9 +77,7 @@ def _validate_pdf(
         if pdf.page_count < 1:
             raise UploadValidationError("PDF contains no pages.")
         if pdf.page_count > max_pages:
-            raise UploadValidationError(
-                f"PDF has {pdf.page_count} pages; maximum is {max_pages}."
-            )
+            raise UploadValidationError(f"PDF has {pdf.page_count} pages; maximum is {max_pages}.")
         for page in pdf:
             width = math.ceil(float(page.rect.width) * 2)
             height = math.ceil(float(page.rect.height) * 2)
@@ -87,6 +85,7 @@ def _validate_pdf(
                 raise UploadValidationError(
                     f"PDF page {page.number + 1} exceeds the rendered pixel limit."
                 )
+        return pdf.page_count
     finally:
         pdf.close()
 
@@ -122,7 +121,8 @@ def validate_uploaded_content(
     *,
     max_pages: int,
     max_page_pixels: int,
-) -> None:
+) -> int:
+    """Validate the upload and return the page count supported by the loader."""
     source = Path(path)
     if not source.is_file() or source.stat().st_size == 0:
         raise UploadValidationError("Uploaded file is empty.")
@@ -133,17 +133,16 @@ def validate_uploaded_content(
 
     normalized_suffix = suffix.lower()
     if normalized_suffix == ".pdf":
-        _validate_pdf(
+        return _validate_pdf(
             source,
             max_pages=max_pages,
             max_page_pixels=max_page_pixels,
         )
-        return
     if normalized_suffix in _IMAGE_FORMATS:
         _validate_image(
             source,
             normalized_suffix,
             max_page_pixels=max_page_pixels,
         )
-        return
+        return 1
     raise UploadValidationError("Unsupported uploaded file type.")

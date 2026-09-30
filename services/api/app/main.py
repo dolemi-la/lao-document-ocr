@@ -27,6 +27,7 @@ from lao_document_ocr.ocr import (
     TesseractEngine,
 )
 from lao_document_ocr.orientation_review import build_orientation_review
+from lao_document_ocr.page_rotations import parse_page_rotations, validate_page_rotations
 from lao_document_ocr.pipeline import (
     SUPPORTED_SUFFIXES,
     DocumentProcessingCancelled,
@@ -405,15 +406,36 @@ def _validate_suffix(filename: str) -> str:
     return suffix
 
 
-def _validate_saved_upload(path: Path, suffix: str) -> None:
+def _rotation_form(specifications: list[str] | None) -> dict[int, int]:
+    # Bound conversion of user-controlled integer strings and reject duplicates.
+    values = specifications or []
+    if len(values) > MAX_PAGES or any(len(value) > 32 for value in values):
+        raise HTTPException(status_code=422, detail="Too many or oversized rotate_page values.")
     try:
-        validate_uploaded_content(
+        return validate_page_rotations(parse_page_rotations(values), page_count=MAX_PAGES)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail=str(exc).replace("--rotate-page", "rotate_page")
+        ) from exc
+
+
+def _validate_saved_upload(
+    path: Path,
+    suffix: str,
+    page_rotations: dict[int, int] | None = None,
+) -> None:
+    try:
+        page_count = validate_uploaded_content(
             path,
             suffix,
             max_pages=MAX_PAGES,
             max_page_pixels=MAX_PAGE_PIXELS,
         )
     except UploadValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        validate_page_rotations(page_rotations, page_count=page_count)
+    except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
@@ -451,6 +473,7 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
             should_cancel=cancel_event.is_set,
             reading_order_resolver=_reading_order_resolver(),
             auto_orient_right_angles=record.auto_orient_right_angles,
+            page_rotations=record.page_rotations,
         )
     except DocumentProcessingCancelled as exc:
         raise JobCancelledError(str(exc)) from exc
@@ -471,8 +494,14 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
         raise JobCancelledError("Document processing was cancelled.")
     # Exposed only after the manager atomically marks this job succeeded.
     # Recompute from selected geometry, never forward arbitrary document metadata.
+    orientation = document.metadata.get("auto_orientation")
+    if record.page_rotations and isinstance(orientation, dict):
+        # Manual pages have selected geometry even when auto-orientation is off.
+        # Do not trust an embedded public review object as assessment evidence.
+        orientation = {"enabled": True, "pages": orientation.get("pages")}
     record.orientation_review = build_orientation_review(
-        document.metadata.get("auto_orientation"), page_count=len(document.pages),
+        orientation,
+        page_count=len(document.pages),
     )
     return artifact
 
@@ -561,7 +590,18 @@ async def parse_document(
     request: Request,
     file: Annotated[UploadFile, File(...)],
     auto_orient_right_angles: Annotated[bool, Form()] = False,
+    rotate_page: Annotated[
+        list[str] | None,
+        Form(
+            description=(
+                "Repeat PAGE:DEGREES clockwise overrides (0/90/180/270), one-based pages. "
+                "Explicit 0 overrides auto-orientation. "
+                "In batches the same map applies to every file."
+            )
+        ),
+    ] = None,
 ) -> dict:
+    rotations = _rotation_form(rotate_page)
     filename = _safe_filename(file.filename)
     _enforce_submission_rate_limit(request)
     suffix = _validate_suffix(filename)
@@ -569,7 +609,7 @@ async def parse_document(
     with tempfile.TemporaryDirectory(prefix="lao-ocr-") as temp_dir:
         input_path = Path(temp_dir) / f"input{suffix}"
         await _save_upload(file, input_path)
-        _validate_saved_upload(input_path, suffix)
+        _validate_saved_upload(input_path, suffix, rotations)
         try:
             document = process_document(
                 input_path,
@@ -579,6 +619,7 @@ async def parse_document(
                 max_page_pixels=MAX_PAGE_PIXELS,
                 reading_order_resolver=_reading_order_resolver(),
                 auto_orient_right_angles=auto_orient_right_angles,
+                page_rotations=rotations,
             )
         except DocumentProcessingError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -590,7 +631,18 @@ async def convert_document(
     request: Request,
     file: Annotated[UploadFile, File(...)],
     auto_orient_right_angles: Annotated[bool, Form()] = False,
+    rotate_page: Annotated[
+        list[str] | None,
+        Form(
+            description=(
+                "Repeat PAGE:DEGREES clockwise overrides (0/90/180/270), one-based pages. "
+                "Explicit 0 overrides auto-orientation. "
+                "In batches the same map applies to every file."
+            )
+        ),
+    ] = None,
 ) -> StreamingResponse:
+    rotations = _rotation_form(rotate_page)
     filename = _safe_filename(file.filename)
     _enforce_submission_rate_limit(request)
     suffix = _validate_suffix(filename)
@@ -599,7 +651,7 @@ async def convert_document(
         work_dir = Path(temp_dir)
         input_path = work_dir / f"input{suffix}"
         await _save_upload(file, input_path)
-        _validate_saved_upload(input_path, suffix)
+        _validate_saved_upload(input_path, suffix, rotations)
 
         try:
             document = process_document(
@@ -610,6 +662,7 @@ async def convert_document(
                 max_page_pixels=MAX_PAGE_PIXELS,
                 reading_order_resolver=_reading_order_resolver(),
                 auto_orient_right_angles=auto_orient_right_angles,
+                page_rotations=rotations,
             )
         except DocumentProcessingError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -627,7 +680,18 @@ async def create_conversion_job(
     request: Request,
     file: Annotated[UploadFile, File(...)],
     auto_orient_right_angles: Annotated[bool, Form()] = False,
+    rotate_page: Annotated[
+        list[str] | None,
+        Form(
+            description=(
+                "Repeat PAGE:DEGREES clockwise overrides (0/90/180/270), one-based pages. "
+                "Explicit 0 overrides auto-orientation. "
+                "In batches the same map applies to every file."
+            )
+        ),
+    ] = None,
 ) -> dict:
+    rotations = _rotation_form(rotate_page)
     filename = _safe_filename(file.filename)
     _enforce_submission_rate_limit(request)
     suffix = _validate_suffix(filename)
@@ -636,13 +700,14 @@ async def create_conversion_job(
             filename,
             suffix,
             auto_orient_right_angles=auto_orient_right_angles,
+            page_rotations=rotations,
         )
     except JobCapacityError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
 
     try:
         await _save_upload(file, record.input_path)
-        _validate_saved_upload(record.input_path, suffix)
+        _validate_saved_upload(record.input_path, suffix, rotations)
         JOB_MANAGER.enqueue(record.id)
     except Exception:
         JOB_MANAGER.discard(record.id)
@@ -655,7 +720,18 @@ async def create_conversion_batch(
     request: Request,
     files: Annotated[list[UploadFile], File(...)],
     auto_orient_right_angles: Annotated[bool, Form()] = False,
+    rotate_page: Annotated[
+        list[str] | None,
+        Form(
+            description=(
+                "Repeat PAGE:DEGREES clockwise overrides (0/90/180/270), one-based pages. "
+                "Explicit 0 overrides auto-orientation. "
+                "In batches the same map applies to every file."
+            )
+        ),
+    ] = None,
 ) -> dict:
+    rotations = _rotation_form(rotate_page)
     if not files:
         raise HTTPException(status_code=422, detail="At least one file is required.")
     if len(files) > BATCH_MAX_FILES:
@@ -676,6 +752,7 @@ async def create_conversion_batch(
         records = JOB_MANAGER.reserve_many(
             [(filename, suffix) for _, filename, suffix in prepared],
             auto_orient_right_angles=auto_orient_right_angles,
+            page_rotations=rotations,
         )
     except JobCapacityError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
@@ -683,7 +760,7 @@ async def create_conversion_batch(
     try:
         for (upload, _, suffix), record in zip(prepared, records, strict=True):
             await _save_upload(upload, record.input_path)
-            _validate_saved_upload(record.input_path, suffix)
+            _validate_saved_upload(record.input_path, suffix, rotations)
     except Exception:
         for record in records:
             JOB_MANAGER.discard(record.id)

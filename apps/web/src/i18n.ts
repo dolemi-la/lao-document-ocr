@@ -20,6 +20,12 @@ export type Messages = {
   browse: string;
   autoOrientTitle: string;
   autoOrientHelp: string;
+  manualRotationsTitle: string;
+  manualRotationsHelp: string;
+  manualRotationsSyntax: string;
+  manualRotationsDuplicate: string;
+  manualRotationsImagePage: string;
+  manualRotationsNotConfirmed: string;
   orientationReview: (pages: string) => string;
   orientationUnassessed: (pages: string) => string;
   convert: string;
@@ -45,6 +51,14 @@ export type Messages = {
 
 export const MESSAGES: Record<Locale, Messages> = {
   en: {
+    manualRotationsTitle: "Manual page corrections (optional)",
+    manualRotationsHelp:
+      "After reviewing the source, enter page:clockwise degrees, separated by commas. Example: 1:0, 2:270. Use 0, 90, 180 or 270; page numbers start at 1. Listed pages override auto-orientation, including 0. Convert again to apply corrections to the original upload, not the previous export.",
+    manualRotationsSyntax: "Use page:degrees, such as 1:0, 2:270. Allowed degrees: 0, 90, 180, 270.",
+    manualRotationsDuplicate: "Specify each page only once, even when the angles are identical.",
+    manualRotationsImagePage: "Image uploads support page 1 only. Use 1:degrees.",
+    manualRotationsNotConfirmed:
+      "The API did not confirm your page corrections. No result was downloaded. Update the API and try again.",
     orientationReview: (pages) =>
       `Pages ${pages} may still be sideways. Check the source and exported document before using the result.`,
     orientationUnassessed: (pages) =>
@@ -91,6 +105,14 @@ export const MESSAGES: Record<Locale, Messages> = {
     license: "Apache-2.0",
   },
   lo: {
+    manualRotationsTitle: "ກຳນົດການໝຸນໜ້າດ້ວຍຕົນເອງ (ທາງເລືອກ)",
+    manualRotationsHelp:
+      "ກວດສອບຕົ້ນສະບັບກ່ອນ ແລ້ວປ້ອນ ເລກໜ້າ:ອົງສາຕາມເຂັມໂມງ ແຍກດ້ວຍເຄື່ອງໝາຍ , . ຕົວຢ່າງ: 1:0, 2:270. ໃຊ້ 0, 90, 180 ຫຼື 270; ເລກໜ້າເລີ່ມຈາກ 1. ໜ້າທີ່ລະບຸຈະບໍ່ໃຊ້ການໝຸນອັດຕະໂນມັດ ລວມທັງ 0. ປ່ຽນເອກະສານອີກຄັ້ງເພື່ອໃຊ້ກັບໄຟລ໌ຕົ້ນສະບັບ ບໍ່ແມ່ນຜົນລັບກ່ອນໜ້າ.",
+    manualRotationsSyntax: "ໃຊ້ ເລກໜ້າ:ອົງສາ ເຊັ່ນ 1:0, 2:270. ອົງສາທີ່ຮອງຮັບ: 0, 90, 180, 270.",
+    manualRotationsDuplicate: "ລະບຸແຕ່ລະໜ້າພຽງຄັ້ງດຽວ ເຖິງແມ່ນວ່າອົງສາຈະຄືກັນ.",
+    manualRotationsImagePage: "ໄຟລ໌ຮູບພາບຮອງຮັບໜ້າ 1 ເທົ່ານັ້ນ. ໃຊ້ 1:ອົງສາ.",
+    manualRotationsNotConfirmed:
+      "API ບໍ່ໄດ້ຢືນຢັນການໝຸນໜ້າ. ບໍ່ໄດ້ດາວໂຫຼດຜົນລັບ. ກະລຸນາອັບເດດ API ແລ້ວລອງອີກຄັ້ງ.",
     orientationReview: (pages) =>
       `ໜ້າ ${pages} ອາດຍັງຫັນຂ້າງຢູ່. ກະລຸນາກວດສອບຕົ້ນສະບັບ ແລະ ເອກະສານຜົນລັບກ່ອນນຳໃຊ້.`,
     orientationUnassessed: (pages) =>

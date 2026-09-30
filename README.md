@@ -133,7 +133,10 @@ opt-in auto-orientation. Corrections are relative to the displayed input and
 apply before cleanup. Manual choices are recorded separately from automatic
 rotations and are not certified as correct. See [manual page rotation](docs/manual-page-rotation.md)
 for Python usage, validation, EXIF handling, and review metadata. This feature
-is currently CLI/Python only, not an API/web request option.
+is also supported by HTTP and the web app. Use repeated multipart fields
+`rotate_page=1:0` and `rotate_page=2:270`; the web field accepts `1:0, 2:270`.
+See [HTTP/web manual corrections](docs/manual-page-rotation-http.md) for batch
+semantics, validation, and review warnings.
 
 ## API
 
