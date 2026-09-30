@@ -405,16 +405,14 @@ class ConversionJobManager:
     def cancel(self, job_id: str) -> dict:
         with self._lock:
             record = self._require(job_id)
-            if record.status in _TERMINAL_STATUSES:
-                return self._public(record)
-
-            record.cancellation_requested = True
-            record.cancel_event.set()
-            if record.future is not None and record.future.cancel():
-                record.status = JobStatus.CANCELLED
-                record.completed_at = datetime.now(UTC)
-                self._record_terminal_unlocked(record)
-            return self._public(record)
+            if record.status not in _TERMINAL_STATUSES:
+                record.cancellation_requested = True
+                record.cancel_event.set()
+                if record.future is not None and record.future.cancel():
+                    record.status = JobStatus.CANCELLED
+                    record.completed_at = datetime.now(UTC)
+                    self._record_terminal_unlocked(record)
+        return self._public(record)
 
     def acquire_download(self, job_id: str) -> JobDownloadLease:
         """Pin an available successful result before checking/opening storage.
@@ -464,9 +462,38 @@ class ConversionJobManager:
     def public(self, job_id: str) -> dict:
         self.cleanup_expired()
         with self._lock:
-            return self._public(self._require(job_id))
+            record = self._require(job_id)
+        return self._public(record)
 
     def _public(self, record: JobRecord) -> dict:
+        # Snapshot only immutable readiness inputs. A provider HEAD or even a
+        # filesystem stat must not hold the lock needed by every job transition.
+        with self._lock:
+            self._require_current_record_unlocked(record)
+            status = record.status
+            output_path = record.output_path
+            output_artifact = record.output_artifact
+            artifact_exists = self.artifact_exists
+
+        ready = self._download_ready(status, output_path, output_artifact, artifact_exists)
+
+        with self._lock:
+            # Expiry/discard can proceed while the probe waits. Never resurrect
+            # a removed job or attach its result to a replacement record.
+            self._require_current_record_unlocked(record)
+            same_result = (
+                record.status == status
+                and record.output_path == output_path
+                and record.output_artifact == output_artifact
+                and self.artifact_exists is artifact_exists
+            )
+            return self._public_fields_unlocked(record, download_ready=ready and same_result)
+
+    def _require_current_record_unlocked(self, record: JobRecord) -> None:
+        if self._jobs.get(record.id) is not record:
+            raise JobNotFoundError(record.id)
+
+    def _public_fields_unlocked(self, record: JobRecord, *, download_ready: bool) -> dict:
         return {
             "id": record.id,
             "filename": record.filename,
@@ -485,7 +512,7 @@ class ConversionJobManager:
             ),
             "cancellation_requested": record.cancellation_requested,
             "error": record.error,
-            "download_ready": self._download_ready(record),
+            "download_ready": download_ready,
             "orientation_review": (
                 record.orientation_review.to_dict()
                 if record.status == JobStatus.SUCCEEDED
@@ -494,17 +521,27 @@ class ConversionJobManager:
             ),
         }
 
-    def _download_ready(self, record: JobRecord) -> bool:
-        if record.status != JobStatus.SUCCEEDED:
+    @staticmethod
+    def _download_ready(
+        status: JobStatus,
+        output_path: Path | None,
+        output_artifact: StoredArtifact | None,
+        artifact_exists: ArtifactExists | None,
+    ) -> bool:
+        if status != JobStatus.SUCCEEDED:
             return False
-        if record.output_artifact is not None:
-            if self.artifact_exists is None:
+        if output_artifact is not None:
+            if artifact_exists is None:
                 return True
             try:
-                return bool(self.artifact_exists(record.output_artifact))
+                return bool(artifact_exists(output_artifact))
             except Exception:
                 return False
-        return record.output_path is not None and record.output_path.is_file()
+        try:
+            return output_path is not None and output_path.is_file()
+        except OSError:
+            # Inaccessible local results are unknown, not a public path/error leak.
+            return False
 
     def _require(self, job_id: str) -> JobRecord:
         record = self._jobs.get(job_id)

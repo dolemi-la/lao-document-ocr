@@ -197,6 +197,14 @@ lease is released, including interrupted S3-adapter responses. External/provider
 lifecycle deletion and process crashes are not prevented. A stalled transfer can
 hold data beyond public retention; this is not proof of erasure or receipt.
 
+## Status readiness
+
+Public job responses check result existence outside the shared job-manager lock
+and revalidate the record/result afterward. A delayed provider check therefore
+does not serialize unrelated job transitions. This is advisory readiness, not
+a lease or a provider timeout; actual downloads still acquire their own lease
+and check storage. See [job-status readiness](job-status-readiness.md).
+
 ## Health/privacy
 
 The public health response reports only the storage backend name.

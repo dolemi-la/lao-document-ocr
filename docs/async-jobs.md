@@ -96,6 +96,13 @@ Statuses:
 
 The response includes created/started/completed timestamps when available.
 
+Result-readiness checks run outside the shared manager lock, so a slow storage
+check does not block unrelated job-state transitions. The response revalidates
+ownership and current result identity afterward. `download_ready` remains advisory,
+not a download lease; a concurrent state change can yield false until the next
+check. See [job-status readiness](job-status-readiness.md) for expiry races and
+remaining synchronous-I/O limits.
+
 ## Download
 
 After `status=succeeded`:
