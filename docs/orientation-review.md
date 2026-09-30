@@ -151,3 +151,11 @@ justified design. MAF transcription review, missing-source coverage and the
 actual printed/scanned/photographed pilot remain outstanding. Model weights,
 font policy, capture kits, collector sessions and optional-orientation defaults
 are unchanged.
+
+## Explicit correction follow-up
+
+[Manual page rotation](manual-page-rotation.md) adds CLI/Python `--rotate-page`
+and `page_rotations` overrides. It records the operator's correction separately
+and reviews the selected output without claiming the angle is correct. A bad
+manual choice can still trigger a sideways warning. HTTP/web manual request
+controls are not implemented in that slice; the warning workflow here remains.

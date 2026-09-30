@@ -47,6 +47,7 @@ Status: in progress
 - [x] bilingual web UI opt-in control for right-angle auto-orientation
 - [x] Lao-dominance probe-skip optimization + auto-orientation probe-state reporting
 - [x] no-text selected-orientation review summaries in conversion JSON, async jobs and bilingual web warnings
+- [x] explicit CLI/Python per-page cardinal overrides with validation, source/embedded geometry, EXIF normalization and separate review provenance
 - [x] retire production orientation-hint early exit after production-equivalent remote comparison
 - [x] plain-OCR vs auto-orient suite performance mode with diagnostic probes independently switchable
 - [x] bounded official HPLT Lao streaming sampler + provenance metadata
@@ -238,3 +239,10 @@ the same as before: near-equal upright/sideways OCR scores fail the unchanged
 acceptance thresholds. Two cases add three probe attempts each without a
 correction. This closes the early-exit path, not the broader high-confidence
 orientation-selection problem or the outstanding optical-validation gate.
+
+### Manual correction surface
+
+[Explicit per-page corrections](manual-page-rotation.md) now provide a CLI/Python
+recovery path after visual review, without weakening automatic acceptance.
+HTTP/web manual controls are a separate follow-up. Manual completion does not
+resolve issue #17 or the optical benchmark/review gates.

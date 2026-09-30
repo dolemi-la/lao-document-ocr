@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,13 +40,13 @@ def convert_document_to_outputs(
     font_name: str = "Phetsarath OT",
     reading_order_resolver: ReadingOrderResolver | None = None,
     auto_orient_right_angles: bool = False,
+    page_rotations: Mapping[int, int] | None = None,
 ) -> ConversionOutputs:
     source = Path(input_path)
     if not source.is_file():
         raise FileNotFoundError(f"Input document not found: {source}")
 
     output = Path(output_dir)
-    output.mkdir(parents=True, exist_ok=True)
     stem = source.stem or "document"
 
     document = process_document(
@@ -55,8 +56,11 @@ def convert_document_to_outputs(
         max_pages=max_pages,
         reading_order_resolver=reading_order_resolver,
         auto_orient_right_angles=auto_orient_right_angles,
+        page_rotations=page_rotations,
     )
 
+    # Invalid page selections and processing failures must not touch output files.
+    output.mkdir(parents=True, exist_ok=True)
     return ConversionOutputs(
         docx=export_docx(document, output / f"{stem}.docx", font_name=font_name),
         markdown=export_markdown(document, output / f"{stem}.md"),

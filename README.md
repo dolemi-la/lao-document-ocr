@@ -116,6 +116,25 @@ lao-ocr convert-document \
 
 Both modes write editable `.docx` plus `.md`, `.txt`, and structured `.json`.
 
+After inspecting a sideways input, apply explicit clockwise corrections by page:
+
+```bash
+lao-ocr convert-document \
+  --input scan.pdf \
+  --output-dir corrected-output \
+  --rotate-page 2:270 \
+  --rotate-page 1:0 \
+  --auto-orient-right-angles
+```
+
+Page numbers are one-based. Explicit `0` keeps that page's displayed cardinal
+orientation and prevents an automatic override; other pages can still use
+opt-in auto-orientation. Corrections are relative to the displayed input and
+apply before cleanup. Manual choices are recorded separately from automatic
+rotations and are not certified as correct. See [manual page rotation](docs/manual-page-rotation.md)
+for Python usage, validation, EXIF handling, and review metadata. This feature
+is currently CLI/Python only, not an API/web request option.
+
 ## API
 
 ### Health

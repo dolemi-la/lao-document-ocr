@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import io
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 import pymupdf
-from PIL import Image
+from PIL import Image, ImageOps
 
 from lao_document_ocr.diagram_regions import detect_diagram_regions
 from lao_document_ocr.embedded_images import EmbeddedImageAsset, extract_pdf_embedded_images
@@ -20,6 +20,10 @@ from lao_document_ocr.orientation_geometry import (
     orientation_line_geometry,
 )
 from lao_document_ocr.orientation_review import build_orientation_review
+from lao_document_ocr.page_rotations import (
+    MANUAL_PAGE_ROTATION_VERSION,
+    validate_page_rotations,
+)
 from lao_document_ocr.preprocessing import preprocess_image
 from lao_document_ocr.raster_regions import detect_raster_regions
 from lao_document_ocr.reading_order import (
@@ -126,7 +130,9 @@ def _load_pages(
                     raise DocumentProcessingError(
                         "Image dimensions exceed the pixel limit."
                     )
-                return [LoadedPage(image=image.convert("RGB"))]
+                # Normalize EXIF once for both OCR and preserved source pixels.
+                # Doing it only during cleanup leaves source/image coordinates stale.
+                return [LoadedPage(image=ImageOps.exif_transpose(image).convert("RGB"))]
         except DocumentProcessingError:
             raise
         except Exception as exc:
@@ -475,7 +481,9 @@ def process_document(
     reading_order_resolver: ReadingOrderResolver | None = None,
     auto_orient_right_angles: bool = False,
     include_ocr_line_stats: bool = False,
+    page_rotations: Mapping[int, int] | None = None,
 ) -> Document:
+    rotations = validate_page_rotations(page_rotations)
     path = Path(path)
     engine = engine or TesseractEngine()
     resolver = reading_order_resolver or DeterministicReadingOrderResolver()
@@ -488,19 +496,49 @@ def process_document(
         max_page_pixels=max_page_pixels,
         should_cancel=should_cancel,
     )
+    rotations = validate_page_rotations(rotations, page_count=len(pages))
 
     output_pages: list[Page] = []
     orientation_pages: list[dict[str, object]] = []
     ocr_line_stats_pages: list[dict[str, object]] = []
     for page_number, loaded_page in enumerate(pages, start=1):
         _raise_if_cancelled(should_cancel)
-        cleaned = preprocess_image(loaded_page.image)
         source_image = loaded_page.image
         embedded_images = loaded_page.embedded_images
+        manual_override = page_number in rotations
+        if manual_override:
+            manual_degrees = rotations[page_number]
+            embedded_images = _rotate_embedded_assets(
+                embedded_images,
+                page_width=source_image.width,
+                page_height=source_image.height,
+                degrees=manual_degrees,
+            )
+            source_image = _rotate_image_clockwise(source_image, manual_degrees)
+        cleaned = preprocess_image(source_image)
         orientation_degrees = 0
         orientation_diagnostics: dict[str, object] | None = None
         try:
-            if auto_orient_right_angles:
+            if manual_override:
+                # The operator's correction is already applied before cleanup.
+                # Do not let automatic ranking override it, including explicit 0.
+                lines = engine.recognize(cleaned)
+                confidence, characters, score, lao_ratio = _orientation_line_stats(lines)
+                orientation_diagnostics = {
+                    "candidate_geometry_policy": ORIENTATION_GEOMETRY_VERSION,
+                    "candidate_geometry": [
+                        {"degrees_clockwise": 0, "geometry": orientation_line_geometry(lines)}
+                    ],
+                    "probe_skipped": True,
+                    "probe_skip_reason": "manual-override",
+                    "probe_strategy": "manual-override",
+                    "probed_degrees": [],
+                    "selected_confidence": confidence,
+                    "selected_characters": characters,
+                    "selected_score": score,
+                    "selected_lao_ratio": lao_ratio,
+                }
+            elif auto_orient_right_angles:
                 (
                     cleaned,
                     lines,
@@ -652,6 +690,21 @@ def process_document(
     metadata["auto_orientation"]["review"] = build_orientation_review(
         metadata["auto_orientation"], page_count=len(output_pages),
     ).to_dict()
+    if rotations:
+        metadata["manual_page_rotations"] = {
+            "version": MANUAL_PAGE_ROTATION_VERSION,
+            "basis": "loaded-page-before-cleanup",
+            "pages": [
+                {"page": page, "degrees_clockwise": angle}
+                for page, angle in rotations.items()
+            ],
+            # Review selected output, not the correctness of the operator's choice.
+            # Unspecified default-off pages remain explicitly unassessed.
+            "review": build_orientation_review(
+                {"enabled": True, "pages": orientation_pages},
+                page_count=len(output_pages),
+            ).to_dict(),
+        }
     if include_ocr_line_stats:
         metadata["ocr_line_stats"] = {"pages": ocr_line_stats_pages}
 

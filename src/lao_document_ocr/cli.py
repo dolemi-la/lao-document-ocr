@@ -135,6 +135,16 @@ def _parser() -> argparse.ArgumentParser:
             "apply a non-zero rotation only when OCR confidence improves enough."
         ),
     )
+    convert.add_argument(
+        "--rotate-page",
+        action="append",
+        default=[],
+        metavar="PAGE:DEGREES",
+        help=(
+            "Explicit clockwise correction for a one-based page (0/90/180/270). "
+            "Repeat for different pages; overrides auto-orientation on those pages."
+        ),
+    )
     convert.add_argument("--font", default="Phetsarath OT")
 
     validate = subparsers.add_parser("validate-dataset", help="Validate a benchmark dataset.")
@@ -1166,6 +1176,9 @@ def _build_reading_order_resolver(args: argparse.Namespace):
 
 
 def _convert_document(args: argparse.Namespace) -> int:
+    from lao_document_ocr.page_rotations import parse_page_rotations
+
+    rotations = parse_page_rotations(args.rotate_page)
     reading_order_resolver = _build_reading_order_resolver(args)
     engine = _build_ocr_engine(args)
 
@@ -1177,6 +1190,7 @@ def _convert_document(args: argparse.Namespace) -> int:
         font_name=args.font,
         reading_order_resolver=reading_order_resolver,
         auto_orient_right_angles=args.auto_orient_right_angles,
+        page_rotations=rotations,
     )
     print(json.dumps(outputs.to_dict(), indent=2))
     return 0
