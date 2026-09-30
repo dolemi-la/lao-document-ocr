@@ -1,6 +1,7 @@
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 
 import { initialLocale, Locale, MESSAGES, persistLocale } from "./i18n";
+import { REQUEST_DEADLINES, RequestTimeoutError, withRequestDeadline } from "./requestDeadline";
 import {
   createJobSession, JobRecoveryError, loadJobDownload, loadJobStatus,
   parseConversionJob, waitForNextPoll,
@@ -121,7 +122,9 @@ function App() {
   }
 
   function errorMessage(error: unknown) {
+    if (error instanceof RequestTimeoutError) return m.requestTimedOut;
     if (error instanceof JobRecoveryError) {
+      if (error.code === "request-timeout") return m.requestTimedOut;
       if (error.code === "expired") return m.recoveryUnavailable;
       if (error.code === "corrections-unconfirmed") return m.manualRotationsNotConfirmed;
       if (error.code === "invalid-response") return m.recoveryInvalid;
@@ -144,6 +147,13 @@ function App() {
         current = parseConversionJob(current, session.id);
         if (!confirmsPageRotations(current.page_rotations, session.rotations)) {
           throw new JobRecoveryError("corrections-unconfirmed");
+        }
+        if (["succeeded", "failed", "cancelled"].includes(current.status)) {
+          // A completed status supersedes a still-pending cancellation request.
+          // Its eventual timeout/reply must not overwrite this terminal result.
+          cancelRef.current?.abort();
+          cancelRef.current = null;
+          setCancelling(false);
         }
         setJob(current);
         if (current.status === "succeeded") {
@@ -213,23 +223,30 @@ function App() {
       if (autoOrient) {
         form.append("auto_orient_right_angles", "true");
       }
-      const response = await fetch(`${API_URL}/v1/jobs`, {
-        method: "POST",
-        body: form,
-        signal: attempt.signal,
-      });
+      const created = await withRequestDeadline(
+        attempt.signal, REQUEST_DEADLINES.submission, async signal => {
+          const response = await fetch(`${API_URL}/v1/jobs`, {
+            method: "POST", body: form, signal,
+          });
+          if (!response.ok) {
+            responseReceived = true; // Known rejection, not a confirmed created job.
+            throw new Error(await readError(response, m.conversionFailedStatus(response.status)));
+          }
+          // Successful headers alone do not acknowledge an ID. Bound the JSON body too.
+          return parseConversionJob(await response.json());
+        },
+      );
       if (!isCurrent(attempt)) return;
       responseReceived = true;
-      if (!response.ok) {
-        throw new Error(await readError(response, m.conversionFailedStatus(response.status)));
-      }
-      const created = parseConversionJob(await response.json());
-      if (!isCurrent(attempt)) return;
       if (!confirmsPageRotations(created.page_rotations, rotations.specs)) {
         // A stale API can ignore unknown fields. Never recover/download that result.
-        await fetch(`${API_URL}/v1/jobs/${encodeURIComponent(created.id)}`, {
-          method: "DELETE", signal: attempt.signal,
-        }).catch(() => null);
+        await withRequestDeadline(
+          attempt.signal, REQUEST_DEADLINES.cancellation, async signal => {
+            await fetch(`${API_URL}/v1/jobs/${encodeURIComponent(created.id)}`, {
+              method: "DELETE", signal,
+            });
+          },
+        ).catch(() => null);
         throw new JobRecoveryError("corrections-unconfirmed");
       }
       const session = createJobSession(created, file.name, rotations.specs);
@@ -270,13 +287,17 @@ function App() {
     const stillCurrent = () => cancelRef.current === request && !request.signal.aborted &&
       attemptRef.current === owner && sessionRef.current === session;
     try {
-      const response = await fetch(`${API_URL}/v1/jobs/${encodeURIComponent(session.id)}`, {
-        method: "DELETE", signal: request.signal, cache: "no-store",
-      });
-      if (!response.ok) {
-        throw new Error(await readError(response, m.cancellationFailedStatus(response.status)));
-      }
-      const cancelled = parseConversionJob(await response.json(), session.id);
+      const cancelled = await withRequestDeadline(
+        request.signal, REQUEST_DEADLINES.cancellation, async signal => {
+          const response = await fetch(`${API_URL}/v1/jobs/${encodeURIComponent(session.id)}`, {
+            method: "DELETE", signal, cache: "no-store",
+          });
+          if (!response.ok) {
+            throw new Error(await readError(response, m.cancellationFailedStatus(response.status)));
+          }
+          return parseConversionJob(await response.json(), session.id);
+        },
+      );
       if (!stillCurrent()) return;
       if (!confirmsPageRotations(cancelled.page_rotations, session.rotations)) {
         throw new JobRecoveryError("corrections-unconfirmed");
@@ -292,7 +313,9 @@ function App() {
         setMessage(m.cancelled);
       }
     } catch (error) {
-      if (stillCurrent()) setMessage(errorMessage(error));
+      if (stillCurrent()) setMessage(
+        error instanceof RequestTimeoutError ? m.cancellationUnconfirmed : errorMessage(error),
+      );
     } finally {
       if (cancelRef.current === request && !request.signal.aborted) setCancelling(false);
     }

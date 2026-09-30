@@ -56,7 +56,8 @@ test("status recovery performs GET on the same job with the abort signal, never 
     assert.equal(url, "http://local/v1/jobs/job-a");
     assert.equal(options.method, "GET");
     assert.equal(options.cache, "no-store");
-    assert.equal(options.signal, signal);
+    assert.notEqual(options.signal, signal); // Request-local deadline signal.
+    assert.equal(options.signal.aborted, false);
     assert.equal(options.body, undefined);
     return json(job({ status: "succeeded", page_rotations: [{ page: 1, degrees_clockwise: 0 }] }));
   });
@@ -181,10 +182,60 @@ test("job parser retains safe status fields and ignores arbitrary response addit
 for (const locale of ["lo", "en"]) {
   test(`same-job recovery messages are localized (${locale})`, () => {
     for (const key of ["resumeConversion", "retryDownload", "recovering", "recoveryHelp",
-      "recoveryUnavailable", "recoveryInvalid", "recoveryInterrupted", "submissionUnknown"]) {
+      "recoveryUnavailable", "recoveryInvalid", "recoveryInterrupted", "submissionUnknown",
+      "requestTimedOut", "cancellationUnconfirmed"]) {
       assert.equal(typeof MESSAGES[locale][key], "string");
       assert.ok(MESSAGES[locale][key].length > 0);
       if (locale === "lo") assert.match(MESSAGES[locale][key], /[\u0e80-\u0eff]/);
     }
+  });
+}
+
+
+for (const load of [loadJobStatus, loadJobDownload]) {
+  for (const phase of ["headers", "body"]) {
+    test(`${load.name} times out stalled ${phase} and offers same-job retry`, async () => {
+      const saved = session();
+      const control = controller();
+      let requests = 0;
+      let child;
+      let late;
+      const stalled = new Promise(resolve => { late = resolve; });
+      await assert.rejects(load("http://local", saved, control.signal, async (url, options) => {
+        requests++;
+        child = options.signal;
+        assert.equal(options.method, "GET");
+        assert.ok(url.includes(`/v1/jobs/${saved.id}`));
+        return phase === "headers" ? stalled : {
+          ok: true, status: 200, headers: new Headers(), json: () => stalled, blob: () => stalled,
+        };
+      }, 10), code("request-timeout", true));
+      assert.equal(requests, 1);
+      assert.equal(control.signal.aborted, false);
+      assert.equal(child.aborted, true);
+      // Release ignored late work; it cannot become a trusted response/download.
+      late(phase === "headers" ? json(job({ status: "succeeded" })) :
+        load === loadJobStatus ? job({ status: "succeeded" }) : new Blob(["old result"]));
+      await Promise.resolve();
+      const result = await load("http://local", saved, control.signal, async (url, options) => {
+        requests++;
+        assert.ok(url.includes(`/v1/jobs/${saved.id}`));
+        assert.equal(options.method, "GET");
+        assert.equal(options.body, undefined);
+        assert.notEqual(options.signal, child);
+        return load === loadJobStatus ? json(job({ status: "succeeded" })) : new Response("zip");
+      });
+      assert.equal(requests, 2);
+      assert.ok(result);
+    });
+  }
+
+  test(`${load.name} abort rejects even if fetch never responds`, async () => {
+    const parent = controller();
+    const pending = load("http://local", session(), parent.signal,
+      async () => new Promise(() => {}));
+    await Promise.resolve();
+    parent.abort();
+    await assert.rejects(pending, { name: "AbortError" });
   });
 }

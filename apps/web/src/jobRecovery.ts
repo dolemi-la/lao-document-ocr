@@ -1,3 +1,5 @@
+import { REQUEST_DEADLINES, RequestTimeoutError, withRequestDeadline } from "./requestDeadline.ts";
+
 // In-memory recovery only. A retry reads an existing job; it never submits a file.
 export type ConversionJob = {
   id: string;
@@ -17,7 +19,7 @@ export type JobSession = Readonly<{
   rotations: readonly string[];
 }>;
 
-export type RecoveryCode = "expired" | "invalid-response" | "request-failed" | "corrections-unconfirmed";
+export type RecoveryCode = "expired" | "invalid-response" | "request-failed" | "request-timeout" | "corrections-unconfirmed";
 export class JobRecoveryError extends Error {
   readonly code: RecoveryCode;
   readonly retryable: boolean;
@@ -92,23 +94,43 @@ async function request(
   return response;
 }
 
+/** Translate request-local timeout into same-job recovery without aborting its owner. */
+async function recoverableRequest<T>(
+  signal: AbortSignal,
+  milliseconds: number,
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  try {
+    return await withRequestDeadline(signal, milliseconds, operation);
+  } catch (error) {
+    signal.throwIfAborted();
+    if (error instanceof RequestTimeoutError) throw new JobRecoveryError("request-timeout", true);
+    throw error;
+  }
+}
+
 export async function loadJobStatus(
   api: string,
   session: JobSession,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
+  milliseconds: number = REQUEST_DEADLINES.status,
 ): Promise<ConversionJob> {
-  const response = await request(`${api}/v1/jobs/${encodeURIComponent(session.id)}`, signal, fetcher);
-  let data: unknown;
-  try {
-    data = await response.json();
-  } catch (error) {
-    signal.throwIfAborted();
-    if (error instanceof SyntaxError) throw new JobRecoveryError("invalid-response");
-    throw new JobRecoveryError("request-failed", true);
-  }
-  signal.throwIfAborted();
-  return parseConversionJob(data, session.id);
+  return recoverableRequest(signal, milliseconds, async requestSignal => {
+    const response = await request(
+      `${api}/v1/jobs/${encodeURIComponent(session.id)}`, requestSignal, fetcher,
+    );
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch (error) {
+      requestSignal.throwIfAborted();
+      if (error instanceof SyntaxError) throw new JobRecoveryError("invalid-response");
+      throw new JobRecoveryError("request-failed", true);
+    }
+    requestSignal.throwIfAborted();
+    return parseConversionJob(data, session.id);
+  });
 }
 
 export async function loadJobDownload(
@@ -116,22 +138,25 @@ export async function loadJobDownload(
   session: JobSession,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
+  milliseconds: number = REQUEST_DEADLINES.download,
 ): Promise<{ blob: Blob; filename: string }> {
-  const response = await request(
-    `${api}/v1/jobs/${encodeURIComponent(session.id)}/download`, signal, fetcher,
-  );
-  let blob: Blob;
-  try {
-    blob = await response.blob();
-  } catch {
-    signal.throwIfAborted();
-    throw new JobRecoveryError("request-failed", true);
-  }
-  signal.throwIfAborted();
-  const disposition = response.headers.get("content-disposition") ?? "";
-  const match = disposition.match(/filename="?([^";]+)"?/i);
-  const filename = match?.[1] ?? `${session.sourceName.replace(/\.[^.]+$/, "")}-ocr.zip`;
-  return { blob, filename };
+  return recoverableRequest(signal, milliseconds, async requestSignal => {
+    const response = await request(
+      `${api}/v1/jobs/${encodeURIComponent(session.id)}/download`, requestSignal, fetcher,
+    );
+    let blob: Blob;
+    try {
+      blob = await response.blob();
+    } catch {
+      requestSignal.throwIfAborted();
+      throw new JobRecoveryError("request-failed", true);
+    }
+    requestSignal.throwIfAborted();
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    const filename = match?.[1] ?? `${session.sourceName.replace(/\.[^.]+$/, "")}-ocr.zip`;
+    return { blob, filename };
+  });
 }
 
 /** A discarded screen/attempt must not schedule one more poll or leave a timer. */

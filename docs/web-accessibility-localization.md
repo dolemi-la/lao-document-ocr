@@ -134,3 +134,14 @@ requests. Retry preserves the submitted job/corrections; invalid edits to a new
 form do not block retrieval of an existing result. Expired, foreign or malformed
 responses cannot become an all-upright message. The recovery browser check uses
 mocked HTTP and is not a visual or assistive-technology accessibility audit.
+
+
+## Request timeout messages
+
+[Conversion request deadlines](web-request-deadlines.md) add separate Lao/English
+messages for a timed-out request and unconfirmed cancellation. The existing
+retry controls become available after stalled status or archive requests without
+changing their keyboard/live-region behavior. A creation response that ends
+before a complete acknowledgement does not create a trusted job or an automatic
+reupload. The browser scenarios use accelerated deadline timers; they are not
+an accessibility certification or real-network timing benchmark.

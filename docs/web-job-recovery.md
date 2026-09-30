@@ -80,7 +80,8 @@ job. Its message says the server may already be processing the submission.
 Choosing Convert again is a new job. This is **not** an idempotent-submission or
 exactly-once transport guarantee: lower network/proxy/browser layers can behave
 differently. The API has no new idempotency-key contract in this slice. Request
-deadlines and cross-reload recovery are also outside its scope.
+deadlines were outside that initial slice; the [deadline follow-up](web-request-deadlines.md)
+now covers conversion requests and consumed bodies. Cross-reload recovery remains out of scope.
 
 ## Regression coverage
 
@@ -125,3 +126,14 @@ optical capture pilot, visual accessibility audit, or external penetration
 review. The six-page physical capture pilot, MAF review, missing remote-source
 coverage, and issue #17 remain open. Phetsarath policy, model artifacts, frozen
 challenge, capture kits and collector sessions are unchanged.
+
+
+## Bounded request follow-up
+
+[Web request deadlines](web-request-deadlines.md) extend recovery to never-ending
+headers and response streams: 30-second status/cancellation operations and
+120-second submission/archive operations. These limits are per request, not
+an OCR execution budget. A timeout preserves the known job for explicit recovery
+without resubmission. Creation without a complete acknowledgement remains
+unknown; cancellation without acknowledgement is not reported as cancelled.
+The existing recovery regression browser suite passes with the bounded transport.

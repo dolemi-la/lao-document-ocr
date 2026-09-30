@@ -175,6 +175,9 @@ or **Retry download** to retrieve the same job without uploading or running OCR
 again. Recovery retains its submitted page corrections even if the form has
 been edited. See [web job recovery](docs/web-job-recovery.md) for expiry,
 acknowledgement checks, and the limits of in-memory recovery.
+[Request deadlines](docs/web-request-deadlines.md) also release stalled upload, status,
+download, and cancellation operations. A timed-out upload is not automatically
+resubmitted, and a timed-out cancellation is not reported as confirmed.
 
 Job endpoints:
 

@@ -9,6 +9,8 @@ export type Messages = {
   recoveryInvalid: string;
   recoveryInterrupted: string;
   submissionUnknown: string;
+  requestTimedOut: string;
+  cancellationUnconfirmed: string;
   pageTitle: string;
   eyebrow: string;
   title: string;
@@ -59,6 +61,8 @@ export type Messages = {
 
 export const MESSAGES: Record<Locale, Messages> = {
   en: {
+    requestTimedOut: "The request timed out. Server processing may continue. Check your connection.",
+    cancellationUnconfirmed: "Cancellation was not confirmed. The job may still be running. Check its status or try cancellation again.",
     resumeConversion: "Resume this conversion",
     retryDownload: "Retry download",
     recovering: "Checking the existing conversion…",
@@ -66,7 +70,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     recoveryUnavailable: "This job or its result is no longer available. Submit the original file again to create a new conversion.",
     recoveryInvalid: "The API returned an invalid or different job. No result was downloaded.",
     recoveryInterrupted: "Could not retrieve this conversion. Check the connection and API access.",
-    submissionUnknown: "The upload response was lost. The server may already be processing it. The app did not retry the upload; converting again creates a new job.",
+    submissionUnknown: "A complete upload confirmation was not received. The server may already be processing it. The app did not retry the upload; converting again creates a new job.",
     manualRotationsTitle: "Manual page corrections (optional)",
     manualRotationsHelp:
       "After reviewing the source, enter page:clockwise degrees, separated by commas. Example: 1:0, 2:270. Use 0, 90, 180 or 270; page numbers start at 1. Listed pages override auto-orientation, including 0. Convert again to apply corrections to the original upload, not the previous export.",
@@ -121,6 +125,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     license: "Apache-2.0",
   },
   lo: {
+    requestTimedOut: "ໝົດເວລາລໍຖ້າຄຳຕອບ. ເຊີບເວີອາດຍັງປະມວນຜົນຢູ່. ກວດສອບການເຊື່ອມຕໍ່.",
+    cancellationUnconfirmed: "ຍັງບໍ່ໄດ້ຢືນຢັນການຍົກເລີກ. ວຽກອາດຍັງດຳເນີນຢູ່. ກວດສອບສະຖານະ ຫຼື ລອງຍົກເລີກອີກຄັ້ງ.",
     resumeConversion: "ສືບຕໍ່ການປ່ຽນເອກະສານນີ້",
     retryDownload: "ດາວໂຫຼດອີກຄັ້ງ",
     recovering: "ກຳລັງກວດສອບການປ່ຽນເອກະສານເດີມ…",
@@ -128,7 +134,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     recoveryUnavailable: "ວຽກນີ້ ຫຼື ຜົນລັບບໍ່ມີໃຫ້ໃຊ້ແລ້ວ. ສົ່ງໄຟລ໌ຕົ້ນສະບັບອີກຄັ້ງເພື່ອເລີ່ມວຽກໃໝ່.",
     recoveryInvalid: "API ສົ່ງຂໍ້ມູນວຽກທີ່ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ແມ່ນວຽກເດີມ. ບໍ່ໄດ້ດາວໂຫຼດຜົນລັບ.",
     recoveryInterrupted: "ບໍ່ສາມາດຮັບຂໍ້ມູນການປ່ຽນເອກະສານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ການເຂົ້າເຖິງ API.",
-    submissionUnknown: "ບໍ່ໄດ້ຮັບຄຳຕອບການອັບໂຫຼດ. ເຊີບເວີອາດກຳລັງປະມວນຜົນຢູ່. ບໍ່ໄດ້ສົ່ງຊ້ຳອັດຕະໂນມັດ; ການປ່ຽນເອກະສານອີກຄັ້ງຈະສ້າງວຽກໃໝ່.",
+    submissionUnknown: "ບໍ່ໄດ້ຮັບການຢືນຢັນການອັບໂຫຼດທີ່ຄົບຖ້ວນ. ເຊີບເວີອາດກຳລັງປະມວນຜົນຢູ່. ບໍ່ໄດ້ສົ່ງຊ້ຳອັດຕະໂນມັດ; ການປ່ຽນເອກະສານອີກຄັ້ງຈະສ້າງວຽກໃໝ່.",
     manualRotationsTitle: "ກຳນົດການໝຸນໜ້າດ້ວຍຕົນເອງ (ທາງເລືອກ)",
     manualRotationsHelp:
       "ກວດສອບຕົ້ນສະບັບກ່ອນ ແລ້ວປ້ອນ ເລກໜ້າ:ອົງສາຕາມເຂັມໂມງ ແຍກດ້ວຍເຄື່ອງໝາຍ , . ຕົວຢ່າງ: 1:0, 2:270. ໃຊ້ 0, 90, 180 ຫຼື 270; ເລກໜ້າເລີ່ມຈາກ 1. ໜ້າທີ່ລະບຸຈະບໍ່ໃຊ້ການໝຸນອັດຕະໂນມັດ ລວມທັງ 0. ປ່ຽນເອກະສານອີກຄັ້ງເພື່ອໃຊ້ກັບໄຟລ໌ຕົ້ນສະບັບ ບໍ່ແມ່ນຜົນລັບກ່ອນໜ້າ.",
