@@ -52,6 +52,14 @@ class JobCapacityError(RuntimeError):
     pass
 
 
+class JobManagerClosedError(RuntimeError):
+    pass
+
+
+class JobSchedulingError(RuntimeError):
+    pass
+
+
 class JobNotFoundError(KeyError):
     pass
 
@@ -180,6 +188,11 @@ class ConversionJobManager:
         self._completed_total: Counter[str] = Counter()
         self._duration_seconds_sum: Counter[str] = Counter()
         self._lock = threading.RLock()
+        self._accepting_jobs = True
+
+    def _ensure_accepting_unlocked(self) -> None:
+        if not self._accepting_jobs:
+            raise JobManagerClosedError("Conversion job manager has stopped accepting work.")
 
     def _active_count(self) -> int:
         return sum(
@@ -209,8 +222,12 @@ class ConversionJobManager:
         if not files:
             raise ValueError("At least one job reservation is required")
         rotations = validate_page_rotations(page_rotations)
+        with self._lock:
+            self._ensure_accepting_unlocked()
         self.cleanup_expired()
         with self._lock:
+            # Cleanup can block on storage while shutdown closes admission.
+            self._ensure_accepting_unlocked()
             active = self._active_count()
             if active + len(files) > self.max_active_jobs:
                 available = max(0, self.max_active_jobs - active)
@@ -275,6 +292,7 @@ class ConversionJobManager:
 
     def enqueue(self, job_id: str) -> JobRecord:
         with self._lock:
+            self._ensure_accepting_unlocked()
             record = self._require(job_id)
             if record.status != JobStatus.UPLOADING:
                 raise RuntimeError(
@@ -288,12 +306,29 @@ class ConversionJobManager:
                 return record
 
             record.status = JobStatus.QUEUED
-            record.future = self._executor.submit(self._run, job_id)
+            try:
+                record.future = self._executor.submit(self._run, job_id)
+            except Exception as exc:
+                # Stop repeated admission to a broken executor. Otherwise each
+                # failed thread start could leave another unreturned work item.
+                self._accepting_jobs = False
+                # submit() can queue work before failing to start a thread. The
+                # worker cannot pass our lock until this terminal state is set.
+                record.status = JobStatus.FAILED
+                record.error = "Conversion worker is unavailable."
+                record.cancel_event.set()
+                record.completed_at = datetime.now(UTC)
+                self._record_terminal_unlocked(record)
+                raise JobSchedulingError(record.error) from exc
             return record
 
     def _run(self, job_id: str) -> None:
         with self._lock:
-            record = self._require(job_id)
+            record = self._jobs.get(job_id)
+            # Rejected submissions can still have queued executor work. A
+            # discarded/terminal record is never permission to invoke the runner.
+            if record is None or record.status != JobStatus.QUEUED:
+                return
             if record.cancel_event.is_set():
                 record.status = JobStatus.CANCELLED
                 record.completed_at = datetime.now(UTC)
@@ -599,9 +634,31 @@ class ConversionJobManager:
 
     def start_cleanup_worker(self) -> bool:
         """Called by the API lifespan; ordinary manager construction stays inert."""
-        return self._cleanup_worker.start()
+        with self._lock:
+            self._ensure_accepting_unlocked()
+            return self._cleanup_worker.start()
 
     def shutdown(self, *, wait: bool = True) -> None:
+        futures_to_cancel: list[Future] = []
+        with self._lock:
+            # Close both reservation and enqueue admission before a join or I/O.
+            # A runner already marked RUNNING keeps the existing graceful policy.
+            self._accepting_jobs = False
+            for record in self._jobs.values():
+                if record.status == JobStatus.QUEUED:
+                    record.cancel_event.set()
+                    record.status = JobStatus.CANCELLED
+                    record.cancellation_requested = True
+                    record.completed_at = datetime.now(UTC)
+                    self._record_terminal_unlocked(record)
+                    if record.future is not None:
+                        futures_to_cancel.append(record.future)
+        # Future callbacks and all joins run outside the manager lock. Even a
+        # dequeued future must pass _run's QUEUED check before starting OCR.
+        for future in futures_to_cancel:
+            future.cancel()
+        # An upload still being written retains its original owner/status; its
+        # caller must finish/abort copying and discard after enqueue is rejected.
         # Stop scheduling first. Never join while holding the job-manager lock:
         # an in-flight cleanup needs that lock to record completed deletion work.
         stopped = self._cleanup_worker.stop(

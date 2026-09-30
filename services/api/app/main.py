@@ -45,9 +45,11 @@ from services.api.app.jobs import (
     JobCapacityError,
     JobDownloadCapacityError,
     JobDownloadNotReadyError,
+    JobManagerClosedError,
     JobNotFoundError,
     JobPublicError,
     JobRecord,
+    JobSchedulingError,
 )
 from services.api.app.metrics import ApiMetrics, RequestTimer
 from services.api.app.rate_limit import SlidingWindowRateLimiter
@@ -718,8 +720,9 @@ async def create_conversion_job(
     filename = _safe_filename(file.filename)
     _enforce_submission_rate_limit(request)
     suffix = _validate_suffix(filename)
+    manager = JOB_MANAGER
     try:
-        record = JOB_MANAGER.reserve(
+        record = manager.reserve(
             filename,
             suffix,
             auto_orient_right_angles=auto_orient_right_angles,
@@ -727,15 +730,23 @@ async def create_conversion_job(
         )
     except JobCapacityError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except JobManagerClosedError as exc:
+        raise HTTPException(
+            status_code=503, detail="Conversion service is unavailable. Try again later.",
+        ) from exc
 
     try:
         await _save_upload(file, record.input_path)
         _validate_saved_upload(record.input_path, suffix, rotations)
-        JOB_MANAGER.enqueue(record.id)
-    except Exception:
-        JOB_MANAGER.discard(record.id)
+        manager.enqueue(record.id)
+    except Exception as exc:
+        manager.discard(record.id)
+        if isinstance(exc, (JobManagerClosedError, JobSchedulingError)):
+            raise HTTPException(
+                status_code=503, detail="Conversion service is unavailable. Try again later.",
+            ) from exc
         raise
-    return JOB_MANAGER.public(record.id)
+    return manager.public(record.id)
 
 
 @app.post("/v1/jobs/batch", status_code=202)
@@ -771,14 +782,19 @@ async def create_conversion_batch(
 
     _enforce_submission_rate_limit(request, cost=len(prepared))
 
+    manager = JOB_MANAGER
     try:
-        records = JOB_MANAGER.reserve_many(
+        records = manager.reserve_many(
             [(filename, suffix) for _, filename, suffix in prepared],
             auto_orient_right_angles=auto_orient_right_angles,
             page_rotations=rotations,
         )
     except JobCapacityError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except JobManagerClosedError as exc:
+        raise HTTPException(
+            status_code=503, detail="Conversion service is unavailable. Try again later.",
+        ) from exc
 
     try:
         for (upload, _, suffix), record in zip(prepared, records, strict=True):
@@ -786,23 +802,34 @@ async def create_conversion_batch(
             _validate_saved_upload(record.input_path, suffix, rotations)
     except Exception:
         for record in records:
-            JOB_MANAGER.discard(record.id)
+            manager.discard(record.id)
         raise
 
     try:
         for record in records:
-            JOB_MANAGER.enqueue(record.id)
-    except Exception:
+            manager.enqueue(record.id)
+    except Exception as exc:
         for record in records:
             try:
-                JOB_MANAGER.cancel(record.id)
+                if record.future is None:
+                    # All uploads are complete. Unsubmitted/rejected members have
+                    # no runner owner; remove only these request-owned workspaces.
+                    manager.discard(record.id)
+                else:
+                    # Earlier members may already be running or successful.
+                    # Cooperatively cancel; never unlink an active workspace.
+                    manager.cancel(record.id)
             except JobNotFoundError:
                 pass
+        if isinstance(exc, (JobManagerClosedError, JobSchedulingError)):
+            raise HTTPException(
+                status_code=503, detail="Conversion service is unavailable. Try again later.",
+            ) from exc
         raise
 
     return {
         "count": len(records),
-        "jobs": [JOB_MANAGER.public(record.id) for record in records],
+        "jobs": [manager.public(record.id) for record in records],
     }
 
 

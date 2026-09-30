@@ -63,8 +63,10 @@ reference was subsequently replaced. Shutdown runs through a threadpool rather
 than joining workers on the ASGI event-loop thread. Startup failure and context
 exceptions also invoke teardown for that owner.
 
-Manager shutdown first signals the idle worker and waits up to **five seconds**
-for it to finish. Waiting for the next interval is interruptible immediately.
+Manager shutdown first [closes job admission](job-admission-shutdown.md) and
+reconciles queued work as cancelled, without deleting an in-progress upload or
+force-cancelling work already running. It then signals the idle worker and waits
+up to **five seconds** for it to finish. Waiting for the next interval is interruptible immediately.
 An already-running cleanup pass finishes cooperatively; it is not killed midway
 through storage I/O. With `shutdown(wait=False)`, no join wait is requested.
 

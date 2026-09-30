@@ -165,6 +165,21 @@ MAX_UPLOAD_BYTES=26214400
 MAX_PAGES=60
 ```
 
+## Shutdown and scheduling failures
+
+New reservations and enqueue attempts stop before manager shutdown joins workers.
+Queued work becomes cancelled with terminal accounting; already-running work keeps
+its existing graceful completion policy. A scheduling exception marks that job
+failed and closes further admission to that executor. Replace the manager/restart
+the API to restore admission; no automatic resubmission is performed.
+
+The single/batch creation endpoints return a fixed HTTP 503 for these unavailable
+states, separately from capacity's HTTP 429. Unstarted batch uploads are discarded
+only after copying stops; earlier scheduled members receive cooperative cancellation.
+Already-running or successful members cannot be transactionally undone. See
+[job admission and shutdown](job-admission-shutdown.md) for owner isolation,
+queued-work fencing, and the remaining upload/retention limits.
+
 ## Retention
 
 Public expiry and physical deletion are separate. Failed archive or workspace
