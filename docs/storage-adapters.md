@@ -142,15 +142,15 @@ The adapter rejects unsafe absolute/traversal keys before making an object-store
 
 ## Upload/download behavior
 
-For an async job, the OCR worker:
+For an async job, the service:
 
 1. processes input inside the transient job workspace
 2. creates DOCX/Markdown/TXT/JSON
 3. builds the result ZIP
 4. uploads the ZIP to the configured result-storage backend
-5. stores only the artifact reference in the job record
+5. hands the returned artifact to the job manager before success/cancellation is decided
 6. streams later downloads through the storage adapter
-7. deletes the artifact when job retention expires
+7. requests best-effort artifact deletion at cancellation or retention expiry
 
 The S3 adapter uses boto3's managed file upload and chunked object reads.
 
@@ -163,6 +163,17 @@ JOB_RETENTION_SECONDS
 ```
 
 the job manager asks the storage adapter to delete its stored artifact, then removes the transient workspace.
+
+Cancellation also requests immediate deletion of a successfully returned stored
+result when cancellation wins before job success. Expiry cannot race that
+in-progress cancellation deletion. A failed immediate delete retains the private
+reference for the existing expiry pass. See [job artifact ownership](job-artifact-ownership.md).
+
+This is not durable cleanup: the existing expiry pass drops the in-memory job
+even if its deletion fails. Restarts and uploads that fail after storing bytes
+but before returning an artifact also require independent retention controls.
+Local OCR workspaces are still retained until normal expiry, not erased as soon
+as cancellation is requested.
 
 ## Health/privacy
 

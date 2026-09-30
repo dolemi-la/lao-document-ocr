@@ -123,6 +123,13 @@ Cancellation is cooperative.
 
 Queued jobs can usually be cancelled before execution. Running OCR checks cancellation at PDF/page processing boundaries, so it does not kill a native OCR call in the middle of one page.
 
+If cancellation wins after result storage finishes, the manager keeps ownership
+of that artifact and attempts deletion without publishing a download. A failure
+retains its private reference for the existing expiry pass. A cancellation that
+arrives after confirmed success does not delete the successful result. See
+[stored-result ownership](job-artifact-ownership.md) for the concurrency contract
+and limits of best-effort cleanup; cancellation is not proof of data erasure.
+
 ## Capacity
 
 The local worker queue is deliberately bounded.

@@ -202,6 +202,8 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] CPU/CUDA/MPS owned-recognizer worker option + NVIDIA deployment preset
 - [x] atomic bounded batch job submission baseline
 - [x] cooperative job cancellation at page boundaries
+- [x] owned stored-result handoff on cancellation, with coordinated best-effort deletion
+- [ ] durable stored-result cleanup retries across deletion failures and process restarts
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
 - [x] disabled-by-default per-client submission rate-limit baseline
 - [x] filesystem result-storage adapter abstraction baseline

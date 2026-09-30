@@ -482,18 +482,9 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
     if cancel_event.is_set():
         raise JobCancelledError("Document processing was cancelled.")
 
-    archive = _write_outputs_archive(document, record.workspace, record.filename)
-    artifact = RESULT_STORAGE.put_file(
-        archive,
-        key=f"jobs/{record.id}/{archive.name}",
-        filename=archive.name,
-        media_type="application/zip",
-    )
-    if cancel_event.is_set():
-        RESULT_STORAGE.delete(artifact)
-        raise JobCancelledError("Document processing was cancelled.")
-    # Exposed only after the manager atomically marks this job succeeded.
-    # Recompute from selected geometry, never forward arbitrary document metadata.
+    # Finish fallible metadata/export work before publishing a stored result.
+    # Once put_file returns, the manager owns the artifact and atomically decides
+    # success versus cancellation; there must be no post-store worker gap.
     orientation = document.metadata.get("auto_orientation")
     if record.page_rotations and isinstance(orientation, dict):
         # Manual pages have selected geometry even when auto-orientation is off.
@@ -503,7 +494,15 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
         orientation,
         page_count=len(document.pages),
     )
-    return artifact
+    archive = _write_outputs_archive(document, record.workspace, record.filename)
+    if cancel_event.is_set():
+        raise JobCancelledError("Document processing was cancelled.")
+    return RESULT_STORAGE.put_file(
+        archive,
+        key=f"jobs/{record.id}/{archive.name}",
+        filename=archive.name,
+        media_type="application/zip",
+    )
 
 
 JOB_MANAGER = ConversionJobManager(

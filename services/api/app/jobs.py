@@ -72,6 +72,7 @@ class JobRecord:
     terminal_recorded: bool = field(default=False, repr=False)
     orientation_review: OrientationReview | None = None
     page_rotations: Mapping[int, int] = field(default_factory=dict)
+    _artifact_cleanup_in_progress: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self) -> None:
         # Snapshot each job independently, retaining explicit zero overrides.
@@ -229,20 +230,29 @@ class ConversionJobManager:
             record.status = JobStatus.RUNNING
             record.started_at = datetime.now(UTC)
 
+        cancelled_artifact: StoredArtifact | None = None
+        artifact_cleanup = self.artifact_cleanup
         try:
             output = self.runner(record, record.cancel_event)
             with self._lock:
+                # Take ownership before deciding whether cancellation won the race.
+                # A returned object must remain tracked even when never downloadable.
+                if isinstance(output, StoredArtifact):
+                    record.output_artifact = output
+                    record.output_path = None
+                else:
+                    record.output_path = Path(output)
+                    record.output_artifact = None
                 if record.cancel_event.is_set():
                     record.status = JobStatus.CANCELLED
                     record.cancellation_requested = True
                     record.output_path = None
+                    if record.output_artifact is not None and artifact_cleanup is not None:
+                        cancelled_artifact = record.output_artifact
+                        # Prevent expiry from deleting twice or dropping this reference
+                        # while storage I/O executes outside the manager lock.
+                        record._artifact_cleanup_in_progress = True
                 else:
-                    if isinstance(output, StoredArtifact):
-                        record.output_artifact = output
-                        record.output_path = None
-                    else:
-                        record.output_path = Path(output)
-                        record.output_artifact = None
                     record.status = JobStatus.SUCCEEDED
         except JobCancelledError:
             with self._lock:
@@ -267,6 +277,23 @@ class ConversionJobManager:
             with self._lock:
                 record.completed_at = datetime.now(UTC)
                 self._record_terminal_unlocked(record)
+
+        if cancelled_artifact is not None and artifact_cleanup is not None:
+            try:
+                artifact_cleanup(cancelled_artifact)
+            except Exception:
+                # Retain the private reference for the existing expiry cleanup pass.
+                # Storage exception bodies may contain keys, paths or credentials.
+                logger.warning(
+                    "Cancelled job artifact cleanup failed; retained for expiry cleanup.",
+                    extra={"job_id": job_id},
+                )
+            else:
+                with self._lock:
+                    record.output_artifact = None
+            finally:
+                with self._lock:
+                    record._artifact_cleanup_in_progress = False
 
     def cancel(self, job_id: str) -> dict:
         with self._lock:
@@ -366,6 +393,7 @@ class ConversionJobManager:
             for job_id, record in list(self._jobs.items()):
                 if (
                     record.status in _TERMINAL_STATUSES
+                    and not record._artifact_cleanup_in_progress
                     and record.completed_at is not None
                     and record.completed_at <= cutoff
                 ):
