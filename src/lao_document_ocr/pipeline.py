@@ -34,6 +34,7 @@ DEFAULT_AUTO_ORIENT_PROBE_BELOW_CONFIDENCE = 0.65
 DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CONFIDENCE = 0.45
 DEFAULT_AUTO_ORIENT_LAO_DOMINANT_MIN_CHARACTERS = 200
 DEFAULT_AUTO_ORIENT_LAO_DOMINANT_RATIO = 0.75
+AUTO_ORIENT_PROBE_SKIP_POLICY = "confidence-with-line-axis-v1"
 
 
 class DocumentProcessingError(RuntimeError):
@@ -296,7 +297,17 @@ def _recognize_with_right_angle_orientation(
     ):
         probe_skip_reason = "lao-dominant-baseline"
 
+    # Confident recognition is not evidence of upright page geometry. Reuse
+    # the same conservative sideways test that vetoes rotated candidates; do
+    # not weaken any acceptance threshold or remove the zero-degree fallback.
+    probe_skip_override_reason = None
+    if probe_skip_reason is not None and geometry[0]["sideways_dominant"]:
+        probe_skip_override_reason = "sideways-baseline"
+        probe_skip_reason = None
+
     base_diagnostics: dict[str, object] = {
+        "probe_skip_policy": AUTO_ORIENT_PROBE_SKIP_POLICY,
+        "probe_skip_override_reason": probe_skip_override_reason,
         "candidate_geometry_policy": ORIENTATION_GEOMETRY_VERSION,
         "baseline_confidence": baseline_confidence,
         "baseline_characters": baseline_characters,

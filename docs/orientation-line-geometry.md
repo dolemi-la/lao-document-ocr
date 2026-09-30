@@ -71,11 +71,14 @@ ordering and existing improvement thresholds. If the winner still fails those
 thresholds, return the unchanged baseline. No confidence threshold is relaxed,
 no extra OCR is invoked, and no source ID or expected angle is hard-coded.
 
-The existing high-confidence and Lao-dominant probe-skip rules are unchanged.
-**A high-confidence sideways baseline may still be skipped.** This patch does
-not claim to solve that separate case. Nor can line-axis evidence distinguish
-upright from upside-down horizontal text; existing OCR ranking still decides
-between those cases. Right-angle auto-orientation remains off by default.
+The initial `ecc22dd` change left high-confidence and Lao-dominant probe-skip
+rules unchanged. The subsequent [geometry-aware skip policy](orientation-probe-skip.md)
+now overrides those shortcuts when the baseline satisfies the existing sideways
+criterion. Rotation acceptance thresholds remain unchanged: equal-score
+sideways/upright results can still retain the baseline after probing. Line-axis
+evidence cannot distinguish upright from upside-down horizontal text; existing
+OCR ranking still decides between those cases. Right-angle auto-orientation
+remains off by default.
 
 Diagnostics add `candidate_geometry_policy`, `candidate_geometry`, and
 `geometry_vetoed_degrees`. Retained best/runner-up score margins now describe

@@ -34,6 +34,7 @@ Status: in progress
 - [x] Tesseract OSD orientation hint cross-check against exhaustive rotation diagnostics
 - [x] opt-in coordinate-safe right-angle auto-orientation for document conversion + remote A/B diagnostics
 - [x] no-text line-axis veto for sideways right-angle candidates, shared with remote probes
+- [x] geometry-aware confidence probe skips with unchanged rotation acceptance and safe fallback
 - [x] bounded small-angle deskew direction correction with signed-angle and pipeline regressions
 - [x] conservative small-angle image-evidence veto for clipping/unsupported alignment; real accuracy validation remains open
 - [ ] reliable text-skew proposals and text-retention safeguards — tracked in [#17](https://github.com/dolemi-la/lao-document-ocr/issues/17)
@@ -228,3 +229,11 @@ is unchanged on the seven available pages. This is not transcription-accuracy
 validation. Two source failures, MAF's text-retention tradeoff and the genuine
 capture pilot keep issue #17 open. High-confidence baseline skip behavior is
 unchanged and remains a limitation of the current opt-in orientation path.
+
+The [geometry-aware probe-skip follow-up](orientation-probe-skip.md) makes
+confident sideways baselines eligible for the existing opt-in probes. Its
+project-authored Tesseract control still corrects only 6/8 known rotations,
+the same as before: near-equal upright/sideways OCR scores fail the unchanged
+acceptance thresholds. Two cases add three probe attempts each without a
+correction. This closes the early-exit path, not the broader high-confidence
+orientation-selection problem or the outstanding optical-validation gate.

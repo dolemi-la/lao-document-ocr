@@ -152,8 +152,8 @@ def test_failed_probe_has_no_geometry_and_no_exception_text():
     assert engine.calls == 4
 
 
-def test_high_confidence_skip_is_deliberately_unchanged():
-    engine = SequenceEngine([lines(0.95, vertical=True)])
+def test_high_confidence_horizontal_skip_is_unchanged():
+    engine = SequenceEngine([lines(0.95)])
     _, _, angle, info = pipeline._recognize_with_right_angle_orientation(
         Image.new("RGB", (400, 600)), engine=engine
     )
