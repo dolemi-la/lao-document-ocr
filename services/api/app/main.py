@@ -118,6 +118,7 @@ RESULT_STORAGE_S3_FORCE_PATH_STYLE = os.getenv(
 ).strip().lower() in {"1", "true", "yes", "on"}
 JOB_MAX_WORKERS = int(os.getenv("JOB_MAX_WORKERS", "2"))
 JOB_MAX_ACTIVE = int(os.getenv("JOB_MAX_ACTIVE", "8"))
+JOB_MAX_RETAINED = int(os.getenv("JOB_MAX_RETAINED", "1024"))
 JOB_RETENTION_SECONDS = int(os.getenv("JOB_RETENTION_SECONDS", "3600"))
 BATCH_MAX_FILES = int(os.getenv("BATCH_MAX_FILES", "10"))
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "0"))
@@ -510,6 +511,7 @@ JOB_MANAGER = ConversionJobManager(
     _run_conversion_job,
     max_workers=JOB_MAX_WORKERS,
     max_active_jobs=JOB_MAX_ACTIVE,
+    max_retained_jobs=JOB_MAX_RETAINED,
     retention_seconds=JOB_RETENTION_SECONDS,
     artifact_exists=RESULT_STORAGE.exists,
     artifact_cleanup=RESULT_STORAGE.delete,
@@ -559,6 +561,7 @@ def health() -> dict:
         "jobs": {
             "max_workers": JOB_MAX_WORKERS,
             "max_active_jobs": JOB_MAX_ACTIVE,
+            "max_retained_jobs": JOB_MAX_RETAINED,
             "retention_seconds": JOB_RETENTION_SECONDS,
             "batch_max_files": BATCH_MAX_FILES,
         },

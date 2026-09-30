@@ -19,6 +19,11 @@ from services.api.app.storage import StoredArtifact
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_MAX_RETAINED_JOBS = 1024
+CLEANUP_MAX_TASKS_PER_PASS = 8
+CLEANUP_RETRY_INITIAL_SECONDS = 30
+CLEANUP_RETRY_MAX_SECONDS = 3600
+
 
 class JobStatus(StrEnum):
     UPLOADING = "uploading"
@@ -79,6 +84,18 @@ class JobRecord:
         self.page_rotations = MappingProxyType(validate_page_rotations(self.page_rotations))
 
 
+@dataclass
+class _ExpiredJobCleanup:
+    """Minimal private ownership after the public job has expired; not durable."""
+
+    workspace: Path
+    artifact: StoredArtifact | None
+    retry_at: datetime
+    workspace_pending: bool = True
+    failures: int = 0
+    in_progress: bool = False
+
+
 JobRunner = Callable[[JobRecord, threading.Event], Path | StoredArtifact]
 ArtifactExists = Callable[[StoredArtifact], bool]
 ArtifactCleanup = Callable[[StoredArtifact], None]
@@ -93,6 +110,7 @@ class ConversionJobManager:
         max_workers: int = 2,
         max_active_jobs: int = 8,
         retention_seconds: int = 3600,
+        max_retained_jobs: int = DEFAULT_MAX_RETAINED_JOBS,
         artifact_exists: ArtifactExists | None = None,
         artifact_cleanup: ArtifactCleanup | None = None,
     ) -> None:
@@ -103,12 +121,16 @@ class ConversionJobManager:
         if retention_seconds < 0:
             raise ValueError("retention_seconds must be non-negative")
 
+        if type(max_retained_jobs) is not int or max_retained_jobs < max_active_jobs:
+            raise ValueError("max_retained_jobs must be an integer >= max_active_jobs")
+
         self.root_dir = Path(root_dir)
         self.root_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.root_dir.chmod(0o700)
         self.runner = runner
         self.max_active_jobs = max_active_jobs
         self.retention_seconds = retention_seconds
+        self.max_retained_jobs = max_retained_jobs
         self.artifact_exists = artifact_exists
         self.artifact_cleanup = artifact_cleanup
         self._executor = ThreadPoolExecutor(
@@ -116,6 +138,9 @@ class ConversionJobManager:
             thread_name_prefix="lao-ocr-job",
         )
         self._jobs: dict[str, JobRecord] = {}
+        self._pending_cleanup: dict[str, _ExpiredJobCleanup] = {}
+        self._cleanup_attempts_total = 0
+        self._cleanup_failures_total = 0
         self._completed_total: Counter[str] = Counter()
         self._duration_seconds_sum: Counter[str] = Counter()
         self._lock = threading.RLock()
@@ -155,6 +180,15 @@ class ConversionJobManager:
                 available = max(0, self.max_active_jobs - active)
                 raise JobCapacityError(
                     f"Job capacity reached ({available} slot(s) available, {len(files)} requested)."
+                )
+
+            # Bound both live/terminal records and private failed-cleanup ownership.
+            # Backpressure rather than dropping references during a storage outage.
+            retained = len(self._jobs) + len(self._pending_cleanup)
+            if retained + len(files) > self.max_retained_jobs:
+                raise JobCapacityError(
+                    "Retained job capacity reached; wait for expiry/cleanup "
+                    "or increase JOB_MAX_RETAINED."
                 )
 
             records: list[JobRecord] = []
@@ -378,17 +412,29 @@ class ConversionJobManager:
                 },
                 "active_jobs": self._active_count(),
                 "max_active_jobs": self.max_active_jobs,
+                "retained_jobs": len(self._jobs) + len(self._pending_cleanup),
+                "max_retained_jobs": self.max_retained_jobs,
+                "cleanup_pending_jobs": len(self._pending_cleanup),
+                "cleanup_pending_artifacts": sum(
+                    item.artifact is not None for item in self._pending_cleanup.values()
+                ),
+                "cleanup_in_progress": sum(
+                    item.in_progress for item in self._pending_cleanup.values()
+                ),
+                "cleanup_attempts_total": self._cleanup_attempts_total,
+                "cleanup_failures_total": self._cleanup_failures_total,
             }
 
     def cleanup_expired(self, *, now: datetime | None = None) -> int:
-        if self.retention_seconds == 0:
-            cutoff = now or datetime.now(UTC)
-        else:
-            cutoff = (now or datetime.now(UTC)) - timedelta(
-                seconds=self.retention_seconds
-            )
+        """Expire public records and attempt a bounded batch of due private cleanups.
 
-        expired: list[JobRecord] = []
+        Returns newly expired jobs, not successful deletions. Retry ownership
+        survives failures in this process only. Callbacks and workspace I/O run
+        outside the manager lock; a task cannot be claimed by two passes.
+        """
+        current_time = now or datetime.now(UTC)
+        cutoff = current_time - timedelta(seconds=self.retention_seconds)
+        expired_count = 0
         with self._lock:
             for job_id, record in list(self._jobs.items()):
                 if (
@@ -397,17 +443,75 @@ class ConversionJobManager:
                     and record.completed_at is not None
                     and record.completed_at <= cutoff
                 ):
-                    expired.append(record)
+                    self._pending_cleanup[job_id] = _ExpiredJobCleanup(
+                        record.workspace, record.output_artifact, current_time,
+                    )
                     del self._jobs[job_id]
+                    expired_count += 1
 
-        for record in expired:
-            if record.output_artifact is not None and self.artifact_cleanup is not None:
+            due = sorted(
+                (
+                    (job_id, item) for job_id, item in self._pending_cleanup.items()
+                    if not item.in_progress and item.retry_at <= current_time
+                ),
+                key=lambda pair: (pair[1].retry_at, pair[0]),
+            )[:CLEANUP_MAX_TASKS_PER_PASS]
+            for _, item in due:
+                item.in_progress = True
+            self._cleanup_attempts_total += len(due)
+
+        for job_id, item in due:
+            artifact_deleted = item.artifact is None
+            workspace_deleted = not item.workspace_pending
+            artifact_cleanup = self.artifact_cleanup
+            if item.artifact is not None and artifact_cleanup is not None:
                 try:
-                    self.artifact_cleanup(record.output_artifact)
+                    artifact_cleanup(item.artifact)
+                except Exception:
+                    # Never serialize provider exceptions or storage identities.
+                    pass
+                else:
+                    artifact_deleted = True
+            if item.workspace_pending:
+                try:
+                    shutil.rmtree(item.workspace)
+                except FileNotFoundError:
+                    # A missing child is not proof that the whole workspace is gone.
+                    try:
+                        workspace_deleted = not (
+                            item.workspace.exists() or item.workspace.is_symlink()
+                        )
+                    except OSError:
+                        # An inaccessible root is unknown, never a deletion receipt.
+                        workspace_deleted = False
                 except Exception:
                     pass
-            shutil.rmtree(record.workspace, ignore_errors=True)
-        return len(expired)
+                else:
+                    workspace_deleted = True
+
+            complete = artifact_deleted and workspace_deleted
+            with self._lock:
+                if artifact_deleted:
+                    item.artifact = None
+                item.workspace_pending = not workspace_deleted
+                item.in_progress = False
+                if complete:
+                    self._pending_cleanup.pop(job_id)
+                else:
+                    item.failures += 1
+                    # Saturate the exponent; long outages must not allocate huge integers.
+                    delay = min(
+                        CLEANUP_RETRY_INITIAL_SECONDS * 2 ** min(item.failures - 1, 7),
+                        CLEANUP_RETRY_MAX_SECONDS,
+                    )
+                    item.retry_at = (now or datetime.now(UTC)) + timedelta(seconds=delay)
+                    self._cleanup_failures_total += 1
+            if not complete:
+                logger.warning(
+                    "Expired job cleanup incomplete; retained for retry.",
+                    extra={"job_id": job_id},
+                )
+        return expired_count
 
     def shutdown(self, *, wait: bool = True) -> None:
         self._executor.shutdown(wait=wait, cancel_futures=True)

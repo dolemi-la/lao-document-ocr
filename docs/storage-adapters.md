@@ -162,7 +162,15 @@ When a terminal job expires according to:
 JOB_RETENTION_SECONDS
 ```
 
-the job manager asks the storage adapter to delete its stored artifact, then removes the transient workspace.
+the job manager expires public access and queues the stored artifact and transient
+workspace for cleanup. Failed stages remain privately tracked for delayed,
+bounded [process-local retries](job-expiry-cleanup.md). A successful object
+deletion is not repeated solely because workspace removal failed. No restart-safe
+cleanup ledger is provided; expired status is not proof of physical deletion.
+
+`JOB_MAX_RETAINED` (default 1024) bounds live/terminal records plus pending-cleanup
+tasks. Reaching the limit rejects new reservations instead of discarding deletion
+references. It is a record-count limit, not a storage-byte quota.
 
 Cancellation also requests immediate deletion of a successfully returned stored
 result when cancellation wins before job success. Expiry cannot race that

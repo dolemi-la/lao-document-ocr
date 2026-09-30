@@ -123,6 +123,28 @@ class ApiMetrics:
                     f'{float(total):.9f}'
                 )
 
+        if job_snapshot:
+            # Fixed, aggregate-only series: never use cleanup IDs/keys as labels.
+            cleanup_series = (
+                ("retained_jobs", "jobs_retained", "gauge", "All retained job/cleanup records."),
+                ("max_retained_jobs", "jobs_retained_limit", "gauge", "Retained job capacity."),
+                ("cleanup_pending_jobs", "cleanup_pending_jobs", "gauge", "Pending cleanup tasks."),
+                ("cleanup_pending_artifacts", "cleanup_pending_artifacts", "gauge",
+                 "Stored artifacts awaiting successful expiry deletion."),
+                ("cleanup_in_progress", "cleanup_in_progress", "gauge", "Claimed cleanup tasks."),
+                ("cleanup_attempts_total", "cleanup_attempts_total", "counter",
+                 "Expiry cleanup task attempts in this process."),
+                ("cleanup_failures_total", "cleanup_failures_total", "counter",
+                 "Incomplete expiry cleanup attempts in this process."),
+            )
+            for key, suffix, metric_type, help_text in cleanup_series:
+                value = job_snapshot.get(key)
+                if type(value) is not int or value < 0:
+                    continue
+                name = f"lao_ocr_{suffix}"
+                lines.extend((f"# HELP {name} {help_text}", f"# TYPE {name} {metric_type}",
+                              f"{name} {value}"))
+
         return "\n".join(lines) + "\n"
 
 

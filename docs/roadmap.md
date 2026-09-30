@@ -196,6 +196,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 ## Phase 4 — production hardening
 
 - [x] bounded local async conversion jobs
+- [x] process-local expired artifact/workspace cleanup retries with bounded backoff, retained-job admission and aggregate metrics
 - [x] same-job web status/download recovery with frozen corrections and stale-response guards
 - [x] bounded web conversion requests including response bodies, with safe timeout recovery
 - [x] upload/page/active-job concurrency limits baseline

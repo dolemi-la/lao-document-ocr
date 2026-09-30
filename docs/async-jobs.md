@@ -154,6 +154,18 @@ MAX_PAGES=60
 
 ## Retention
 
+Public expiry and physical deletion are separate. Failed archive or workspace
+cleanup remains in a private, bounded-admission retry queue with 30-second
+exponential backoff capped at one hour. Each existing expiry pass claims at most
+eight due tasks; there is no new background cleanup worker. Job IDs remain
+unavailable while deletion is pending. See [expiry cleanup](job-expiry-cleanup.md).
+
+`JOB_MAX_RETAINED=1024` limits all live/terminal records and pending-cleanup tasks
+combined, separately from `JOB_MAX_ACTIVE`. It must be at least the active limit.
+At capacity, single and batch submissions return HTTP 429 before allocating new
+job workspaces. Successful normal expiry or retry cleanup releases capacity.
+A restart still loses the in-memory retry queue; this is not guaranteed erasure.
+
 Terminal job workspaces are retained long enough for result download, then lazily cleaned when jobs are accessed/submitted.
 
 The default is one hour.

@@ -62,8 +62,9 @@ cancellations do not create a new immediate-delete retry loop.
 
 - Expiry is invoked by the existing manager activity, not a new scheduled worker.
   A retained reference gets another deletion attempt only when expiry runs.
-- Existing expiry behavior removes the in-memory job even if that later deletion
-  also fails. This patch does not add a durable retry queue or persistent ledger.
+- The follow-up [expiry cleanup queue](job-expiry-cleanup.md) now hides expired
+  public jobs while retaining unfinished artifact/workspace deletion for delayed
+  retries in the same process. It does not add restart durability or a persistent ledger.
 - A process crash/restart, or a storage call that commits bytes but raises before
   returning a reference, can still leave stored bytes requiring independent
   retention management. Provider versioning/lifecycle semantics are unchanged.

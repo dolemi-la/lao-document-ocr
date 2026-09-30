@@ -121,3 +121,19 @@ This baseline intentionally avoids:
 - per-job-ID metric labels
 
 A larger deployment can add OpenTelemetry/exporters later without making them mandatory for local users.
+
+
+## Expiry cleanup ownership
+
+[Process-local cleanup retries](job-expiry-cleanup.md) expose aggregate gauges
+`lao_ocr_jobs_retained`, `lao_ocr_jobs_retained_limit`,
+`lao_ocr_cleanup_pending_jobs`, `lao_ocr_cleanup_pending_artifacts`, and
+`lao_ocr_cleanup_in_progress`. Counters `lao_ocr_cleanup_attempts_total` and
+`lao_ocr_cleanup_failures_total` count claimed expiry tasks and incomplete
+attempts, not individual provider requests or immediate cancellation deletes.
+They reset on API restart and include no job IDs, object keys, or document text.
+
+Metrics snapshots can trigger a due cleanup pass through the existing manager
+activity path. No scheduled retry service or server-side storage timeout is
+implied. Inspect persistent pending counts and retained-capacity saturation;
+raising the admission limit alone does not fix failed storage deletion.
