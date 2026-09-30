@@ -139,3 +139,14 @@ passes without traffic, using the same per-task backoff. These metrics still
 do not imply restart-safe ownership, a deletion SLA, or storage I/O deadlines.
 Inspect persistent pending counts and retained-capacity saturation;
 raising the admission limit alone does not fix failed storage deletion.
+
+
+## Download ownership during expiry
+
+[Download leases](job-download-leases.md) add the gauges
+`lao_ocr_downloads_active` (admitted responses still holding ownership) and
+`lao_ocr_cleanup_download_blocked_jobs` (expired tasks waiting for those
+responses). They have no per-job labels or document text. Values are current
+process counts, not downloaded bytes, client receipts, or deletion proof.
+A blocked task still counts toward retained capacity. Snapshot-triggered cleanup
+remains active, but cannot claim that task until its final response releases.

@@ -187,6 +187,16 @@ artifact require independent retention controls.
 Local OCR workspaces are still retained until normal expiry, not erased as soon
 as cancellation is requested.
 
+## Active archive transfers
+
+[Process-local download leases](job-download-leases.md) now protect admitted
+archive responses from this manager's expiry deletion. Public expiry still
+hides the job; private artifact/workspace cleanup waits until all admitted
+responses close. Stored-response iterators are explicitly closed before their
+lease is released, including interrupted S3-adapter responses. External/provider
+lifecycle deletion and process crashes are not prevented. A stalled transfer can
+hold data beyond public retention; this is not proof of erasure or receipt.
+
 ## Health/privacy
 
 The public health response reports only the storage backend name.

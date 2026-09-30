@@ -205,6 +205,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] cooperative job cancellation at page boundaries
 - [x] owned stored-result handoff on cancellation, with coordinated best-effort deletion
 - [x] ASGI lifespan-managed idle cleanup with bounded join and unchanged retry/backoff limits
+- [x] bounded active-download leases defer expiry deletion until admitted responses close, without renewing public access
 - [ ] durable stored-result cleanup retries across deletion failures and process restarts
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
 - [x] disabled-by-default per-client submission rate-limit baseline

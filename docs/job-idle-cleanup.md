@@ -92,10 +92,11 @@ can still trigger their own cleanup pass; this change does not make every
 request-side storage operation asynchronous or deadline-bounded.
 
 Public job expiry remains separate from physical deletion. Expired jobs stay
-unavailable while their cleanup tasks are pending. This worker introduces no
-download lease or retention extension: a transfer near the expiry boundary may
-still lose access. Browser request deadlines and same-job recovery do not
-prevent server-side expiration or certify erasure.
+unavailable while their cleanup tasks are pending. The subsequent
+[download-lease protection](job-download-leases.md) keeps an already admitted
+response's archive/workspace out of deletion until its response closes. New
+requests cannot extend expired public access. Browser request deadlines and
+same-job recovery do not prevent server-side expiration or certify erasure.
 
 **Cleanup ownership remains process-local and is lost on restart.** The worker
 does not discover old objects/workspaces, reconstruct jobs, persist failed

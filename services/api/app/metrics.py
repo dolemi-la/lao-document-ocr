@@ -126,6 +126,9 @@ class ApiMetrics:
         if job_snapshot:
             # Fixed, aggregate-only series: never use cleanup IDs/keys as labels.
             cleanup_series = (
+                ("active_downloads", "downloads_active", "gauge", "Admitted archive responses."),
+                ("cleanup_download_blocked_jobs", "cleanup_download_blocked_jobs", "gauge",
+                 "Expired cleanup tasks waiting for admitted downloads."),
                 ("retained_jobs", "jobs_retained", "gauge", "All retained job/cleanup records."),
                 ("max_retained_jobs", "jobs_retained_limit", "gauge", "Retained job capacity."),
                 ("cleanup_pending_jobs", "cleanup_pending_jobs", "gauge", "Pending cleanup tasks."),

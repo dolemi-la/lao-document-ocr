@@ -113,6 +113,18 @@ The response is the same ZIP bundle used by synchronous conversion:
 
 Trying to download a queued/running/failed/cancelled job returns HTTP 409.
 
+## Downloads crossing expiry
+
+An archive download admitted before public expiry holds a private lease through
+response completion, error or disconnect. Expiry can hide the job while its
+existing transfer finishes; new requests cannot renew expired access. Cleanup
+waits for the last admitted transfer, so physical deletion can occur later than
+public expiry. Download admission is capped at four responses per job and 32 per
+manager; excess requests return HTTP 429. Missing results still return 410 and
+non-successful jobs return 409. See [download leases](job-download-leases.md)
+for storage-reader closure, range behavior, metrics and limits. This is not a
+transfer-success or erasure guarantee.
+
 ## Cancel
 
 ```http

@@ -84,6 +84,15 @@ have no new server-side I/O deadline.
 A hung call can hold its claimed batch and delay the invoking request; the web
 request deadline neither terminates it nor certifies deletion.
 
+## Admitted downloads
+
+[Download leases](job-download-leases.md) defer physical cleanup while an already
+admitted archive response is using the job. Expiry still removes the public
+record. Leased tasks are excluded before the eight-task selection budget and
+retain their capacity slot; they do not increment cleanup attempts/failures.
+After the last response closes, a later pass retries any due unfinished stages.
+This changes neither the existing backoff nor restart-durability limitations.
+
 ## Bounded retention and admission
 
 A new configurable process-wide admission limit bounds all live and retained

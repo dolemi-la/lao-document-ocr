@@ -25,6 +25,8 @@ from services.api.app.storage import StoredArtifact
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_RETAINED_JOBS = 1024
+MAX_DOWNLOADS_PER_JOB = 4
+MAX_DOWNLOADS_TOTAL = 32
 CLEANUP_MAX_TASKS_PER_PASS = 8
 CLEANUP_RETRY_INITIAL_SECONDS = 30
 CLEANUP_RETRY_MAX_SECONDS = 3600
@@ -52,6 +54,27 @@ class JobCapacityError(RuntimeError):
 
 class JobNotFoundError(KeyError):
     pass
+
+
+class JobDownloadNotReadyError(RuntimeError):
+    pass
+
+
+class JobDownloadCapacityError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class JobDownloadLease:
+    """An admitted response owns a private snapshot until close, not public retention."""
+
+    output_path: Path | None
+    output_artifact: StoredArtifact | None
+    _release: Callable[[], None] = field(repr=False, compare=False)
+
+    def close(self) -> None:
+        """Idempotently release without storage I/O; normal cleanup handles deletion."""
+        self._release()
 
 
 class JobCancelledError(RuntimeError):
@@ -151,6 +174,7 @@ class ConversionJobManager:
         )
         self._jobs: dict[str, JobRecord] = {}
         self._pending_cleanup: dict[str, _ExpiredJobCleanup] = {}
+        self._download_leases: dict[str, int] = {}
         self._cleanup_attempts_total = 0
         self._cleanup_failures_total = 0
         self._completed_total: Counter[str] = Counter()
@@ -243,6 +267,8 @@ class ConversionJobManager:
 
     def discard(self, job_id: str) -> None:
         with self._lock:
+            if self._download_leases.get(job_id, 0):
+                raise RuntimeError("Cannot discard a job with an admitted download.")
             record = self._jobs.pop(job_id, None)
         if record is not None:
             shutil.rmtree(record.workspace, ignore_errors=True)
@@ -355,6 +381,46 @@ class ConversionJobManager:
                 self._record_terminal_unlocked(record)
             return self._public(record)
 
+    def acquire_download(self, job_id: str) -> JobDownloadLease:
+        """Pin an available successful result before checking/opening storage.
+
+        Public expiry still removes the job. Its private cleanup waits until all
+        admitted responses close. No new lease may bypass the retention boundary.
+        """
+        self.cleanup_expired()
+        with self._lock:
+            record = self._require(job_id)
+            # Cleanup may have spent time on unrelated storage before we got the lock.
+            cutoff = datetime.now(UTC) - timedelta(seconds=self.retention_seconds)
+            if record.completed_at is not None and record.completed_at <= cutoff:
+                raise JobNotFoundError(job_id)
+            if record.status != JobStatus.SUCCEEDED:
+                raise JobDownloadNotReadyError(
+                    f"Job is not ready for download (status={record.status.value})."
+                )
+            count = self._download_leases.get(job_id, 0)
+            if (
+                count >= MAX_DOWNLOADS_PER_JOB
+                or sum(self._download_leases.values()) >= MAX_DOWNLOADS_TOTAL
+            ):
+                raise JobDownloadCapacityError("Too many active downloads. Try again later.")
+            self._download_leases[job_id] = count + 1
+            released = False
+
+            def release() -> None:
+                nonlocal released
+                with self._lock:
+                    if released:
+                        return
+                    released = True
+                    remaining = self._download_leases[job_id] - 1
+                    if remaining:
+                        self._download_leases[job_id] = remaining
+                    else:
+                        del self._download_leases[job_id]
+
+            return JobDownloadLease(record.output_path, record.output_artifact, release)
+
     def get_record(self, job_id: str) -> JobRecord:
         self.cleanup_expired()
         with self._lock:
@@ -425,6 +491,11 @@ class ConversionJobManager:
                 "active_jobs": self._active_count(),
                 "max_active_jobs": self.max_active_jobs,
                 "retained_jobs": len(self._jobs) + len(self._pending_cleanup),
+                "active_downloads": sum(self._download_leases.values()),
+                "cleanup_download_blocked_jobs": sum(
+                    bool(self._download_leases.get(job_id, 0))
+                    for job_id in self._pending_cleanup
+                ),
                 "max_retained_jobs": self.max_retained_jobs,
                 "cleanup_pending_jobs": len(self._pending_cleanup),
                 "cleanup_pending_artifacts": sum(
@@ -465,6 +536,7 @@ class ConversionJobManager:
                 (
                     (job_id, item) for job_id, item in self._pending_cleanup.items()
                     if not item.in_progress and item.retry_at <= current_time
+                    and not self._download_leases.get(job_id, 0)
                 ),
                 key=lambda pair: (pair[1].retry_at, pair[0]),
             )[:CLEANUP_MAX_TASKS_PER_PASS]

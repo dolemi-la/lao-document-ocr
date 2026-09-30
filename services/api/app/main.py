@@ -38,14 +38,16 @@ from lao_document_ocr.pipeline import (
     process_document,
 )
 from lao_document_ocr.reading_order import DeterministicReadingOrderResolver
+from services.api.app.downloads import LeasedDownloadResponse
 from services.api.app.jobs import (
     ConversionJobManager,
     JobCancelledError,
     JobCapacityError,
+    JobDownloadCapacityError,
+    JobDownloadNotReadyError,
     JobNotFoundError,
     JobPublicError,
     JobRecord,
-    JobStatus,
 )
 from services.api.app.metrics import ApiMetrics, RequestTimer
 from services.api.app.rate_limit import SlidingWindowRateLimiter
@@ -823,39 +825,45 @@ def cancel_conversion_job(job_id: str) -> dict:
 @app.get("/v1/jobs/{job_id}/download")
 def download_conversion_job(job_id: str):
     try:
-        record = JOB_MANAGER.get_record(job_id)
+        lease = JOB_MANAGER.acquire_download(job_id)
     except JobNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Job not found.") from exc
+    except JobDownloadNotReadyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except JobDownloadCapacityError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
-    if record.status != JobStatus.SUCCEEDED:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Job is not ready for download (status={record.status.value}).",
-        )
-
-    if record.output_artifact is not None:
-        artifact = record.output_artifact
-        if not RESULT_STORAGE.exists(artifact):
-            raise HTTPException(
-                status_code=410,
-                detail="Job result is no longer available.",
+    try:
+        if lease.output_artifact is not None:
+            artifact = lease.output_artifact
+            if not RESULT_STORAGE.exists(artifact):
+                raise HTTPException(
+                    status_code=410,
+                    detail="Job result is no longer available.",
+                )
+            return LeasedDownloadResponse.streaming(
+                RESULT_STORAGE.iter_bytes(artifact), lease,
+                media_type=artifact.media_type,
+                headers=_download_headers(artifact.filename),
             )
-        return StreamingResponse(
-            RESULT_STORAGE.iter_bytes(artifact),
-            media_type=artifact.media_type,
-            headers=_download_headers(artifact.filename),
-        )
 
-    if record.output_path is None:
-        raise HTTPException(
-            status_code=409,
-            detail="Job completed without a downloadable result.",
-        )
-    if not record.output_path.is_file():
-        raise HTTPException(status_code=410, detail="Job result is no longer available.")
+        if lease.output_path is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Job completed without a downloadable result.",
+            )
+        if not lease.output_path.is_file():
+            raise HTTPException(status_code=410, detail="Job result is no longer available.")
 
-    return FileResponse(
-        record.output_path,
-        media_type="application/zip",
-        filename=record.output_path.name,
-    )
+        return LeasedDownloadResponse(
+            FileResponse(
+                lease.output_path,
+                media_type="application/zip",
+                filename=lease.output_path.name,
+            ),
+            lease,
+        )
+    except BaseException:
+        # Pre-response failures have no ASGI finalizer to release the admission.
+        lease.close()
+        raise
