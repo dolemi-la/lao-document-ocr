@@ -200,7 +200,10 @@ unavailable while deletion is pending. See [expiry cleanup](job-expiry-cleanup.m
 combined, separately from `JOB_MAX_ACTIVE`. It must be at least the active limit.
 At capacity, single and batch submissions return HTTP 429 before allocating new
 job workspaces. Successful normal expiry or retry cleanup releases capacity.
-A restart still loses the in-memory retry queue; this is not guaranteed erasure.
+By default, a restart still loses the in-memory retry queue. Opt-in
+`JOB_CLEANUP_DURABLE=true` journals already-expired tasks on a persistent `JOB_ROOT`;
+see [durable expired cleanup](durable-expired-cleanup.md). This does not restore
+public jobs or cover crashes before expiry, and is not guaranteed erasure.
 
 Terminal job workspaces are retained for result download, then cleaned by
 request activity or the API lifespan worker. `JOB_CLEANUP_INTERVAL_SECONDS=30`
@@ -217,7 +220,9 @@ A production deployment with shared storage or multiple API replicas should even
 
 The current implementation is intended for one API process.
 
-The queue and job metadata are in memory. Result files live under `JOB_ROOT`.
+The active queue and public job metadata remain in memory. Workspaces live under
+`JOB_ROOT`; stored archives use the configured result adapter. Optional expired
+cleanup journaling does not turn this into a multi-process job queue.
 
 For multi-process/multi-host deployments, use a future external queue backend rather than running independent in-memory queues behind a load balancer.
 

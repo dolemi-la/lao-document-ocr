@@ -165,8 +165,9 @@ JOB_RETENTION_SECONDS
 the job manager expires public access and queues the stored artifact and transient
 workspace for cleanup. Failed stages remain privately tracked for delayed,
 bounded [process-local retries](job-expiry-cleanup.md). A successful object
-deletion is not repeated solely because workspace removal failed. No restart-safe
-cleanup ledger is provided; expired status is not proof of physical deletion.
+deletion is not repeated solely because workspace removal failed. Optional
+[durable expired cleanup](durable-expired-cleanup.md) journals those expired tasks;
+expired status remains separate from physical deletion.
 The [API idle worker](job-idle-cleanup.md) invokes the same bounded cleanup
 pass on a configurable cadence, so an idle process no longer requires another
 request to start due deletion work.
@@ -180,10 +181,11 @@ result when cancellation wins before job success. Expiry cannot race that
 in-progress cancellation deletion. A failed immediate delete retains the private
 reference for the existing expiry pass. See [job artifact ownership](job-artifact-ownership.md).
 
-This is not durable cleanup: public expiry removes the job while a private
-process-local task retains unfinished deletion. Restart still loses that task.
-Restarts and uploads that fail after storing bytes but before returning an
-artifact require independent retention controls.
+The default mode is process-local and loses unfinished cleanup on restart.
+With `JOB_CLEANUP_DURABLE=true`, already-expired tasks survive through the bound
+local journal. Crashes before its intent commit and uploads that store bytes
+without returning an artifact remain outside recovery and require independent
+retention controls.
 Local OCR workspaces are still retained until normal expiry, not erased as soon
 as cancellation is requested.
 
@@ -204,6 +206,18 @@ and revalidate the record/result afterward. A delayed provider check therefore
 does not serialize unrelated job transitions. This is advisory readiness, not
 a lease or a provider timeout; actual downloads still acquire their own lease
 and check storage. See [job-status readiness](job-status-readiness.md).
+
+## Optional durable expired cleanup
+
+The opt-in journal binds cleanup to the canonical job root and result-storage
+namespace. S3 binding uses the effective endpoint/region plus bucket and prefix;
+filesystem binding uses the result root. Changed namespaces, malformed ledgers,
+and a second live owner refuse startup rather than redirecting deletions. Only
+keys in a generated job's direct object namespace can be replayed. No bucket
+scan, public-job reconstruction, or automatic storage migration is performed.
+
+See [durable expired cleanup](durable-expired-cleanup.md) for persistent-volume
+setup, failed-commit behavior, shutdown/download leases, and pre-expiry gaps.
 
 ## Health/privacy
 

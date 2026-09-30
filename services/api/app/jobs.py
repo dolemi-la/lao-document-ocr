@@ -15,6 +15,12 @@ from types import MappingProxyType
 
 from lao_document_ocr.orientation_review import OrientationReview
 from lao_document_ocr.page_rotations import validate_page_rotations
+from services.api.app.cleanup_journal import (
+    MAX_FAILURES,
+    CleanupEntry,
+    CleanupJournal,
+    CleanupJournalError,
+)
 from services.api.app.cleanup_worker import (
     CLEANUP_SHUTDOWN_TIMEOUT_SECONDS,
     DEFAULT_CLEANUP_INTERVAL_SECONDS,
@@ -23,6 +29,11 @@ from services.api.app.cleanup_worker import (
 from services.api.app.storage import StoredArtifact
 
 logger = logging.getLogger(__name__)
+
+
+def _invalid_cleanup_workspace() -> None:
+    raise CleanupJournalError("Invalid cleanup workspace ownership.")
+
 
 DEFAULT_MAX_RETAINED_JOBS = 1024
 MAX_DOWNLOADS_PER_JOB = 4
@@ -122,7 +133,7 @@ class JobRecord:
 
 @dataclass
 class _ExpiredJobCleanup:
-    """Minimal private ownership after the public job has expired; not durable."""
+    """Minimal private expired ownership; optionally backed by a cleanup journal."""
 
     workspace: Path
     artifact: StoredArtifact | None
@@ -150,6 +161,8 @@ class ConversionJobManager:
         cleanup_interval_seconds: float = DEFAULT_CLEANUP_INTERVAL_SECONDS,
         artifact_exists: ArtifactExists | None = None,
         artifact_cleanup: ArtifactCleanup | None = None,
+        durable_cleanup: bool = False,
+        cleanup_namespace: Mapping | None = None,
     ) -> None:
         if max_workers < 1:
             raise ValueError("max_workers must be at least 1")
@@ -161,13 +174,22 @@ class ConversionJobManager:
         if type(max_retained_jobs) is not int or max_retained_jobs < max_active_jobs:
             raise ValueError("max_retained_jobs must be an integer >= max_active_jobs")
 
+        if type(durable_cleanup) is not bool:
+            raise ValueError("durable_cleanup must be a boolean")
+        if durable_cleanup and (
+            not isinstance(cleanup_namespace, Mapping) or not cleanup_namespace
+        ):
+            raise ValueError("Durable cleanup requires a storage namespace")
+        if durable_cleanup and Path(root_dir).is_symlink():
+            raise ValueError("Durable cleanup requires a non-symlink job root")
+
         # Validate before allocating directories/executor; no thread starts here.
         self._cleanup_worker = IdleCleanupWorker(
             lambda: self.cleanup_expired(), interval_seconds=cleanup_interval_seconds,
         )
         self.cleanup_interval_seconds = cleanup_interval_seconds
 
-        self.root_dir = Path(root_dir)
+        self.root_dir = Path(root_dir).resolve() if durable_cleanup else Path(root_dir)
         self.root_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.root_dir.chmod(0o700)
         self.runner = runner
@@ -176,10 +198,6 @@ class ConversionJobManager:
         self.max_retained_jobs = max_retained_jobs
         self.artifact_exists = artifact_exists
         self.artifact_cleanup = artifact_cleanup
-        self._executor = ThreadPoolExecutor(
-            max_workers=max_workers,
-            thread_name_prefix="lao-ocr-job",
-        )
         self._jobs: dict[str, JobRecord] = {}
         self._pending_cleanup: dict[str, _ExpiredJobCleanup] = {}
         self._download_leases: dict[str, int] = {}
@@ -189,8 +207,70 @@ class ConversionJobManager:
         self._duration_seconds_sum: Counter[str] = Counter()
         self._lock = threading.RLock()
         self._accepting_jobs = True
+        self.durable_cleanup = durable_cleanup
+        self._journal: CleanupJournal | None = None
+        self._journal_failed = False
+        self._cleanup_passes = 0
+        self._cleanup_stopping = False
+        self._journal_shutdown_ready = False
+        try:
+            if durable_cleanup:
+                self._journal = CleanupJournal(
+                    self.root_dir, cleanup_namespace, max_entries=max_retained_jobs,
+                )
+                for entry in self._journal.load():
+                    artifact = (
+                        StoredArtifact(entry.artifact_key, "result.zip", "application/zip", 0)
+                        if entry.artifact_key is not None else None
+                    )
+                    self._pending_cleanup[entry.job_id] = _ExpiredJobCleanup(
+                        self.root_dir / entry.job_id, artifact, entry.retry_at,
+                        workspace_pending=entry.workspace_pending, failures=entry.failures,
+                    )
+            self._executor = ThreadPoolExecutor(
+                max_workers=max_workers, thread_name_prefix="lao-ocr-job",
+            )
+        except BaseException:
+            if self._journal is not None:
+                self._journal.close()
+            raise
+
+    def _ensure_journal_usable_unlocked(self) -> None:
+        if self._journal is not None:
+            self._journal.assert_process_owner()
+        if self._journal_failed:
+            raise CleanupJournalError("Cleanup journal unavailable; cleanup paused.")
+
+    def _journal_operation_unlocked(self, operation: Callable[[], None]) -> None:
+        self._ensure_journal_usable_unlocked()
+        try:
+            operation()
+        except CleanupJournalError:
+            # A failed/ambiguous commit is not permission to delete or forget.
+            # No automatic fallback to an unjournaled queue; restart must reconcile.
+            self._journal_failed = True
+            self._accepting_jobs = False
+            for item in self._pending_cleanup.values():
+                item.in_progress = False
+            logger.warning("Cleanup journal unavailable; admission and cleanup paused.")
+            raise CleanupJournalError("Cleanup journal unavailable; cleanup paused.") from None
+
+    def _maybe_close_journal_unlocked(self) -> None:
+        if (
+            self._journal is not None and self._journal_shutdown_ready
+            and self._cleanup_passes == 0 and not self._download_leases
+        ):
+            self._journal.close()
+
+    @staticmethod
+    def _cleanup_entry(job_id: str, item: _ExpiredJobCleanup) -> CleanupEntry:
+        return CleanupEntry(
+            job_id, item.artifact.key if item.artifact is not None else None,
+            item.workspace_pending, item.retry_at, item.failures,
+        )
 
     def _ensure_accepting_unlocked(self) -> None:
+        self._ensure_journal_usable_unlocked()
         if not self._accepting_jobs:
             raise JobManagerClosedError("Conversion job manager has stopped accepting work.")
 
@@ -422,6 +502,8 @@ class ConversionJobManager:
         """
         self.cleanup_expired()
         with self._lock:
+            if self.durable_cleanup and self._cleanup_stopping:
+                raise JobManagerClosedError("Conversion job manager has stopped accepting work.")
             record = self._require(job_id)
             # Cleanup may have spent time on unrelated storage before we got the lock.
             cutoff = datetime.now(UTC) - timedelta(seconds=self.retention_seconds)
@@ -451,6 +533,7 @@ class ConversionJobManager:
                         self._download_leases[job_id] = remaining
                     else:
                         del self._download_leases[job_id]
+                    self._maybe_close_journal_unlocked()
 
             return JobDownloadLease(record.output_path, record.output_artifact, release)
 
@@ -490,6 +573,7 @@ class ConversionJobManager:
             return self._public_fields_unlocked(record, download_ready=ready and same_result)
 
     def _require_current_record_unlocked(self, record: JobRecord) -> None:
+        self._ensure_journal_usable_unlocked()
         if self._jobs.get(record.id) is not record:
             raise JobNotFoundError(record.id)
 
@@ -584,25 +668,49 @@ class ConversionJobManager:
         """Expire public records and attempt a bounded batch of due private cleanups.
 
         Returns newly expired jobs, not successful deletions. Retry ownership
-        survives failures in this process only. Callbacks and workspace I/O run
-        outside the manager lock; a task cannot be claimed by two passes.
+        is process-local by default; the opt-in journal persists expired tasks.
+        Provider/workspace I/O runs outside the lock; local journal commits do not.
+        A task cannot be claimed by two passes.
         """
+        with self._lock:
+            if self.durable_cleanup and self._cleanup_stopping:
+                return 0
+            self._ensure_journal_usable_unlocked()
+            self._cleanup_passes += 1
+        try:
+            return self._cleanup_expired(now=now)
+        finally:
+            with self._lock:
+                self._cleanup_passes -= 1
+                self._maybe_close_journal_unlocked()
+
+    def _cleanup_expired(self, *, now: datetime | None = None) -> int:
         current_time = now or datetime.now(UTC)
         cutoff = current_time - timedelta(seconds=self.retention_seconds)
-        expired_count = 0
         with self._lock:
-            for job_id, record in list(self._jobs.items()):
-                if (
-                    record.status in _TERMINAL_STATUSES
-                    and not record._artifact_cleanup_in_progress
-                    and record.completed_at is not None
-                    and record.completed_at <= cutoff
-                ):
-                    self._pending_cleanup[job_id] = _ExpiredJobCleanup(
-                        record.workspace, record.output_artifact, current_time,
-                    )
-                    del self._jobs[job_id]
-                    expired_count += 1
+            expired = {
+                job_id: _ExpiredJobCleanup(record.workspace, record.output_artifact, current_time)
+                for job_id, record in self._jobs.items()
+                if record.status in _TERMINAL_STATUSES
+                and not record._artifact_cleanup_in_progress
+                and record.completed_at is not None and record.completed_at <= cutoff
+            }
+            if self._journal is not None and expired:
+                # Commit the private deletion intent before dropping public ownership
+                # or performing any provider/workspace deletion. Short local journal
+                # transactions are synchronous; provider I/O still runs outside lock.
+                for job_id, item in expired.items():
+                    if item.workspace != self.root_dir / job_id:
+                        self._journal_operation_unlocked(
+                            _invalid_cleanup_workspace,
+                        )
+                self._journal_operation_unlocked(lambda: self._journal.add([
+                    self._cleanup_entry(job_id, item) for job_id, item in expired.items()
+                ]))
+            for job_id, item in expired.items():
+                self._pending_cleanup[job_id] = item
+                del self._jobs[job_id]
+            expired_count = len(expired)
 
             due = sorted(
                 (
@@ -617,6 +725,8 @@ class ConversionJobManager:
             self._cleanup_attempts_total += len(due)
 
         for job_id, item in due:
+            with self._lock:
+                self._ensure_journal_usable_unlocked()
             artifact_deleted = item.artifact is None
             workspace_deleted = not item.workspace_pending
             artifact_cleanup = self.artifact_cleanup
@@ -647,20 +757,33 @@ class ConversionJobManager:
 
             complete = artifact_deleted and workspace_deleted
             with self._lock:
-                if artifact_deleted:
-                    item.artifact = None
-                item.workspace_pending = not workspace_deleted
+                failures = item.failures if complete else min(item.failures + 1, MAX_FAILURES)
+                retry_at = item.retry_at
+                if not complete:
+                    delay = min(
+                        CLEANUP_RETRY_INITIAL_SECONDS * 2 ** min(failures - 1, 7),
+                        CLEANUP_RETRY_MAX_SECONDS,
+                    )
+                    retry_at = (now or datetime.now(UTC)) + timedelta(seconds=delay)
+                updated = _ExpiredJobCleanup(
+                    item.workspace, None if artifact_deleted else item.artifact, retry_at,
+                    workspace_pending=not workspace_deleted, failures=failures,
+                )
+                if self._journal is not None:
+                    self._journal_operation_unlocked(
+                        lambda job_id=job_id, updated=updated: self._journal.update(
+                            self._cleanup_entry(job_id, updated),
+                        ),
+                    )
+                # Forget ownership only after the stage update/removal commits.
+                item.artifact = updated.artifact
+                item.workspace_pending = updated.workspace_pending
+                item.retry_at = updated.retry_at
+                item.failures = updated.failures
                 item.in_progress = False
                 if complete:
                     self._pending_cleanup.pop(job_id)
                 else:
-                    item.failures += 1
-                    # Saturate the exponent; long outages must not allocate huge integers.
-                    delay = min(
-                        CLEANUP_RETRY_INITIAL_SECONDS * 2 ** min(item.failures - 1, 7),
-                        CLEANUP_RETRY_MAX_SECONDS,
-                    )
-                    item.retry_at = (now or datetime.now(UTC)) + timedelta(seconds=delay)
                     self._cleanup_failures_total += 1
             if not complete:
                 logger.warning(
@@ -681,6 +804,7 @@ class ConversionJobManager:
             # Close both reservation and enqueue admission before a join or I/O.
             # A runner already marked RUNNING keeps the existing graceful policy.
             self._accepting_jobs = False
+            self._cleanup_stopping = True
             for record in self._jobs.values():
                 if record.status == JobStatus.QUEUED:
                     record.cancel_event.set()
@@ -704,3 +828,10 @@ class ConversionJobManager:
         if wait and not stopped:
             logger.warning("Idle job cleanup still running after shutdown wait; stop requested.")
         self._executor.shutdown(wait=wait, cancel_futures=True)
+        with self._lock:
+            # Nonwaiting shutdown deliberately retains exclusive ownership until
+            # a later waiting shutdown or process exit. Active cleanup/downloads
+            # release only after their own finalizers have completed.
+            if wait:
+                self._journal_shutdown_ready = True
+            self._maybe_close_journal_unlocked()

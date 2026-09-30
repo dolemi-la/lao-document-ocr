@@ -191,6 +191,11 @@ GET    /v1/jobs/{job_id}/download
 
 See [docs/async-jobs.md](docs/async-jobs.md).
 
+Expired cleanup can optionally survive API restarts through a namespace-bound
+SQLite journal on persistent local storage. This does not restore public jobs
+or cover crashes before expiry. See [durable expired cleanup](docs/durable-expired-cleanup.md)
+for the opt-in setting and Compose overlay; default behavior is unchanged.
+
 ### Convert
 
 ```http

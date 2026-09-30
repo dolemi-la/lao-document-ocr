@@ -14,4 +14,8 @@ Available presets:
 - `compose.s3.yml` — installs the optional S3 dependencies and selects the S3 storage backend
 - `compose.gpu.yml` — owned-recognizer API image, model mount, and GPU reservation
 
+- `compose.durable-cleanup.yml` — opt-in expired-cleanup journal on a named job volume; apply last
+
 See `docs/deployment-presets.md` for commands and caveats.
+See `docs/durable-expired-cleanup.md` for the expiry-only recovery boundary,
+single-owner requirement, storage binding, and persistent-volume permissions.

@@ -1,5 +1,13 @@
 # Process-local retry ownership for expired job cleanup
 
+## Optional durability follow-up
+
+The mechanics below describe the default process-local mode. The opt-in
+[expired-cleanup journal](durable-expired-cleanup.md) now adds restart recovery
+for committed expired tasks, without covering pre-expiry/publication gaps or
+restoring public jobs. The original non-durable restart control remains valid
+when that option is disabled.
+
 ## Failure and scope
 
 Starting checkout: `f26edababc896e338ce7824addd28d0b23280062`.

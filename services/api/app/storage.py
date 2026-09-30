@@ -39,6 +39,8 @@ class ArtifactStorage(Protocol):
 
     def metadata(self) -> dict: ...
 
+    def cleanup_namespace(self) -> dict: ...
+
 
 def _safe_relative_key(key: str) -> Path:
     path = Path(key)
@@ -123,6 +125,9 @@ class FilesystemArtifactStorage:
             except OSError:
                 break
             parent = parent.parent
+
+    def cleanup_namespace(self) -> dict:
+        return {"backend": "filesystem", "root": str(self.root)}
 
     def metadata(self) -> dict:
         return {
@@ -275,6 +280,19 @@ class S3ArtifactStorage:
             Bucket=self.bucket,
             Key=self._object_key(artifact.key),
         )
+
+    def cleanup_namespace(self) -> dict:
+        # Resolve SDK defaults as well as explicit configuration. A changed
+        # endpoint/bucket/prefix must not replay old cleanup in a new namespace.
+        meta = getattr(self.client, "meta", None)
+        endpoint = self.endpoint_url or getattr(meta, "endpoint_url", None)
+        region = self.region_name or getattr(meta, "region_name", None)
+        if not isinstance(endpoint, str) or not endpoint:
+            raise ValueError("Durable S3 cleanup requires a resolved endpoint.")
+        return {
+            "backend": "s3", "bucket": self.bucket, "prefix": self.prefix,
+            "endpoint_url": endpoint, "region": region,
+        }
 
     def metadata(self) -> dict:
         return {

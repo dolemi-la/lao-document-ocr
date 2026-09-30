@@ -160,6 +160,23 @@ according to host size and OCR model choice.
 
 The project-owned PyTorch recognizer requires a different resource profile from Tesseract.
 
+## Optional expired-cleanup persistence
+
+Append `-f deploy/compose.durable-cleanup.yml` after the other Compose files to
+use a named `/data/jobs` volume and enable `JOB_CLEANUP_DURABLE=true`. Rebuild the
+API image so the mount directory is prepared for the non-root account. The base
+file and presets keep this mode disabled; a bare flag with an ephemeral job root
+does not survive container recreation.
+
+```bash
+docker compose -f docker-compose.yml -f deploy/compose.durable-cleanup.yml up --build
+```
+
+This is single-owner, expired-task cleanup recovery, not persistent public jobs,
+a multi-node queue, or complete publication-through-expiry ownership. The volume
+also retains pre-expiry workspaces, which are not yet reconciled after crashes.
+See [durable expired cleanup](durable-expired-cleanup.md) before enabling it.
+
 ## Multi-node warning
 
 The current job metadata and rate limiter are process-local.

@@ -15,7 +15,7 @@ from urllib.parse import quote
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 
 from lao_document_ocr.exporters import (
     export_docx,
@@ -38,6 +38,7 @@ from lao_document_ocr.pipeline import (
     process_document,
 )
 from lao_document_ocr.reading_order import DeterministicReadingOrderResolver
+from services.api.app.cleanup_journal import CleanupJournalError
 from services.api.app.downloads import LeasedDownloadResponse
 from services.api.app.jobs import (
     ConversionJobManager,
@@ -128,6 +129,10 @@ JOB_MAX_ACTIVE = int(os.getenv("JOB_MAX_ACTIVE", "8"))
 JOB_MAX_RETAINED = int(os.getenv("JOB_MAX_RETAINED", "1024"))
 JOB_RETENTION_SECONDS = int(os.getenv("JOB_RETENTION_SECONDS", "3600"))
 JOB_CLEANUP_INTERVAL_SECONDS = int(os.getenv("JOB_CLEANUP_INTERVAL_SECONDS", "30"))
+_cleanup_durable_value = os.getenv("JOB_CLEANUP_DURABLE", "false").strip().lower()
+if _cleanup_durable_value not in {"0", "1", "false", "true", "no", "yes", "off", "on"}:
+    raise ValueError("JOB_CLEANUP_DURABLE must be a boolean value")
+JOB_CLEANUP_DURABLE = _cleanup_durable_value in {"1", "true", "yes", "on"}
 BATCH_MAX_FILES = int(os.getenv("BATCH_MAX_FILES", "10"))
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "0"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
@@ -168,6 +173,15 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(CleanupJournalError)
+async def cleanup_journal_unavailable(request: Request, exc: CleanupJournalError):
+    # Never expose journal errors, stored keys, SQL, or storage identity in HTTP.
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Conversion service is unavailable. Try again later."},
+    )
+
 
 API_METRICS = ApiMetrics()
 SUBMISSION_RATE_LIMITER = SlidingWindowRateLimiter(
@@ -537,6 +551,8 @@ JOB_MANAGER = ConversionJobManager(
     cleanup_interval_seconds=JOB_CLEANUP_INTERVAL_SECONDS,
     artifact_exists=RESULT_STORAGE.exists,
     artifact_cleanup=RESULT_STORAGE.delete,
+    durable_cleanup=JOB_CLEANUP_DURABLE,
+    cleanup_namespace=RESULT_STORAGE.cleanup_namespace() if JOB_CLEANUP_DURABLE else None,
 )
 
 
@@ -586,6 +602,7 @@ def health() -> dict:
             "max_retained_jobs": JOB_MAX_RETAINED,
             "retention_seconds": JOB_RETENTION_SECONDS,
             "cleanup_interval_seconds": JOB_CLEANUP_INTERVAL_SECONDS,
+            "durable_expired_cleanup": JOB_CLEANUP_DURABLE,
             "batch_max_files": BATCH_MAX_FILES,
         },
         "submission_rate_limit": SUBMISSION_RATE_LIMITER.snapshot(),
@@ -859,6 +876,10 @@ def download_conversion_job(job_id: str):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except JobDownloadCapacityError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except JobManagerClosedError as exc:
+        raise HTTPException(
+            status_code=503, detail="Conversion service is unavailable. Try again later.",
+        ) from exc
 
     try:
         if lease.output_artifact is not None:

@@ -1,0 +1,12 @@
+# Optional: apply after the base file and any public/S3/GPU overlay.
+# One API owner per volume. This restores expired cleanup, not public jobs.
+services:
+  api:
+    environment:
+      JOB_CLEANUP_DURABLE: "true"
+      JOB_ROOT: /data/jobs
+    volumes:
+      - lao-ocr-jobs:/data/jobs
+
+volumes:
+  lao-ocr-jobs:
