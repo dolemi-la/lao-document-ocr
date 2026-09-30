@@ -19,6 +19,7 @@ from lao_document_ocr.orientation_geometry import (
     ORIENTATION_GEOMETRY_VERSION,
     orientation_line_geometry,
 )
+from lao_document_ocr.orientation_review import build_orientation_review
 from lao_document_ocr.preprocessing import preprocess_image
 from lao_document_ocr.raster_regions import detect_raster_regions
 from lao_document_ocr.reading_order import (
@@ -648,6 +649,9 @@ def process_document(
             "pages": orientation_pages,
         },
     }
+    metadata["auto_orientation"]["review"] = build_orientation_review(
+        metadata["auto_orientation"], page_count=len(output_pages),
+    ).to_dict()
     if include_ocr_line_stats:
         metadata["ocr_line_stats"] = {"pages": ocr_line_stats_pages}
 

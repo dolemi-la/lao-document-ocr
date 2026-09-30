@@ -26,6 +26,7 @@ from lao_document_ocr.ocr import (
     OwnedRecognizerEngine,
     TesseractEngine,
 )
+from lao_document_ocr.orientation_review import build_orientation_review
 from lao_document_ocr.pipeline import (
     SUPPORTED_SUFFIXES,
     DocumentProcessingCancelled,
@@ -468,6 +469,11 @@ def _run_conversion_job(record: JobRecord, cancel_event) -> StoredArtifact:
     if cancel_event.is_set():
         RESULT_STORAGE.delete(artifact)
         raise JobCancelledError("Document processing was cancelled.")
+    # Exposed only after the manager atomically marks this job succeeded.
+    # Recompute from selected geometry, never forward arbitrary document metadata.
+    record.orientation_review = build_orientation_review(
+        document.metadata.get("auto_orientation"), page_count=len(document.pages),
+    )
     return artifact
 
 

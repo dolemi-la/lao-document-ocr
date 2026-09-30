@@ -46,6 +46,7 @@ Status: in progress
 - [x] expose best-vs-runner-up orientation score-margin diagnostics + suite summaries
 - [x] bilingual web UI opt-in control for right-angle auto-orientation
 - [x] Lao-dominance probe-skip optimization + auto-orientation probe-state reporting
+- [x] no-text selected-orientation review summaries in conversion JSON, async jobs and bilingual web warnings
 - [x] retire production orientation-hint early exit after production-equivalent remote comparison
 - [x] plain-OCR vs auto-orient suite performance mode with diagnostic probes independently switchable
 - [x] bounded official HPLT Lao streaming sampler + provenance metadata

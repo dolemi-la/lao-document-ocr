@@ -20,6 +20,8 @@ export type Messages = {
   browse: string;
   autoOrientTitle: string;
   autoOrientHelp: string;
+  orientationReview: (pages: string) => string;
+  orientationUnassessed: (pages: string) => string;
   convert: string;
   processing: string;
   cancel: string;
@@ -43,6 +45,10 @@ export type Messages = {
 
 export const MESSAGES: Record<Locale, Messages> = {
   en: {
+    orientationReview: (pages) =>
+      `Pages ${pages} may still be sideways. Check the source and exported document before using the result.`,
+    orientationUnassessed: (pages) =>
+      `Orientation could not be assessed on pages ${pages}. Check those pages before using the result.`,
     pageTitle: "Lao Document OCR",
     eyebrow: "OPEN-SOURCE · LOCAL-FIRST",
     title: "Lao Document OCR",
@@ -85,6 +91,10 @@ export const MESSAGES: Record<Locale, Messages> = {
     license: "Apache-2.0",
   },
   lo: {
+    orientationReview: (pages) =>
+      `ໜ້າ ${pages} ອາດຍັງຫັນຂ້າງຢູ່. ກະລຸນາກວດສອບຕົ້ນສະບັບ ແລະ ເອກະສານຜົນລັບກ່ອນນຳໃຊ້.`,
+    orientationUnassessed: (pages) =>
+      `ບໍ່ສາມາດປະເມີນທິດທາງຂອງໜ້າ ${pages} ໄດ້. ກະລຸນາກວດສອບໜ້າເຫຼົ່ານີ້ກ່ອນນຳໃຊ້.`,
     pageTitle: "Lao Document OCR",
     eyebrow: "ໂອເພນຊອດ · ເນັ້ນການໃຊ້ງານໃນເຄື່ອງ",
     title: "Lao Document OCR",

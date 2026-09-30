@@ -141,3 +141,11 @@ Issue #17 remains open. A separate future selection design must address
 high-confidence equal-score sideways versus horizontal candidates without
 silently weakening accuracy/retention safeguards. MAF transcription review,
 missing-source coverage and the genuine capture pilot are still outstanding.
+
+## User-visible unresolved-output follow-up
+
+The [selected-output review signal](orientation-review.md) now flags retained
+sideways geometry in conversion JSON, successful job status and the bilingual
+web UI. It does not relax any rule above. The repeated eight-case control still
+corrects 6/8 orientations; both unresolved cases now request review. Missing
+geometry remains unassessed rather than being called upright.

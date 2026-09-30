@@ -99,3 +99,16 @@ Before a public hosted release, manually test at minimum:
 - Lao text rendering on target browsers
 
 Future UI features should preserve native semantic controls instead of replacing them with div-based custom widgets.
+
+## Orientation review warnings
+
+Successful jobs may return a versioned, page-specific `orientation_review`
+summary. The web UI displays separate Lao/English messages for selected output
+that still looks sideways and for pages without usable geometry evidence.
+Warnings persist in the existing polite live region alongside completion and
+do not block downloading. No warning is a guarantee of upright or correct OCR.
+See [orientation-review.md](orientation-review.md) for the contract and tests.
+
+Run `pnpm test` in `apps/web` for dependency-free Node tests of response
+validation, both message catalogs and live-region wiring. These tests are also
+part of the web CI job, separately from lint and the TypeScript/Vite build.

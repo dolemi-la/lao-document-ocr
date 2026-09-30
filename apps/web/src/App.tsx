@@ -1,6 +1,7 @@
 import { ChangeEvent, DragEvent, useEffect, useState } from "react";
 
 import { initialLocale, Locale, MESSAGES, persistLocale } from "./i18n";
+import { orientationReviewWarnings } from "./orientationReview";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 const ACCEPTED = [".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"];
@@ -20,6 +21,7 @@ type ConversionJob = {
   cancellation_requested: boolean;
   error: string | null;
   download_ready: boolean;
+  orientation_review?: unknown;
 };
 
 const sleep = (milliseconds: number) =>
@@ -177,6 +179,7 @@ function App() {
   }
 
   const canCancel = Boolean(job && ["uploading", "queued", "running"].includes(job.status));
+  const reviewWarnings = orientationReviewWarnings(job?.status, job?.orientation_review, m);
 
   return (
     <main aria-labelledby="page-heading">
@@ -292,6 +295,9 @@ function App() {
         <div className="announcements" aria-live="polite" aria-atomic="true">
           {job && busy && <p className="jobStatus">{m.jobStatus(job.status)}</p>}
           {message && <p className="message">{message}</p>}
+          {reviewWarnings.map((warning) => (
+            <p className="warning" key={warning}>{warning}</p>
+          ))}
         </div>
         {health?.error && (
           <p className="warning" role="alert">

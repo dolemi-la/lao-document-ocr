@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 
+from lao_document_ocr.orientation_review import OrientationReview
 from services.api.app.storage import StoredArtifact
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ class JobRecord:
     cancel_event: threading.Event = field(default_factory=threading.Event, repr=False)
     future: Future | None = field(default=None, repr=False)
     terminal_recorded: bool = field(default=False, repr=False)
+    orientation_review: OrientationReview | None = None
 
 
 JobRunner = Callable[[JobRecord, threading.Event], Path | StoredArtifact]
@@ -299,6 +301,12 @@ class ConversionJobManager:
             "cancellation_requested": record.cancellation_requested,
             "error": record.error,
             "download_ready": self._download_ready(record),
+            "orientation_review": (
+                record.orientation_review.to_dict()
+                if record.status == JobStatus.SUCCEEDED
+                and isinstance(record.orientation_review, OrientationReview)
+                else None
+            ),
         }
 
     def _download_ready(self, record: JobRecord) -> bool:
