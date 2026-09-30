@@ -196,6 +196,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 ## Phase 4 — production hardening
 
 - [x] bounded local async conversion jobs
+- [x] same-job web status/download recovery with frozen corrections and stale-response guards
 - [x] upload/page/active-job concurrency limits baseline
 - [x] CPU/CUDA/MPS owned-recognizer worker option + NVIDIA deployment preset
 - [x] atomic bounded batch job submission baseline
@@ -230,8 +231,8 @@ sideways OCR candidates: KPMG pages 8/15/21 now select 90 degrees in the availab
 same-byte diagnostic, matching public-page visual orientation. Plain OCR output
 is unchanged on the seven available pages. This is not transcription-accuracy
 validation. Two source failures, MAF's text-retention tradeoff and the genuine
-capture pilot keep issue #17 open. High-confidence baseline skip behavior is
-unchanged and remains a limitation of the current opt-in orientation path.
+capture pilot keep issue #17 open. That candidate-veto slice did not change
+high-confidence probe skipping; the follow-up below covers that separate path.
 
 The [geometry-aware probe-skip follow-up](orientation-probe-skip.md) makes
 confident sideways baselines eligible for the existing opt-in probes. Its
@@ -245,5 +246,7 @@ orientation-selection problem or the outstanding optical-validation gate.
 
 [Explicit per-page corrections](manual-page-rotation.md) now provide a CLI/Python
 recovery path after visual review, without weakening automatic acceptance.
-HTTP/web manual controls are a separate follow-up. Manual completion does not
-resolve issue #17 or the optical benchmark/review gates.
+The [HTTP/web controls](manual-page-rotation-http.md) now share that contract.
+[Same-job web recovery](web-job-recovery.md) retries interrupted status/download
+requests without submitting a replacement OCR job or using edited correction
+settings. Neither feature resolves issue #17 or the optical benchmark gates.

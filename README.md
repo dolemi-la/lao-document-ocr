@@ -169,7 +169,14 @@ The endpoint exposes normalized HTTP request counters/durations plus live/comple
 
 ### Asynchronous jobs
 
-The default web UI uses bounded background jobs for long conversions:
+The default web UI uses bounded background jobs for long conversions.
+After a temporary status or download failure, use **Resume this conversion**
+or **Retry download** to retrieve the same job without uploading or running OCR
+again. Recovery retains its submitted page corrections even if the form has
+been edited. See [web job recovery](docs/web-job-recovery.md) for expiry,
+acknowledgement checks, and the limits of in-memory recovery.
+
+Job endpoints:
 
 ```text
 POST   /v1/jobs

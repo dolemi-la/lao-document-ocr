@@ -125,3 +125,12 @@ old result warnings. The original upload is used for every retry.
 The local headless-browser interaction check covered desktop/mobile widths,
 Lao validation, warning persistence and stale-server rejection using mocked
 HTTP responses. This is not a full visual or assistive-technology audit.
+
+## Same-job recovery actions
+
+[Web job recovery](web-job-recovery.md) adds Lao/English resume and download-retry
+buttons with associated explanatory text. They are disabled during active
+requests. Retry preserves the submitted job/corrections; invalid edits to a new
+form do not block retrieval of an existing result. Expired, foreign or malformed
+responses cannot become an all-upright message. The recovery browser check uses
+mocked HTTP and is not a visual or assistive-technology accessibility audit.

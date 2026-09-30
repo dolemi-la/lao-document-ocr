@@ -163,3 +163,10 @@ coverage checks against the existing private Phetsarath font; no font is bundled
 Issue #17 remains open: equal-confidence automatic selection, MAF transcription
 review, unavailable Census sources, and the genuine capture pilot are not
 resolved by a manual operator option. Automatic orientation remains opt-in.
+
+## Same-job network recovery
+
+[Web job recovery](web-job-recovery.md) adds explicit retries for interrupted
+status or archive requests. These reuse the acknowledged job and frozen manual
+correction map, not edited form values, and refresh identity/acknowledgement
+before downloading. Applying new angles still requires a new conversion.

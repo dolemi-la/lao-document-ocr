@@ -110,7 +110,8 @@ test("App wires the editable field, reset, validation, acknowledgement and resub
   assert.match(app, /setFile\(next\);\s*setManualRotations\(""\)/);
   assert.match(app, /appendPageRotations\(form, rotations\)/);
   assert.match(app, /confirmsPageRotations\(created.page_rotations, rotations.specs\)/);
-  assert.match(app, /confirmsPageRotations\(current.page_rotations, expectedRotations\)/);
-  assert.match(app, /await pollJob\(created, file, rotations.specs\)/);
+  assert.match(app, /confirmsPageRotations\(current.page_rotations, session.rotations\)/);
+  assert.match(app, /createJobSession\(created, file.name, rotations.specs\)/);
+  assert.match(app, /await pollJob\(created, session, attempt\)/);
   assert.match(app, /form.append\("file", file\)/);
 });

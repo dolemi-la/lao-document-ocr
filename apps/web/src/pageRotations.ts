@@ -30,7 +30,7 @@ export function appendPageRotations(form: FormData, input: RotationInput): void 
 }
 
 /** Do not silently download an uncorrected result from an older API. */
-export function confirmsPageRotations(payload: unknown, expected: string[]): boolean {
+export function confirmsPageRotations(payload: unknown, expected: readonly string[]): boolean {
   if (expected.length === 0) return true; // Older APIs still support ordinary conversion.
   if (!Array.isArray(payload) || payload.length !== expected.length) return false;
   const observed: string[] = [];

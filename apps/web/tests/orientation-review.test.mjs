@@ -79,5 +79,5 @@ test("the actual App wires warnings into its persistent live region", () => {
   assert.match(announcements, /aria-live="polite"/);
   assert.match(announcements, /reviewWarnings\.map/);
   assert.match(announcements, /className="warning"/);
-  assert.match(app, /await downloadResult\(current, sourceFile\)/);
+  assert.match(app, /await loadJobDownload\(API_URL, session, attempt.signal\)/);
 });

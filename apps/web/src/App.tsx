@@ -1,6 +1,11 @@
-import { ChangeEvent, DragEvent, useEffect, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 
 import { initialLocale, Locale, MESSAGES, persistLocale } from "./i18n";
+import {
+  createJobSession, JobRecoveryError, loadJobDownload, loadJobStatus,
+  parseConversionJob, waitForNextPoll,
+} from "./jobRecovery";
+import type { ConversionJob, JobSession } from "./jobRecovery";
 import { orientationReviewWarnings } from "./orientationReview";
 import { appendPageRotations, confirmsPageRotations, parsePageRotations } from "./pageRotations";
 
@@ -14,21 +19,6 @@ type Health = {
   error: string | null;
 };
 
-type ConversionJob = {
-  id: string;
-  filename: string;
-  auto_orient_right_angles: boolean;
-  status: "uploading" | "queued" | "running" | "succeeded" | "failed" | "cancelled";
-  cancellation_requested: boolean;
-  error: string | null;
-  download_ready: boolean;
-  orientation_review?: unknown;
-  page_rotations?: unknown;
-};
-
-const sleep = (milliseconds: number) =>
-  new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-
 function App() {
   const [locale, setLocale] = useState<Locale>(initialLocale);
   const [file, setFile] = useState<File | null>(null);
@@ -38,6 +28,17 @@ function App() {
   const [manualRotations, setManualRotations] = useState("");
   const [message, setMessage] = useState("");
   const [job, setJob] = useState<ConversionJob | null>(null);
+  const [recovery, setRecovery] = useState<{ session: JobSession; download: boolean } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const sessionRef = useRef<JobSession | null>(null);
+  const attemptRef = useRef<AbortController | null>(null);
+  const cancelRef = useRef<AbortController | null>(null);
+  const busyRef = useRef(false);
+
+  useEffect(() => () => {
+    attemptRef.current?.abort();
+    cancelRef.current?.abort();
+  }, []);
   const m = MESSAGES[locale];
   const rotations = parsePageRotations(manualRotations, file?.name);
   const rotationError = rotations.error ? {
@@ -64,12 +65,19 @@ function App() {
     : m.fileHelp;
 
   function choose(next: File | undefined) {
-    if (!next || busy) return;
+    if (!next || busyRef.current) return;
     const lower = next.name.toLowerCase();
     if (!ACCEPTED.some((extension) => lower.endsWith(extension))) {
       setMessage(m.unsupported);
       return;
     }
+    attemptRef.current?.abort();
+    attemptRef.current = null;
+    cancelRef.current?.abort();
+    cancelRef.current = null;
+    sessionRef.current = null;
+    setRecovery(null);
+    setCancelling(false);
     setFile(next);
     setManualRotations("");
     setJob(null);
@@ -87,73 +95,116 @@ function App() {
 
   async function readError(response: Response, fallback: string) {
     const payload = await response.json().catch(() => null);
-    return payload?.detail ?? fallback;
+    return typeof payload?.detail === "string" ? payload.detail : fallback;
   }
 
-  async function downloadResult(currentJob: ConversionJob, sourceFile: File) {
-    const response = await fetch(`${API_URL}/v1/jobs/${currentJob.id}/download`);
-    if (!response.ok) {
-      throw new Error(await readError(response, m.downloadFailed(response.status)));
-    }
-
-    const blob = await response.blob();
-    const disposition = response.headers.get("content-disposition") ?? "";
-    const match = disposition.match(/filename="?([^";]+)"?/i);
-    const downloadName = match?.[1] ?? `${sourceFile.name.replace(/\.[^.]+$/, "")}-ocr.zip`;
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = downloadName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+  function beginAttempt() {
+    attemptRef.current?.abort();
+    cancelRef.current?.abort();
+    cancelRef.current = null;
+    const attempt = new AbortController();
+    attemptRef.current = attempt;
+    busyRef.current = true;
+    setBusy(true);
+    setCancelling(false);
+    return attempt;
   }
 
-  async function pollJob(initial: ConversionJob, sourceFile: File, expectedRotations: string[]) {
-    let current = initial;
-    setJob(current);
+  function isCurrent(attempt: AbortController) {
+    return attemptRef.current === attempt && !attempt.signal.aborted;
+  }
 
-    while (["uploading", "queued", "running"].includes(current.status)) {
-      if (current.status === "queued") {
-        setMessage(m.queued);
-      } else if (current.status === "running") {
-        setMessage(current.cancellation_requested ? m.cancelling : m.running);
-      }
+  function finishAttempt(attempt: AbortController) {
+    if (!isCurrent(attempt)) return;
+    busyRef.current = false;
+    setBusy(false);
+  }
 
-      await sleep(650);
-      const response = await fetch(`${API_URL}/v1/jobs/${current.id}`);
-      if (!response.ok) {
-        throw new Error(await readError(response, m.jobStatusFailed(response.status)));
-      }
-      current = await response.json();
-      setJob(current);
+  function errorMessage(error: unknown) {
+    if (error instanceof JobRecoveryError) {
+      if (error.code === "expired") return m.recoveryUnavailable;
+      if (error.code === "corrections-unconfirmed") return m.manualRotationsNotConfirmed;
+      if (error.code === "invalid-response") return m.recoveryInvalid;
+      return m.recoveryInterrupted;
     }
+    return error instanceof Error ? error.message : m.conversionFailed;
+  }
 
-    if (current.status === "succeeded") {
-      if (!confirmsPageRotations(current.page_rotations, expectedRotations)) {
-        throw new Error(m.manualRotationsNotConfirmed);
+  async function pollJob(
+    initial: ConversionJob | null,
+    session: JobSession,
+    attempt: AbortController,
+    downloadRetry = false,
+  ) {
+    let downloading = downloadRetry;
+    try {
+      // Recovery always refreshes status before downloading. It never POSTs again.
+      let current = initial ?? await loadJobStatus(API_URL, session, attempt.signal);
+      while (isCurrent(attempt)) {
+        current = parseConversionJob(current, session.id);
+        if (!confirmsPageRotations(current.page_rotations, session.rotations)) {
+          throw new JobRecoveryError("corrections-unconfirmed");
+        }
+        setJob(current);
+        if (current.status === "succeeded") {
+          downloading = true;
+          const result = await loadJobDownload(API_URL, session, attempt.signal);
+          if (!isCurrent(attempt)) return;
+          const url = URL.createObjectURL(result.blob);
+          const anchor = document.createElement("a");
+          try {
+            anchor.href = url;
+            anchor.download = result.filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+          } finally {
+            anchor.remove();
+            URL.revokeObjectURL(url);
+          }
+          setRecovery(null);
+          setMessage(m.done);
+          return;
+        }
+        if (current.status === "cancelled") {
+          setRecovery(null);
+          setMessage(m.cancelled);
+          return;
+        }
+        if (current.status === "failed") {
+          setRecovery(null);
+          throw new Error(current.error || m.conversionFailed);
+        }
+        downloading = false;
+        if (current.status === "queued") setMessage(m.queued);
+        else setMessage(current.cancellation_requested ? m.cancelling : m.running);
+        await waitForNextPoll(attempt.signal);
+        current = await loadJobStatus(API_URL, session, attempt.signal);
       }
-      await downloadResult(current, sourceFile);
-      setMessage(m.done);
-      return;
+    } catch (error) {
+      if (!isCurrent(attempt)) return;
+      setRecovery(error instanceof JobRecoveryError && error.retryable
+        ? { session, download: downloading } : null);
+      if (error instanceof JobRecoveryError && !error.retryable) {
+        // Do not display a stale success/review assessment after expiry or a foreign response.
+        setJob(null);
+        sessionRef.current = null;
+      }
+      setMessage(errorMessage(error));
     }
-    if (current.status === "cancelled") {
-      setMessage(m.cancelled);
-      return;
-    }
-    throw new Error(current.error || m.conversionFailed);
   }
 
   async function convert() {
-    if (!file || busy) return;
+    if (!file || busyRef.current) return;
     if (rotationError) {
       setMessage(rotationError);
       return;
     }
-    setBusy(true);
+    const attempt = beginAttempt();
+    sessionRef.current = null;
+    setRecovery(null);
     setJob(null);
     setMessage(m.uploading);
+    let responseReceived = false;
 
     try {
       const form = new FormData();
@@ -165,40 +216,85 @@ function App() {
       const response = await fetch(`${API_URL}/v1/jobs`, {
         method: "POST",
         body: form,
+        signal: attempt.signal,
       });
-
+      if (!isCurrent(attempt)) return;
+      responseReceived = true;
       if (!response.ok) {
         throw new Error(await readError(response, m.conversionFailedStatus(response.status)));
       }
-
-      const created: ConversionJob = await response.json();
+      const created = parseConversionJob(await response.json());
+      if (!isCurrent(attempt)) return;
       if (!confirmsPageRotations(created.page_rotations, rotations.specs)) {
-        // A stale API can silently ignore an unknown form field. Never download
-        // that result as corrected; attempt to cancel only this submitted job.
-        await fetch(`${API_URL}/v1/jobs/${created.id}`, { method: "DELETE" }).catch(() => null);
-        throw new Error(m.manualRotationsNotConfirmed);
+        // A stale API can ignore unknown fields. Never recover/download that result.
+        await fetch(`${API_URL}/v1/jobs/${encodeURIComponent(created.id)}`, {
+          method: "DELETE", signal: attempt.signal,
+        }).catch(() => null);
+        throw new JobRecoveryError("corrections-unconfirmed");
       }
-      await pollJob(created, file, rotations.specs);
+      const session = createJobSession(created, file.name, rotations.specs);
+      sessionRef.current = session;
+      await pollJob(created, session, attempt);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : m.conversionFailed);
+      if (isCurrent(attempt)) {
+        // No acknowledged ID means no safe same-job retry. Do not automatically resubmit.
+        setMessage(responseReceived ? errorMessage(error) : m.submissionUnknown);
+      }
     } finally {
-      setBusy(false);
+      finishAttempt(attempt);
+    }
+  }
+
+  async function resume() {
+    if (!recovery || busyRef.current || sessionRef.current !== recovery.session) return;
+    const saved = recovery;
+    const attempt = beginAttempt();
+    setMessage(m.recovering);
+    try {
+      await pollJob(null, saved.session, attempt, saved.download);
+    } finally {
+      finishAttempt(attempt);
     }
   }
 
   async function cancel() {
-    if (!job || !["uploading", "queued", "running"].includes(job.status)) return;
+    const session = sessionRef.current;
+    const owner = attemptRef.current;
+    if (!session || !owner || !job || cancelling ||
+        !["uploading", "queued", "running"].includes(job.status)) return;
+    const request = new AbortController();
+    cancelRef.current?.abort();
+    cancelRef.current = request;
+    setCancelling(true);
     setMessage(m.cancelling);
+    const stillCurrent = () => cancelRef.current === request && !request.signal.aborted &&
+      attemptRef.current === owner && sessionRef.current === session;
     try {
-      const response = await fetch(`${API_URL}/v1/jobs/${job.id}`, {
-        method: "DELETE",
+      const response = await fetch(`${API_URL}/v1/jobs/${encodeURIComponent(session.id)}`, {
+        method: "DELETE", signal: request.signal, cache: "no-store",
       });
       if (!response.ok) {
         throw new Error(await readError(response, m.cancellationFailedStatus(response.status)));
       }
-      setJob(await response.json());
+      const cancelled = parseConversionJob(await response.json(), session.id);
+      if (!stillCurrent()) return;
+      if (!confirmsPageRotations(cancelled.page_rotations, session.rotations)) {
+        throw new JobRecoveryError("corrections-unconfirmed");
+      }
+      setJob(cancelled);
+      if (cancelled.status === "cancelled") {
+        owner.abort();
+        attemptRef.current = null;
+        busyRef.current = false;
+        setBusy(false);
+        setRecovery(null);
+        sessionRef.current = null;
+        setMessage(m.cancelled);
+      }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : m.cancellationFailed);
+      if (stillCurrent()) setMessage(errorMessage(error));
+    } finally {
+      if (cancelRef.current === request && !request.signal.aborted) setCancelling(false);
     }
   }
 
@@ -331,14 +427,21 @@ function App() {
           >
             {busy ? m.processing : m.convert}
           </button>
+          {recovery && (
+            <button type="button" className="secondary" onClick={resume} disabled={busy}
+              aria-describedby="job-recovery-help" data-testid="resume-job">
+              {recovery.download ? m.retryDownload : m.resumeConversion}
+            </button>
+          )}
           {canCancel && (
-            <button type="button" className="secondary" onClick={cancel}>
+            <button type="button" className="secondary" onClick={cancel} disabled={cancelling}>
               {m.cancel}
             </button>
           )}
         </div>
 
         <div className="announcements" aria-live="polite" aria-atomic="true">
+          {recovery && <p id="job-recovery-help" className="message">{m.recoveryHelp}</p>}
           {job && busy && <p className="jobStatus">{m.jobStatus(job.status)}</p>}
           {message && <p className="message">{message}</p>}
           {reviewWarnings.map((warning) => (
