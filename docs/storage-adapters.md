@@ -249,6 +249,15 @@ It does not expose:
 
 The adapter's internal metadata may contain the configured bucket/endpoint for diagnostics, but credentials are never part of adapter metadata.
 
+## Standalone incomplete-upload inventory
+
+The optional [S3 multipart inventory](s3-multipart-inventory.md) lists metadata
+under an explicit bucket and prefix without constructing the production adapter.
+It does not list parts, read objects, abort uploads, or change lifecycle policy.
+Reports distinguish incomplete traversal from complete listing and hide raw keys
+and upload IDs by default. A timestamp or listing is not abandonment evidence.
+No live account is queried during tests; the SDK transport is replaced in memory.
+
 ## Important current limitation
 
 Job metadata is still stored in the API process memory.

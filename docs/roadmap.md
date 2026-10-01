@@ -213,6 +213,7 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] pre-allocation workspace ownership, cancellation-safe upload/batch aborts, and upload-owner shutdown guards — see [workspace ownership](workspace-ownership.md)
 - [x] recoverable exact-key filesystem staging with bounded writer/cleanup locks and crash-retry coverage — see [filesystem staging cleanup](filesystem-staging-cleanup.md)
 - [x] bounded read-only filesystem remnant inventory with private-by-default metadata, partial-scan reporting, and no ownership/deletion inference — see [inventory](filesystem-remnant-inventory.md)
+- [x] bounded read-only S3 multipart inventory with explicit scope, paired pagination, private metadata and offline real-SDK coverage — see [S3 inventory](s3-multipart-inventory.md)
 - [ ] full-lifecycle reconciliation for legacy random temporary files, framework spool files, S3 multipart remnants, and late provider writes
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
 - [x] disabled-by-default per-client submission rate-limit baseline

@@ -209,6 +209,11 @@ can report legacy/staging filename-pattern candidates without opening document
 contents or changing files. It requires an explicit root, hides paths by default,
 and reports partial scans; no candidate is automatically authorized for deletion.
 
+A separate [read-only S3 multipart inventory](docs/s3-multipart-inventory.md)
+requires an explicit bucket/prefix and reports bounded incomplete-upload metadata.
+It hides keys and upload identities by default, reports incomplete evidence,
+and never aborts uploads or changes lifecycle/storage configuration.
+
 ### Convert
 
 ```http

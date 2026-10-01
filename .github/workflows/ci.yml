@@ -13,7 +13,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
+      # S3 inventory tests use fake credentials and an in-memory HTTP transport.
+      - run: pip install -e ".[dev,s3]"
       - run: ruff check src services tests
       - run: pytest
 
