@@ -209,7 +209,8 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] storage readiness probes outside the shared job-state lock, with post-probe owner/result revalidation
 - [x] bounded active-download leases defer expiry deletion until admitted responses close, without renewing public access
 - [x] opt-in namespace-bound SQLite recovery for already-expired cleanup tasks, with commit ordering and single-owner/download-lease guards — see [durable expired cleanup](durable-expired-cleanup.md)
-- [ ] durable stored-result ownership from publication through expiry, including restart gaps before an expiry-intent commit and store-before-reference failures
+- [x] pre-write ownership for tracked API result publication, persisted terminal retention, and atomic expiry transfer — see [publication ownership](result-publication-ownership.md)
+- [ ] full-lifecycle durable cleanup: pre-publication upload/workspace ownership and incomplete/late-provider-write reconciliation
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
 - [x] disabled-by-default per-client submission rate-limit baseline
 - [x] filesystem result-storage adapter abstraction baseline

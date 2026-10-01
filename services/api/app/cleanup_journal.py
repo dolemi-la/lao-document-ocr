@@ -1,4 +1,4 @@
-"""Private, single-owner SQLite journal for already-expired job cleanup.
+"""Private, single-owner journal for expired cleanup and tracked result ownership.
 
 No directory/object discovery and no public job restoration. The caller must
 serialize ownership changes around commits. Storage callbacks never run here.
@@ -273,6 +273,36 @@ class CleanupJournal:
             if count + len(values) > self.max_entries:
                 raise CleanupJournalError("Cleanup journal exceeds retained-job capacity.")
             db.executemany("INSERT INTO pending VALUES (?, ?, ?, ?, ?)", values)
+
+    def expire(self, entries: Sequence[CleanupEntry], *, owned_ids: set[str]) -> None:
+        """Atomically transfer live publication rows and add expiry-only rows.
+
+        Known ownership must exist and match; missing or changed rows are never
+        silently recreated. The row format is unchanged from the v1 journal.
+        """
+        values = [self._values(entry) for entry in entries]
+        ids = {value[0] for value in values}
+        if len(ids) != len(values) or not owned_ids <= ids:
+            raise CleanupJournalError("Invalid cleanup ownership transfer.")
+        with self._transaction() as db:
+            count = db.execute("SELECT COUNT(*) FROM pending").fetchone()[0]
+            if count + len(values) - len(owned_ids) > self.max_entries:
+                raise CleanupJournalError("Cleanup journal exceeds retained-job capacity.")
+            for value in values:
+                job_id, key, workspace, retry, failures = value
+                if job_id not in owned_ids:
+                    db.execute("INSERT INTO pending VALUES (?, ?, ?, ?, ?)", value)
+                    continue
+                existing = db.execute(
+                    "SELECT artifact_key, workspace_pending FROM pending WHERE job_id=?",
+                    (job_id,),
+                ).fetchone()
+                if existing != (key, 1):
+                    raise CleanupJournalError("Cleanup publication ownership does not match.")
+                db.execute(
+                    "UPDATE pending SET workspace_pending=?, retry_at=?, failures=? WHERE job_id=?",
+                    (workspace, retry, failures, job_id),
+                )
 
     def update(self, entry: CleanupEntry) -> None:
         values = self._values(entry)

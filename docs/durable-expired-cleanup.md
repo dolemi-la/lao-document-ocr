@@ -4,18 +4,19 @@ Starting checkout: `d30d70e25e99cde3b12ba2e427700850bd0b358c`.
 
 ## Scope and boundary
 
-`JOB_CLEANUP_DURABLE=true` adds a private SQLite journal for cleanup tasks that
-have **already reached expiry and committed their deletion intent**. A replacement
-manager can retry their unfinished stored-object and workspace cleanup without
-restoring public access or invoking OCR again. The default remains `false` and
-retains the existing process-local behavior.
+`JOB_CLEANUP_DURABLE=true` adds a private SQLite journal for cleanup ownership.
+The initial slice persisted already-expired tasks. The
+[result-publication follow-up](result-publication-ownership.md) now commits
+ownership before managed API storage writes and preserves it through terminal
+retention, cancellation, and expiry. A replacement manager retries unfinished
+cleanup without restoring public access or invoking OCR again. The default
+remains `false` and retains process-local behavior.
 
-This is not a persistent job queue or complete crash-safe result ownership.
-Uploads, running jobs, successful results still inside retention, immediate
-cancellation cleanup before expiry, and a store operation that commits bytes but
-never returns its reference are not recovered by this slice. A crash before the
-expiry-intent commit can still leave those bytes untracked. The broader roadmap
-item for publication-through-expiry ownership therefore remains open.
+This is not a persistent job queue or complete upload/workspace recovery.
+Workspaces before publication intent, custom runners bypassing the tracked
+publisher, temporary/multipart upload remnants, and provider writes completing
+after recovery deletion remain outside the completed contract. The broader
+full-lifecycle cleanup roadmap item remains open.
 
 No scan/photo benchmark, recognizer change, font change, or accuracy claim is
 part of this work. Filesystem tests use authored fixtures; S3 tests use the real
@@ -57,14 +58,16 @@ recursively repair permissions on arbitrary operator-owned data.
 The base Compose configuration and environment examples still default to the
 old temporary job root and disabled persistence. No existing deployment is
 silently opted in. Do not remove the named volume during a routine restart.
-This new volume also retains unexpired workspaces across container recreation;
-those workspaces are **not yet automatically reconciled** after a process crash.
+This volume also retains unexpired workspaces across container recreation.
+Only workspaces with a committed ownership row are recovered; unknown older or
+pre-publication workspaces are not automatically discovered after a crash.
 
 ## Commit and recovery ordering
 
-Expiry first selects eligible terminal records under the manager lock. In
-persistent mode it commits the entire selected set to the journal before
-removing any of those public records or invoking deletion. A stored row contains
+Expiry selects eligible terminal records under the manager lock. In persistent
+mode it atomically transfers known publication rows and adds expiry-only rows
+before removing public records or invoking deletion. Managed publication first
+creates its row before storage I/O, then records terminal retention. A row contains
 only the job identifier, optional artifact key, workspace-stage flag, UTC retry
 time, and failure count. Workspace paths are derived from the bound job root
 and validated identifiers, not loaded as arbitrary paths from disk.
@@ -107,11 +110,11 @@ are not forcibly interrupted. The manager retains its uncommitted in-memory
 ownership until shutdown, and a replacement reconciles from the actual committed
 journal state.
 
-An expiration-intent commit that never succeeded leaves the original public
-record in memory and performs no deletion. If the process is then restarted,
-that uncommitted record is outside this slice's recovery boundary. This is why
-journal availability must be repaired and the remaining full-lifecycle work must
-not be represented as complete.
+An expiry transfer that never succeeded leaves the original public record in
+memory and performs no deletion. Tracked publications retain their earlier
+committed row across restart. A legacy/custom record first journaled at expiry
+still has no durable owner if that first commit fails. Journal availability and
+the remaining full-lifecycle gaps must not be ignored.
 
 ## Storage binding and one active owner
 
@@ -191,13 +194,12 @@ UTF-8 error handling before acceptance. Local plans, initial failures, review
 regressions, and gate logs are retained in the ignored directory
 `benchmarks/private/durable-expiry-d30d70e/`.
 
-Next: durable ownership starting before result publication and continuing through
-normal retention, including explicit handling of interrupted uploads and the
-store-before-reference window. This must be designed separately from restoring
-public jobs or re-running OCR, and must preserve the same storage-binding,
-privacy, capacity, and download-lease guarantees.
+The [publication follow-up](result-publication-ownership.md) covers managed
+storage writes, lost replies, and normal retention. Remaining work includes
+pre-publication upload/workspace ownership and incomplete/late-provider-write
+reconciliation, separately from restoring public jobs or re-running OCR.
 
-## Completed local gates
+## Initial expired-cleanup slice gates
 
 All 1,428 Python tests passed, including 78 new journal, manager, HTTP, process,
 and configuration cases. Ruff, web lint, all 145 web tests, the production web

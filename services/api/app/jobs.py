@@ -125,10 +125,27 @@ class JobRecord:
     orientation_review: OrientationReview | None = None
     page_rotations: Mapping[int, int] = field(default_factory=dict)
     _artifact_cleanup_in_progress: bool = field(default=False, init=False, repr=False)
+    _publication_intent: StoredArtifact | None = field(default=None, init=False, repr=False)
+    _publication_started: bool = field(default=False, init=False, repr=False)
+    _runner_thread_id: int | None = field(default=None, init=False, repr=False)
+    _publication_journaled: bool = field(default=False, init=False, repr=False)
+    _result_publisher: Callable[[str, Callable[[], StoredArtifact]], StoredArtifact] | None = field(
+        default=None, init=False, repr=False, compare=False,
+    )
 
     def __post_init__(self) -> None:
         # Snapshot each job independently, retaining explicit zero overrides.
         self.page_rotations = MappingProxyType(validate_page_rotations(self.page_rotations))
+
+    def publish_result(self, key: str, publisher: Callable[[], StoredArtifact]) -> StoredArtifact:
+        """Publish once through this job's owner; the callback must be synchronous.
+
+        Standalone records have no manager/journal and retain legacy behavior.
+        Managed durable records commit the declared key before invoking storage.
+        """
+        if self._result_publisher is None:
+            return publisher()
+        return self._result_publisher(key, publisher)
 
 
 @dataclass
@@ -285,12 +302,77 @@ class ConversionJobManager:
             return
         if record.completed_at is None:
             record.completed_at = datetime.now(UTC)
+        if record._publication_journaled:
+            self._journal_operation_unlocked(lambda: self._journal.update(
+                self._publication_entry(record),
+            ))
         start = record.started_at or record.created_at
         duration = max(0.0, (record.completed_at - start).total_seconds())
         status = record.status.value
         self._completed_total[status] += 1
         self._duration_seconds_sum[status] += duration
         record.terminal_recorded = True
+
+    @staticmethod
+    def _cleanup_artifact(record: JobRecord) -> StoredArtifact | None:
+        # A lost provider reply must not erase the key committed before the write.
+        return record.output_artifact or record._publication_intent
+
+    def _publication_entry(self, record: JobRecord) -> CleanupEntry:
+        artifact = self._cleanup_artifact(record)
+        try:
+            deadline = (record.completed_at or datetime.now(UTC)) + timedelta(
+                seconds=self.retention_seconds,
+            )
+        except (OverflowError, ValueError):
+            raise CleanupJournalError("Invalid publication retention deadline.") from None
+        return CleanupEntry(
+            record.id, artifact.key if artifact is not None else None, True, deadline,
+        )
+
+    def _publish_result(
+        self, record: JobRecord, key: str, publisher: Callable[[], StoredArtifact],
+    ) -> StoredArtifact:
+        with self._lock:
+            self._require_current_record_unlocked(record)
+            if (
+                record.status != JobStatus.RUNNING or record._publication_started
+                or record._runner_thread_id != threading.get_ident()
+            ):
+                raise JobPublicError("Result publication is not available for this job.")
+            if record.cancel_event.is_set():
+                raise JobCancelledError()
+            if self._journal is not None:
+                if record.workspace != self.root_dir / record.id:
+                    self._journal_operation_unlocked(_invalid_cleanup_workspace)
+                intent = StoredArtifact(key, "result.zip", "application/zip", 0)
+                # Keep the in-memory claim only after the intent commit returns.
+                # An uncertain commit latches admission and never starts the write.
+                def commit_intent() -> None:
+                    try:
+                        deadline = datetime.now(UTC) + timedelta(seconds=self.retention_seconds)
+                    except (OverflowError, ValueError):
+                        raise CleanupJournalError(
+                            "Invalid publication retention deadline.",
+                        ) from None
+                    self._journal.add([CleanupEntry(record.id, key, True, deadline)])
+
+                self._journal_operation_unlocked(commit_intent)
+                record._publication_intent = intent
+                record._publication_journaled = True
+            record._publication_started = True
+
+        # Provider I/O must not hold the global job-state lock. The running
+        # job/future keeps its workspace and journal owner until this returns.
+        try:
+            output = publisher()
+        except Exception:
+            # The reference can be lost after a committed write. Retain the
+            # declared key and never expose/log arbitrary provider error bodies.
+            raise JobPublicError("Result storage publication failed.") from None
+        if not isinstance(output, StoredArtifact) or output.key != key:
+            raise JobPublicError("Result storage returned an unexpected reference.")
+        return output
 
     def reserve_many(
         self,
@@ -339,6 +421,11 @@ class ConversionJobManager:
                         auto_orient_right_angles=auto_orient_right_angles,
                         page_rotations=rotations,
                     )
+                    record._result_publisher = (
+                        lambda key, publisher, record=record: self._publish_result(
+                            record, key, publisher,
+                        )
+                    )
                     self._jobs[job_id] = record
                     records.append(record)
             except Exception:
@@ -366,6 +453,9 @@ class ConversionJobManager:
         with self._lock:
             if self._download_leases.get(job_id, 0):
                 raise RuntimeError("Cannot discard a job with an admitted download.")
+            record = self._jobs.get(job_id)
+            if record is not None and record._publication_journaled:
+                raise RuntimeError("Cannot discard a job with durable publication ownership.")
             record = self._jobs.pop(job_id, None)
         if record is not None:
             shutil.rmtree(record.workspace, ignore_errors=True)
@@ -416,12 +506,19 @@ class ConversionJobManager:
                 return
             record.status = JobStatus.RUNNING
             record.started_at = datetime.now(UTC)
+            record._runner_thread_id = threading.get_ident()
 
         cancelled_artifact: StoredArtifact | None = None
         artifact_cleanup = self.artifact_cleanup
         try:
             output = self.runner(record, record.cancel_event)
             with self._lock:
+                if record._publication_journaled and (
+                    not isinstance(output, StoredArtifact)
+                    or record._publication_intent is None
+                    or output.key != record._publication_intent.key
+                ):
+                    raise JobPublicError("Conversion returned an unexpected published result.")
                 # Take ownership before deciding whether cancellation won the race.
                 # A returned object must remain tracked even when never downloadable.
                 if isinstance(output, StoredArtifact):
@@ -441,6 +538,16 @@ class ConversionJobManager:
                         record._artifact_cleanup_in_progress = True
                 else:
                     record.status = JobStatus.SUCCEEDED
+                if record._publication_journaled:
+                    # Publish terminal visibility and its retention deadline in
+                    # one critical section, before status readers can see success.
+                    self._record_terminal_unlocked(record)
+        except CleanupJournalError:
+            with self._lock:
+                record.status = JobStatus.FAILED
+                record.error = "Conversion service is unavailable."
+                record.output_path = None
+            raise
         except JobCancelledError:
             with self._lock:
                 record.status = JobStatus.CANCELLED
@@ -462,7 +569,8 @@ class ConversionJobManager:
                 record.output_artifact = None
         finally:
             with self._lock:
-                record.completed_at = datetime.now(UTC)
+                if record.completed_at is None:
+                    record.completed_at = datetime.now(UTC)
                 self._record_terminal_unlocked(record)
 
         if cancelled_artifact is not None and artifact_cleanup is not None:
@@ -477,7 +585,13 @@ class ConversionJobManager:
                 )
             else:
                 with self._lock:
+                    if record._publication_journaled:
+                        entry = self._publication_entry(record)
+                        self._journal_operation_unlocked(lambda: self._journal.update(
+                            CleanupEntry(record.id, None, True, entry.retry_at),
+                        ))
                     record.output_artifact = None
+                    record._publication_intent = None
             finally:
                 with self._lock:
                     record._artifact_cleanup_in_progress = False
@@ -668,7 +782,7 @@ class ConversionJobManager:
         """Expire public records and attempt a bounded batch of due private cleanups.
 
         Returns newly expired jobs, not successful deletions. Retry ownership
-        is process-local by default; the opt-in journal persists expired tasks.
+        is process-local by default; the opt-in journal also owns tracked publications.
         Provider/workspace I/O runs outside the lock; local journal commits do not.
         A task cannot be claimed by two passes.
         """
@@ -689,7 +803,9 @@ class ConversionJobManager:
         cutoff = current_time - timedelta(seconds=self.retention_seconds)
         with self._lock:
             expired = {
-                job_id: _ExpiredJobCleanup(record.workspace, record.output_artifact, current_time)
+                job_id: _ExpiredJobCleanup(
+                    record.workspace, self._cleanup_artifact(record), current_time,
+                )
                 for job_id, record in self._jobs.items()
                 if record.status in _TERMINAL_STATUSES
                 and not record._artifact_cleanup_in_progress
@@ -704,9 +820,18 @@ class ConversionJobManager:
                         self._journal_operation_unlocked(
                             _invalid_cleanup_workspace,
                         )
-                self._journal_operation_unlocked(lambda: self._journal.add([
+                entries = [
                     self._cleanup_entry(job_id, item) for job_id, item in expired.items()
-                ]))
+                ]
+                owned_ids = {
+                    job_id for job_id in expired if self._jobs[job_id]._publication_journaled
+                }
+                if owned_ids:
+                    self._journal_operation_unlocked(
+                        lambda: self._journal.expire(entries, owned_ids=owned_ids),
+                    )
+                else:
+                    self._journal_operation_unlocked(lambda: self._journal.add(entries))
             for job_id, item in expired.items():
                 self._pending_cleanup[job_id] = item
                 del self._jobs[job_id]

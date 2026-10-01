@@ -182,10 +182,12 @@ in-progress cancellation deletion. A failed immediate delete retains the private
 reference for the existing expiry pass. See [job artifact ownership](job-artifact-ownership.md).
 
 The default mode is process-local and loses unfinished cleanup on restart.
-With `JOB_CLEANUP_DURABLE=true`, already-expired tasks survive through the bound
-local journal. Crashes before its intent commit and uploads that store bytes
-without returning an artifact remain outside recovery and require independent
-retention controls.
+With `JOB_CLEANUP_DURABLE=true`, expired tasks and tracked API publication keys
+survive through the bound journal. [Publication ownership](result-publication-ownership.md)
+is committed before storage is invoked, covering lost replies for that declared
+key. Untracked custom writes, pre-publication workspaces, temporary/multipart
+remnants, and provider writes completing after recovery deletion still need
+independent reconciliation and retention controls.
 Local OCR workspaces are still retained until normal expiry, not erased as soon
 as cancellation is requested.
 
@@ -217,7 +219,9 @@ keys in a generated job's direct object namespace can be replayed. No bucket
 scan, public-job reconstruction, or automatic storage migration is performed.
 
 See [durable expired cleanup](durable-expired-cleanup.md) for persistent-volume
-setup, failed-commit behavior, shutdown/download leases, and pre-expiry gaps.
+setup, failed-commit behavior, and shutdown/download leases. See
+[result publication](result-publication-ownership.md) for the pre-write helper,
+retained deadlines, custom-runner contract, and remaining lifecycle gaps.
 
 ## Health/privacy
 

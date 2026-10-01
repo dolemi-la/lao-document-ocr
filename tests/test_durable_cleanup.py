@@ -246,7 +246,8 @@ def test_namespace_cannot_change_even_when_ledger_is_empty(tmp_path, storage):
     correct.shutdown()
 
 
-def test_unexpired_outputs_are_explicitly_not_recovered(tmp_path, storage):
+def test_custom_runner_bypassing_tracked_publication_remains_expiry_only(tmp_path, storage):
+    # manager_for intentionally calls storage directly, without record.publish_result.
     root = tmp_path / "jobs"
     original = manager_for(root, storage)
     try:

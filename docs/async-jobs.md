@@ -201,9 +201,12 @@ combined, separately from `JOB_MAX_ACTIVE`. It must be at least the active limit
 At capacity, single and batch submissions return HTTP 429 before allocating new
 job workspaces. Successful normal expiry or retry cleanup releases capacity.
 By default, a restart still loses the in-memory retry queue. Opt-in
-`JOB_CLEANUP_DURABLE=true` journals already-expired tasks on a persistent `JOB_ROOT`;
-see [durable expired cleanup](durable-expired-cleanup.md). This does not restore
-public jobs or cover crashes before expiry, and is not guaranteed erasure.
+`JOB_CLEANUP_DURABLE=true` journals expired tasks and
+[tracked API result publication](result-publication-ownership.md) on a persistent
+`JOB_ROOT`, including lost storage replies and unexpired successful results.
+Recovery preserves private cleanup deadlines, not public jobs or download access.
+Pre-publication uploads/workspaces and incomplete or late provider writes remain
+separate gaps; none of this guarantees erasure.
 
 Terminal job workspaces are retained for result download, then cleaned by
 request activity or the API lifespan worker. `JOB_CLEANUP_INTERVAL_SECONDS=30`

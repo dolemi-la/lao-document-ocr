@@ -196,6 +196,11 @@ SQLite journal on persistent local storage. This does not restore public jobs
 or cover crashes before expiry. See [durable expired cleanup](docs/durable-expired-cleanup.md)
 for the opt-in setting and Compose overlay; default behavior is unchanged.
 
+Managed API results can also retain private cleanup ownership from before storage
+publication through retention when durable cleanup is enabled. See
+[publication ownership](docs/result-publication-ownership.md) for lost-reply
+recovery, the custom-runner helper, and remaining upload/workspace gaps.
+
 ### Convert
 
 ```http
