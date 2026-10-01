@@ -535,14 +535,64 @@ def evaluate(model, loader, vocabulary: CharacterVocabulary, device) -> dict[str
     }
 
 
+def _initialize_model_weights(model, source, *, model_config, model_version, vocabulary) -> dict:
+    """Load a selected inference checkpoint, never its optimizer/history or latest state."""
+    torch, _, _, _ = _require_torch()
+    path = Path(source)
+    try:
+        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+    except Exception:
+        raise ValueError("Initialization requires a weights-only inference checkpoint") from None
+    if (not isinstance(checkpoint, dict)
+            or checkpoint.get("artifact_type") == "recognizer-training-state"
+            or "latest_state_dict" in checkpoint):
+        raise ValueError("Initialization requires selected weights, not a training state")
+    if checkpoint.get("model") != "LaoCrnnRecognizer":
+        raise ValueError("Initialization model mismatch")
+    if checkpoint.get("model_version") != model_version:
+        raise ValueError("Initialization model version mismatch")
+    config = _normalized_resume_model_config(
+        checkpoint.get("model_config"), model_version=model_version,
+    )
+    if config != model_config.to_dict():
+        raise ValueError("Initialization model configuration mismatch")
+    if (checkpoint.get("vocabulary_checksum") != vocabulary.checksum()
+            or checkpoint.get("vocabulary") != vocabulary.to_dict()):
+        raise ValueError("Initialization vocabulary mismatch")
+    state = checkpoint.get("state_dict")
+    if not isinstance(state, dict) or not state:
+        raise ValueError("Initialization checkpoint has no selected weights")
+    if any(not isinstance(value, torch.Tensor) or not torch.isfinite(value).all().item()
+           for value in state.values()):
+        raise ValueError("Initialization weights must be finite tensors")
+    try:
+        model.load_state_dict(state, strict=True)
+    except (RuntimeError, TypeError, ValueError):
+        raise ValueError("Initialization weight shapes or keys do not match") from None
+    return {
+        "mode": "weights-only-new-experiment",
+        "source": str(path), "source_sha256": _sha256_file(path),
+        "source_best_epoch": checkpoint.get("best_epoch"),
+        "optimizer_restored": False, "history_restored": False,
+        "rng_restored": False, "vocabulary_verified": True,
+    }
+
+
 def train_recognizer(
     samples: list[TrainingSample],
     output_dir: str | Path,
     *,
     training_config: TrainingConfig | None = None,
     resume_from: str | Path | None = None,
+    initialize_from: str | Path | None = None,
     recompute_resume_metrics: bool = False,
 ) -> dict:
+    if initialize_from is not None and resume_from is not None:
+        raise ValueError("--initialize-from and --resume-from are mutually exclusive")
+    if initialize_from is not None and Path(output_dir).exists():
+        target = Path(output_dir)
+        if not target.is_dir() or any(target.iterdir()):
+            raise ValueError("Initialization requires a new or empty output directory")
     if recompute_resume_metrics and resume_from is None:
         raise ValueError("--recompute-resume-metrics requires --resume-from")
     training_config = training_config or TrainingConfig()
@@ -624,12 +674,24 @@ def train_recognizer(
     best_state: dict[str, Any] | None = None
     start_epoch = 1
     resume_metadata: dict[str, Any] | None = None
+    initialization_metadata: dict[str, Any] | None = None
+    if initialize_from is not None:
+        initialization_metadata = _initialize_model_weights(
+            model, initialize_from, model_config=model_config,
+            model_version=model_version, vocabulary=vocabulary,
+        )
 
     if resume_from is not None:
         resume_path = Path(resume_from)
         if not resume_path.is_file():
             raise FileNotFoundError(f"Resume checkpoint not found: {resume_path}")
         checkpoint = torch.load(resume_path, map_location="cpu", weights_only=False)
+        initialization_metadata = checkpoint.get("initialization")
+        if initialization_metadata is not None and (
+            not isinstance(initialization_metadata, dict)
+            or initialization_metadata.get("mode") != "weights-only-new-experiment"
+        ):
+            raise ValueError("Resume checkpoint has invalid initialization provenance")
 
         if checkpoint.get("model") != "LaoCrnnRecognizer":
             raise ValueError("Resume checkpoint model is not LaoCrnnRecognizer")
@@ -976,6 +1038,7 @@ def train_recognizer(
             "best_epoch": best_epoch,
             "metric_migrations": metric_migrations,
             "completed_epoch": epoch,
+            "initialization": initialization_metadata,
         }
         _atomic_torch_save(torch, training_state, training_state_path)
 
@@ -1005,6 +1068,7 @@ def train_recognizer(
         "best_epoch": best_epoch,
         "metric_migrations": metric_migrations,
         "resume": resume_metadata,
+        "initialization": initialization_metadata,
     }
     torch.save(checkpoint, checkpoint_path)
     checkpoint_sha256 = _sha256_file(checkpoint_path)
@@ -1033,6 +1097,7 @@ def train_recognizer(
         "history": history,
         "training_state": training_state_path.name,
         "resume": resume_metadata,
+        "initialization": initialization_metadata,
     }
     metadata_path = output / "metadata.json"
     metadata_path.write_text(

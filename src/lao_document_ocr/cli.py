@@ -1049,6 +1049,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     train.add_argument("--resume-from", type=Path)
     train.add_argument(
+        "--initialize-from", type=Path,
+        help="Selected weights for a NEW fine-tuning experiment; reset optimizer/history.",
+    )
+    train.add_argument(
         "--recompute-resume-metrics", action="store_true",
         help=(
             "Explicitly migrate valid-timestep-v1 training states by recomputing "
@@ -2283,6 +2287,7 @@ def _train_recognizer(args: argparse.Namespace) -> int:
         args.output,
         training_config=config,
         resume_from=args.resume_from,
+        initialize_from=args.initialize_from,
         recompute_resume_metrics=args.recompute_resume_metrics,
     )
     print(f"Checkpoint: {result['checkpoint']}")

@@ -112,6 +112,25 @@ Example: `lao-ocr train-recognizer --manifest training/generated/v1/manifest.jso
 
 A legacy/final `recognizer.pt` can also be used as a weights-only fallback. In that case optimizer, shuffle-generator, and RNG state cannot be restored; metadata records that limitation and continuation starts from the best stored epoch rather than pretending to restore a later state.
 
+### Fine-tuning on new data: initialize a separate experiment
+
+Use `--initialize-from` with a selected `recognizer.pt` when changing training
+samples or learning settings. Unlike `--resume-from`, this loads model weights
+only and starts a new optimizer, history, epoch count, and seeded shuffle stream.
+The architecture and complete character vocabulary must still match. A full
+`training-state.pt` is not implicitly interpreted as selected initialization
+weights. The destination must be new or empty; existing runs are not overwritten.
+
+The two source options are mutually exclusive. Once the new experiment has an
+atomic `training-state.pt`, use strict `--resume-from` to continue its remaining
+budget with unchanged inputs/settings. Parent initialization provenance is
+retained separately from resume state. This does not validate data rights,
+prevent dataset leakage automatically, or authorize publishing model artifacts.
+
+The completed [Phetsarath coverage fine-tuning experiment](recognizer-coverage-finetuning.md)
+uses this mode and reports its fixed final endpoint separately from the
+checkpoint selected on development data.
+
 ### Watch predictions, not only training loss
 
 Each new epoch records no-text `dev_prediction_diagnostics`: empty decoded

@@ -124,6 +124,7 @@ Status: started
 - [x] line recognizer training pipeline (CRNN + CTC)
 - [x] recognizer training device selection (CPU/CUDA/Apple MPS/auto)
 - [x] atomic per-epoch recognizer training state + resumable long runs
+- [x] explicit weights-only new-experiment initialization with architecture/vocabulary checks and preserved parent provenance
 - [x] width-aware dev decoding aligned with exported recognizer inference
 - [x] normalized training/benchmark CER parity + explicit retained-state metric migration and best-epoch provenance
 - [x] fixed-width train/dev padding aligned with exported bidirectional inference
@@ -161,6 +162,14 @@ evaluated 160 new exact-label groups in 480 correlated variants. The unchanged
 candidate scored 10.30% CER versus 46.41% for the older baseline, but only
 123/480 lines were exact. This is restricted short-line synthetic evidence,
 not document-independent optical accuracy or a production promotion.
+
+A separately planned [coverage fine-tuning run](recognizer-coverage-finetuning.md)
+completed 10 epochs / 1,440 new updates on 1,152 training images with 156 development
+images. The fixed final epoch reduced matched expanded-dev CER from 16.70% to
+9.60%, and the unchanged 480-image synthetic challenge from 10.30% to 6.30%.
+Exact challenge lines increased from 123 to 188. Epoch 9 was best on development
+(9.05%) but was not substituted into the final challenge result. Real optical
+validation and production promotion remain incomplete.
 
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
