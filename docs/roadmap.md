@@ -210,7 +210,8 @@ Exit condition: layout metrics and table metrics are published alongside OCR acc
 - [x] bounded active-download leases defer expiry deletion until admitted responses close, without renewing public access
 - [x] opt-in namespace-bound SQLite recovery for already-expired cleanup tasks, with commit ordering and single-owner/download-lease guards — see [durable expired cleanup](durable-expired-cleanup.md)
 - [x] pre-write ownership for tracked API result publication, persisted terminal retention, and atomic expiry transfer — see [publication ownership](result-publication-ownership.md)
-- [ ] full-lifecycle durable cleanup: pre-publication upload/workspace ownership and incomplete/late-provider-write reconciliation
+- [x] pre-allocation workspace ownership, cancellation-safe upload/batch aborts, and upload-owner shutdown guards — see [workspace ownership](workspace-ownership.md)
+- [ ] full-lifecycle reconciliation for framework spool files, storage temporary/multipart remnants, and late provider writes
 - [x] request IDs + Prometheus-format HTTP/job observability baseline
 - [x] disabled-by-default per-client submission rate-limit baseline
 - [x] filesystem result-storage adapter abstraction baseline

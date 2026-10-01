@@ -54,7 +54,10 @@ def test_only_the_owning_runner_thread_may_publish(tmp_path, storage):
         with pytest.raises(JobPublicError):
             record.publish_result(key, off_thread_write)
         assert writes == []
-        assert manager._journal.load() == []
+        rows = manager._journal.load()
+        assert len(rows) == 1
+        assert rows[0].job_id == record.id
+        assert rows[0].artifact_key is None  # No publication, but the workspace is owned.
         release.set()
         record.future.result(timeout=5)
         assert record.status == JobStatus.SUCCEEDED

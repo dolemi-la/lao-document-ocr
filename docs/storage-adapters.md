@@ -185,9 +185,11 @@ The default mode is process-local and loses unfinished cleanup on restart.
 With `JOB_CLEANUP_DURABLE=true`, expired tasks and tracked API publication keys
 survive through the bound journal. [Publication ownership](result-publication-ownership.md)
 is committed before storage is invoked, covering lost replies for that declared
-key. Untracked custom writes, pre-publication workspaces, temporary/multipart
-remnants, and provider writes completing after recovery deletion still need
-independent reconciliation and retention controls.
+key. [Workspace ownership](workspace-ownership.md) begins before allocation and
+continues through publication and expiry. A custom runner's returned key is
+recorded at terminal handoff, but direct custom writes that lose their reply,
+temporary/multipart remnants, and provider writes completing after recovery
+deletion still need independent reconciliation and retention controls.
 Local OCR workspaces are still retained until normal expiry, not erased as soon
 as cancellation is requested.
 

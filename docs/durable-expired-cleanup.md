@@ -12,11 +12,12 @@ retention, cancellation, and expiry. A replacement manager retries unfinished
 cleanup without restoring public access or invoking OCR again. The default
 remains `false` and retains process-local behavior.
 
-This is not a persistent job queue or complete upload/workspace recovery.
-Workspaces before publication intent, custom runners bypassing the tracked
-publisher, temporary/multipart upload remnants, and provider writes completing
-after recovery deletion remain outside the completed contract. The broader
-full-lifecycle cleanup roadmap item remains open.
+The [workspace follow-up](workspace-ownership.md) now journals application job
+directories before allocation, including interrupted uploads and queued/running
+work. This remains a cleanup journal, not a persistent public job queue. Framework
+spool files, direct custom writes with lost replies, temporary/multipart remnants,
+and provider writes completing after recovery deletion remain outside the
+completed contract. The broader reconciliation roadmap item remains open.
 
 No scan/photo benchmark, recognizer change, font change, or accuracy claim is
 part of this work. Filesystem tests use authored fixtures; S3 tests use the real
@@ -59,8 +60,9 @@ The base Compose configuration and environment examples still default to the
 old temporary job root and disabled persistence. No existing deployment is
 silently opted in. Do not remove the named volume during a routine restart.
 This volume also retains unexpired workspaces across container recreation.
-Only workspaces with a committed ownership row are recovered; unknown older or
-pre-publication workspaces are not automatically discovered after a crash.
+Only workspaces with a committed ownership row are recovered. New durable
+reservations commit before allocation; unknown directories from older runs are
+not automatically discovered or adopted after a crash.
 
 ## Commit and recovery ordering
 
@@ -195,9 +197,11 @@ regressions, and gate logs are retained in the ignored directory
 `benchmarks/private/durable-expiry-d30d70e/`.
 
 The [publication follow-up](result-publication-ownership.md) covers managed
-storage writes, lost replies, and normal retention. Remaining work includes
-pre-publication upload/workspace ownership and incomplete/late-provider-write
-reconciliation, separately from restoring public jobs or re-running OCR.
+storage writes, lost replies, and normal retention. The
+[workspace follow-up](workspace-ownership.md) extends ownership to pre-allocation
+and unfinished upload callers. Remaining work includes framework spool and
+incomplete/late-provider-write reconciliation, separately from restoring public
+jobs or re-running OCR.
 
 ## Initial expired-cleanup slice gates
 

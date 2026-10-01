@@ -274,6 +274,23 @@ class CleanupJournal:
                 raise CleanupJournalError("Cleanup journal exceeds retained-job capacity.")
             db.executemany("INSERT INTO pending VALUES (?, ?, ?, ?, ?)", values)
 
+    def publish(self, entry: CleanupEntry) -> None:
+        """Promote an existing workspace claim before writing its one result key."""
+        values = self._values(entry)
+        if entry.artifact_key is None or not entry.workspace_pending or entry.failures:
+            raise CleanupJournalError("Invalid cleanup publication transfer.")
+        with self._transaction() as db:
+            existing = db.execute(
+                "SELECT artifact_key, workspace_pending, failures FROM pending WHERE job_id=?",
+                (entry.job_id,),
+            ).fetchone()
+            if existing != (None, 1, 0):
+                raise CleanupJournalError("Cleanup workspace ownership does not match.")
+            db.execute(
+                "UPDATE pending SET artifact_key=?, retry_at=? WHERE job_id=?",
+                (values[1], values[3], values[0]),
+            )
+
     def expire(self, entries: Sequence[CleanupEntry], *, owned_ids: set[str]) -> None:
         """Atomically transfer live publication rows and add expiry-only rows.
 

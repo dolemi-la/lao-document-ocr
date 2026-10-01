@@ -117,6 +117,7 @@ def test_intent_exists_before_write_and_slow_publication_does_not_lock_jobs(tmp_
         assert entered.wait(5)
         other = pool.submit(manager.reserve, "other.png", ".png").result(timeout=1)
         assert other.status == JobStatus.UPLOADING
+        manager.discard(other.id)
         assert pool.submit(manager.cleanup_expired).result(timeout=1) == 0
         assert record.workspace.exists()
         assert record.status == JobStatus.RUNNING
@@ -135,14 +136,14 @@ def test_uncertain_intent_commit_never_invokes_storage(
     writes = []
     root = tmp_path / "jobs"
     manager = tracked_manager(root, storage, writer=lambda record, put: writes.append(record.id))
-    add = manager._journal.add
+    publish = manager._journal.publish
 
-    def uncertain(entries):
+    def uncertain(entry):
         if committed:
-            add(entries)
+            publish(entry)
         raise CleanupJournalError("PRIVATE journal path")
 
-    monkeypatch.setattr(manager._journal, "add", uncertain)
+    monkeypatch.setattr(manager._journal, "publish", uncertain)
     try:
         record = enqueue(manager)
         with pytest.raises(CleanupJournalError):
@@ -156,7 +157,9 @@ def test_uncertain_intent_commit_never_invokes_storage(
         manager.shutdown()
     replacement = tracked_manager(root, storage)
     try:
-        assert len(replacement._pending_cleanup) == int(committed)
+        assert len(replacement._pending_cleanup) == 1
+        row = replacement._journal.load()[0]
+        assert (row.artifact_key is not None) is committed
     finally:
         replacement.shutdown()
 

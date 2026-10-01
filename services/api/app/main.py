@@ -716,6 +716,40 @@ async def convert_document(
     return StreamingResponse(archive, media_type="application/zip", headers=headers)
 
 
+def _abort_submission(manager: ConversionJobManager, records: list[JobRecord]) -> None:
+    """Called only after request-owned writers stop, including task cancellation."""
+    journal_error: CleanupJournalError | None = None
+    try:
+        manager.discard_many([record.id for record in records if record.future is None])
+    except CleanupJournalError as exc:
+        journal_error = exc
+    for record in records:
+        if record.future is None:
+            continue
+        try:
+            # An earlier batch member can already be running; never unlink its
+            # workspace while rolling back a later member's scheduling failure.
+            manager.cancel(record.id)
+        except JobNotFoundError:
+            pass
+        except CleanupJournalError as exc:
+            journal_error = exc
+    if journal_error is not None:
+        raise journal_error
+
+
+def _abort_failed_submission(
+    manager: ConversionJobManager, records: list[JobRecord], cause: BaseException,
+) -> None:
+    try:
+        _abort_submission(manager, records)
+    except CleanupJournalError:
+        # Preserve cancellation/termination while still finalizing every upload
+        # pin. Ordinary HTTP failures use the existing fixed journal-503 handler.
+        if isinstance(cause, Exception):
+            raise
+
+
 @app.post("/v1/jobs", status_code=202)
 async def create_conversion_job(
     request: Request,
@@ -755,8 +789,8 @@ async def create_conversion_job(
         await _save_upload(file, record.input_path)
         _validate_saved_upload(record.input_path, suffix, rotations)
         manager.enqueue(record.id)
-    except Exception as exc:
-        manager.discard(record.id)
+    except BaseException as exc:
+        _abort_failed_submission(manager, [record], exc)
         if isinstance(exc, (JobManagerClosedError, JobSchedulingError)):
             raise HTTPException(
                 status_code=503, detail="Conversion service is unavailable. Try again later.",
@@ -816,27 +850,15 @@ async def create_conversion_batch(
         for (upload, _, suffix), record in zip(prepared, records, strict=True):
             await _save_upload(upload, record.input_path)
             _validate_saved_upload(record.input_path, suffix, rotations)
-    except Exception:
-        for record in records:
-            manager.discard(record.id)
+    except BaseException as exc:
+        _abort_failed_submission(manager, records, exc)
         raise
 
     try:
         for record in records:
             manager.enqueue(record.id)
-    except Exception as exc:
-        for record in records:
-            try:
-                if record.future is None:
-                    # All uploads are complete. Unsubmitted/rejected members have
-                    # no runner owner; remove only these request-owned workspaces.
-                    manager.discard(record.id)
-                else:
-                    # Earlier members may already be running or successful.
-                    # Cooperatively cancel; never unlink an active workspace.
-                    manager.cancel(record.id)
-            except JobNotFoundError:
-                pass
+    except BaseException as exc:
+        _abort_failed_submission(manager, records, exc)
         if isinstance(exc, (JobManagerClosedError, JobSchedulingError)):
             raise HTTPException(
                 status_code=503, detail="Conversion service is unavailable. Try again later.",

@@ -205,8 +205,12 @@ By default, a restart still loses the in-memory retry queue. Opt-in
 [tracked API result publication](result-publication-ownership.md) on a persistent
 `JOB_ROOT`, including lost storage replies and unexpired successful results.
 Recovery preserves private cleanup deadlines, not public jobs or download access.
-Pre-publication uploads/workspaces and incomplete or late provider writes remain
-separate gaps; none of this guarantees erasure.
+[Workspace ownership](workspace-ownership.md) also commits before application
+workspace allocation. Interrupted uploads, queued/running work, and aborted
+requests therefore retain cleanup ownership. Upload callers pin their manager
+until successful enqueue or abort finalization, including coroutine cancellation.
+Framework spool files and incomplete or late provider writes remain separate
+gaps; none of this guarantees erasure.
 
 Terminal job workspaces are retained for result download, then cleaned by
 request activity or the API lifespan worker. `JOB_CLEANUP_INTERVAL_SECONDS=30`

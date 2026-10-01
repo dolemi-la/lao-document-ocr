@@ -15,12 +15,13 @@ persistent-volume configuration in [durable cleanup](durable-expired-cleanup.md)
 Persistence remains off by default. No running deployment is enabled by a code
 change, and an ephemeral job root still cannot survive volume or disk loss.
 
-This is not complete durable job scheduling. Input uploads and running-workspace
-bytes created before publication intent are not journaled by this slice. A
-custom runner that bypasses the tracked publisher still has the older expiry-only
-protection. Storage temporary files, multipart fragments, version histories,
-and provider writes that complete after recovery deletion require separate
-reconciliation/lifecycle controls. None of these limits is an erasure guarantee.
+This is not complete durable job scheduling. The later
+[workspace follow-up](workspace-ownership.md) journals input/workspace ownership
+before directory allocation. A custom runner's returned artifact is recorded at
+terminal handoff, but a direct untracked write with a lost reply still has no
+predeclared object key. Storage temporary files, multipart fragments, version
+histories, and provider writes completing after recovery deletion require
+separate reconciliation/lifecycle controls. None of this guarantees erasure.
 
 ## Publication protocol
 
@@ -33,8 +34,9 @@ For a managed durable job, the publisher performs these steps:
 
 1. Verify that the same record is owned, still running, executing on its owning
    runner thread, not previously published, and not already cancelled.
-2. Commit a journal row containing the validated job ID, exact intended artifact
-   key, workspace-stage flag, provisional cleanup deadline, and zero failures.
+2. Commit the validated job ID, exact intended artifact key, workspace-stage
+   flag, provisional cleanup deadline, and zero failures. New durable reservations
+   promote their existing workspace-only row; they do not allocate another row.
    No provider call is made until this commit returns successfully.
 3. Execute the synchronous storage callback outside the shared manager lock.
    A slow upload does not hold the state lock needed by unrelated jobs.
@@ -138,8 +140,9 @@ return record.publish_result(
 The storage adapter must match the manager's bound namespace and clean objects
 idempotently by key. A standalone `JobRecord` without a manager retains its old
 untracked behavior. Direct `storage.put_file()` calls also remain possible for
-legacy/custom runners, but are not protected before expiry. Existing untracked
-files from earlier runs are not automatically adopted. Opting into durable
+legacy/custom runners. Their returned key gains ownership at terminal handoff,
+but the earlier store-before-reference gap requires this publisher helper.
+Existing untracked files from earlier runs are not automatically adopted. Opting into durable
 cleanup is not retroactive recovery of unknown objects.
 
 ## Verification
@@ -163,7 +166,7 @@ are retained locally in `benchmarks/private/result-publication-c6049c7/`, which
 is Git-ignored. No recognizer, Phetsarath font, source registry, capture kit,
 collector session, or frozen evaluation data is changed by this slice.
 
-## Completed local gates
+## Initial publication-slice local gates
 
 All 54 new focused publication cases passed, including six abrupt subprocess
 exit boundaries. The full Python suite passed 1,482 tests; Ruff, web lint, all

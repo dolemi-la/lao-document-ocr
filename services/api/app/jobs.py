@@ -129,6 +129,7 @@ class JobRecord:
     _publication_started: bool = field(default=False, init=False, repr=False)
     _runner_thread_id: int | None = field(default=None, init=False, repr=False)
     _publication_journaled: bool = field(default=False, init=False, repr=False)
+    _workspace_journaled: bool = field(default=False, init=False, repr=False)
     _result_publisher: Callable[[str, Callable[[], StoredArtifact]], StoredArtifact] | None = field(
         default=None, init=False, repr=False, compare=False,
     )
@@ -150,7 +151,7 @@ class JobRecord:
 
 @dataclass
 class _ExpiredJobCleanup:
-    """Minimal private expired ownership; optionally backed by a cleanup journal."""
+    """Minimal private cleanup ownership; optionally backed by a cleanup journal."""
 
     workspace: Path
     artifact: StoredArtifact | None
@@ -218,6 +219,7 @@ class ConversionJobManager:
         self._jobs: dict[str, JobRecord] = {}
         self._pending_cleanup: dict[str, _ExpiredJobCleanup] = {}
         self._download_leases: dict[str, int] = {}
+        self._upload_owners: set[str] = set()
         self._cleanup_attempts_total = 0
         self._cleanup_failures_total = 0
         self._completed_total: Counter[str] = Counter()
@@ -276,6 +278,7 @@ class ConversionJobManager:
         if (
             self._journal is not None and self._journal_shutdown_ready
             and self._cleanup_passes == 0 and not self._download_leases
+            and not self._upload_owners
         ):
             self._journal.close()
 
@@ -302,7 +305,7 @@ class ConversionJobManager:
             return
         if record.completed_at is None:
             record.completed_at = datetime.now(UTC)
-        if record._publication_journaled:
+        if record._workspace_journaled or record._publication_journaled:
             self._journal_operation_unlocked(lambda: self._journal.update(
                 self._publication_entry(record),
             ))
@@ -355,7 +358,11 @@ class ConversionJobManager:
                         raise CleanupJournalError(
                             "Invalid publication retention deadline.",
                         ) from None
-                    self._journal.add([CleanupEntry(record.id, key, True, deadline)])
+                    entry = CleanupEntry(record.id, key, True, deadline)
+                    if record._workspace_journaled:
+                        self._journal.publish(entry)
+                    else:
+                        self._journal.add([entry])
 
                 self._journal_operation_unlocked(commit_intent)
                 record._publication_intent = intent
@@ -406,6 +413,12 @@ class ConversionJobManager:
                     "or increase JOB_MAX_RETAINED."
                 )
 
+            if self._journal is not None:
+                return self._reserve_durable_unlocked(
+                    files, auto_orient_right_angles=auto_orient_right_angles,
+                    page_rotations=rotations,
+                )
+
             records: list[JobRecord] = []
             try:
                 for filename, suffix in files:
@@ -435,6 +448,61 @@ class ConversionJobManager:
                 raise
             return records
 
+    def _reserve_durable_unlocked(
+        self, files: list[tuple[str, str]], *, auto_orient_right_angles: bool,
+        page_rotations: Mapping[int, int],
+    ) -> list[JobRecord]:
+        records: list[JobRecord] = []
+        allocated_ids: set[str] = set()
+        for filename, suffix in files:
+            job_id = uuid.uuid4().hex
+            workspace = self.root_dir / job_id
+            # Never adopt a pre-existing path or a repeated generated identifier.
+            # The private root must not have independent directory writers.
+            if (job_id in allocated_ids or job_id in self._jobs
+                    or job_id in self._pending_cleanup or workspace.exists()
+                    or workspace.is_symlink()):
+                raise JobCapacityError("Job workspace allocation conflict. Try again later.")
+            record = JobRecord(
+                id=job_id, filename=filename, workspace=workspace,
+                input_path=workspace / f"input{suffix}",
+                auto_orient_right_angles=auto_orient_right_angles,
+                page_rotations=page_rotations,
+            )
+            record._result_publisher = (
+                lambda key, publisher, record=record: self._publish_result(record, key, publisher)
+            )
+            records.append(record)
+            allocated_ids.add(job_id)
+
+        entries: list[CleanupEntry] = []
+
+        def commit_reservations() -> None:
+            for record in records:
+                entries.append(self._publication_entry(record))
+            self._journal.add(entries)
+
+        # No directory or caller upload owner exists until the whole batch commits.
+        self._journal_operation_unlocked(commit_reservations)
+        try:
+            for record in records:
+                record.workspace.mkdir(mode=0o700, exist_ok=False)
+            for record in records:
+                record._workspace_journaled = True
+                self._jobs[record.id] = record
+                self._upload_owners.add(record.id)
+        except BaseException:
+            # The caller received no records. Preserve every committed row,
+            # including missing or ambiguously created directories, for cleanup.
+            for record, entry in zip(records, entries, strict=True):
+                self._jobs.pop(record.id, None)
+                self._upload_owners.discard(record.id)
+                self._pending_cleanup[record.id] = _ExpiredJobCleanup(
+                    record.workspace, None, entry.retry_at,
+                )
+            raise
+        return records
+
     def reserve(
         self,
         filename: str,
@@ -450,15 +518,60 @@ class ConversionJobManager:
         )[0]
 
     def discard(self, job_id: str) -> None:
+        self.discard_many([job_id])
+
+    def discard_many(self, job_ids: list[str]) -> None:
+        """Finish caller-owned uploads after all writers have stopped.
+
+        Durable abort transfers the entire request to retryable cleanup before
+        releasing upload ownership. Queued/running/result-owned jobs use normal
+        cancellation and expiry instead. No caller may write after this returns.
+        """
         with self._lock:
-            if self._download_leases.get(job_id, 0):
-                raise RuntimeError("Cannot discard a job with an admitted download.")
-            record = self._jobs.get(job_id)
-            if record is not None and record._publication_journaled:
-                raise RuntimeError("Cannot discard a job with durable publication ownership.")
-            record = self._jobs.pop(job_id, None)
-        if record is not None:
-            shutil.rmtree(record.workspace, ignore_errors=True)
+            records = [self._jobs[job_id] for job_id in dict.fromkeys(job_ids)
+                       if job_id in self._jobs]
+            for record in records:
+                if self._download_leases.get(record.id, 0):
+                    raise RuntimeError("Cannot discard a job with an admitted download.")
+                if record._publication_journaled:
+                    raise RuntimeError("Cannot discard a job with durable publication ownership.")
+                if record._workspace_journaled and (
+                    record.future is not None
+                    or record.status in {JobStatus.QUEUED, JobStatus.RUNNING}
+                ):
+                    raise RuntimeError("Cannot discard a job owned by a conversion worker.")
+            if self._journal is not None:
+                try:
+                    if records:
+                        for record in records:
+                            if record.workspace != self.root_dir / record.id:
+                                self._journal_operation_unlocked(_invalid_cleanup_workspace)
+                        now = datetime.now(UTC)
+                        entries = [CleanupEntry(record.id, None, True, now) for record in records]
+                        self._journal_operation_unlocked(lambda: self._journal.expire(
+                            entries, owned_ids={record.id for record in records},
+                        ))
+                        for record in records:
+                            self._pending_cleanup[record.id] = _ExpiredJobCleanup(
+                                record.workspace, None, now,
+                            )
+                            del self._jobs[record.id]
+                finally:
+                    # The request's writers are finished even if the journal is
+                    # unavailable. Original durable rows remain for recovery;
+                    # an ambiguous commit must not pin this stopped caller forever.
+                    self._upload_owners.difference_update(record.id for record in records)
+                    self._maybe_close_journal_unlocked()
+            else:
+                for record in records:
+                    del self._jobs[record.id]
+        if self._journal is not None:
+            # Shutdown can already have released the journal; a stopped durable
+            # owner does no more deletion. The replacement owns its pending rows.
+            self.cleanup_expired()
+        else:
+            for record in records:
+                shutil.rmtree(record.workspace, ignore_errors=True)
 
     def enqueue(self, job_id: str) -> JobRecord:
         with self._lock:
@@ -473,6 +586,7 @@ class ConversionJobManager:
                 record.cancellation_requested = True
                 record.completed_at = datetime.now(UTC)
                 self._record_terminal_unlocked(record)
+                self._upload_owners.discard(job_id)
                 return record
 
             record.status = JobStatus.QUEUED
@@ -490,6 +604,7 @@ class ConversionJobManager:
                 record.completed_at = datetime.now(UTC)
                 self._record_terminal_unlocked(record)
                 raise JobSchedulingError(record.error) from exc
+            self._upload_owners.discard(job_id)
             return record
 
     def _run(self, job_id: str) -> None:
@@ -538,7 +653,7 @@ class ConversionJobManager:
                         record._artifact_cleanup_in_progress = True
                 else:
                     record.status = JobStatus.SUCCEEDED
-                if record._publication_journaled:
+                if record._workspace_journaled or record._publication_journaled:
                     # Publish terminal visibility and its retention deadline in
                     # one critical section, before status readers can see success.
                     self._record_terminal_unlocked(record)
@@ -782,7 +897,7 @@ class ConversionJobManager:
         """Expire public records and attempt a bounded batch of due private cleanups.
 
         Returns newly expired jobs, not successful deletions. Retry ownership
-        is process-local by default; the opt-in journal also owns tracked publications.
+        is process-local by default; the opt-in journal also owns workspaces/publications.
         Provider/workspace I/O runs outside the lock; local journal commits do not.
         A task cannot be claimed by two passes.
         """
@@ -808,6 +923,7 @@ class ConversionJobManager:
                 )
                 for job_id, record in self._jobs.items()
                 if record.status in _TERMINAL_STATUSES
+                and job_id not in self._upload_owners
                 and not record._artifact_cleanup_in_progress
                 and record.completed_at is not None and record.completed_at <= cutoff
             }
@@ -824,7 +940,9 @@ class ConversionJobManager:
                     self._cleanup_entry(job_id, item) for job_id, item in expired.items()
                 ]
                 owned_ids = {
-                    job_id for job_id in expired if self._jobs[job_id]._publication_journaled
+                    job_id for job_id in expired
+                    if self._jobs[job_id]._workspace_journaled
+                    or self._jobs[job_id]._publication_journaled
                 }
                 if owned_ids:
                     self._journal_operation_unlocked(
@@ -936,15 +1054,21 @@ class ConversionJobManager:
                     record.status = JobStatus.CANCELLED
                     record.cancellation_requested = True
                     record.completed_at = datetime.now(UTC)
-                    self._record_terminal_unlocked(record)
+                    try:
+                        self._record_terminal_unlocked(record)
+                    except CleanupJournalError:
+                        # Keep the earlier workspace/publication row for recovery.
+                        # Journal failure must not abort the remaining teardown.
+                        pass
                     if record.future is not None:
                         futures_to_cancel.append(record.future)
         # Future callbacks and all joins run outside the manager lock. Even a
         # dequeued future must pass _run's QUEUED check before starting OCR.
         for future in futures_to_cancel:
             future.cancel()
-        # An upload still being written retains its original owner/status; its
-        # caller must finish/abort copying and discard after enqueue is rejected.
+        # An upload still being written retains its original owner/status and
+        # durable journal pin. Its caller must stop writing, then enqueue or abort;
+        # rejection during shutdown requires discard/discard_many finalization.
         # Stop scheduling first. Never join while holding the job-manager lock:
         # an in-flight cleanup needs that lock to record completed deletion work.
         stopped = self._cleanup_worker.stop(

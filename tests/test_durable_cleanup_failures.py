@@ -29,14 +29,14 @@ def test_failed_expiration_commit_never_deletes_and_latches_admission(
     try:
         record = finish(original)
         expiry = record.completed_at + timedelta(hours=2)
-        save = original._journal.add
+        save = original._journal.expire
 
-        def uncertain(entries):
+        def uncertain(entries, *, owned_ids):
             if committed:
-                save(entries)
+                save(entries, owned_ids=owned_ids)
             raise CleanupJournalError("PRIVATE journal path and SQL")
 
-        monkeypatch.setattr(original._journal, "add", uncertain)
+        monkeypatch.setattr(original._journal, "expire", uncertain)
         with pytest.raises(CleanupJournalError) as error:
             original.cleanup_expired(now=expiry)
         assert "PRIVATE" not in str(error.value)
@@ -46,7 +46,7 @@ def test_failed_expiration_commit_never_deletes_and_latches_admission(
         assert storage.exists(record.output_artifact)
         assert record.id in original._jobs
         assert not original._pending_cleanup
-        monkeypatch.setattr(original._journal, "add", save)
+        monkeypatch.setattr(original._journal, "expire", save)
         with pytest.raises(CleanupJournalError):
             original.cleanup_expired(now=expiry)
         with pytest.raises(CleanupJournalError):
@@ -57,14 +57,12 @@ def test_failed_expiration_commit_never_deletes_and_latches_admission(
         original.shutdown()
     replacement = manager_for(root, storage)
     try:
-        assert len(replacement._pending_cleanup) == int(committed)
-        if committed:
-            replacement.cleanup_expired(now=expiry)
-            assert not storage.exists(record.output_artifact)
-        else:
-            # Explicit boundary: ownership never durably committed before this restart.
-            assert storage.exists(record.output_artifact)
-            assert record.workspace.exists()
+        # Both outcomes retain ownership: the earlier terminal row exists
+        # even if the explicit expiry transfer never committed.
+        assert len(replacement._pending_cleanup) == 1
+        replacement.cleanup_expired(now=expiry)
+        assert not storage.exists(record.output_artifact)
+        assert not record.workspace.exists()
     finally:
         replacement.shutdown()
 
@@ -167,10 +165,10 @@ def test_http_journal_failure_is_private_and_does_not_admit_new_work(
         with manager._lock:
             record.completed_at -= timedelta(hours=2)
 
-        def unavailable(_):
+        def unavailable(*args, **kwargs):
             raise CleanupJournalError("PRIVATE path, SQL, credential")
 
-        monkeypatch.setattr(manager._journal, "add", unavailable)
+        monkeypatch.setattr(manager._journal, "expire", unavailable)
         expected = {"detail": "Conversion service is unavailable. Try again later."}
         for method, path in [
             ("GET", f"/v1/jobs/{record.id}"),

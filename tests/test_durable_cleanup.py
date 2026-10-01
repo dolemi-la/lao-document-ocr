@@ -246,8 +246,9 @@ def test_namespace_cannot_change_even_when_ledger_is_empty(tmp_path, storage):
     correct.shutdown()
 
 
-def test_custom_runner_bypassing_tracked_publication_remains_expiry_only(tmp_path, storage):
-    # manager_for intentionally calls storage directly, without record.publish_result.
+def test_custom_runner_returned_result_is_recorded_at_terminal_handoff(tmp_path, storage):
+    # Direct writes still lack the pre-write object claim, but a returned key
+    # now augments the workspace's pre-existing cleanup row before completion.
     root = tmp_path / "jobs"
     original = manager_for(root, storage)
     try:
@@ -256,11 +257,14 @@ def test_custom_runner_bypassing_tracked_publication_remains_expiry_only(tmp_pat
         original.shutdown()
     replacement = manager_for(root, storage)
     try:
-        assert not replacement._pending_cleanup
+        assert len(replacement._pending_cleanup) == 1
         with pytest.raises(JobNotFoundError):
             replacement.public(record.id)
         assert storage.exists(record.output_artifact)
         assert record.workspace.exists()
+        replacement.cleanup_expired(now=record.completed_at + timedelta(hours=2))
+        assert not storage.exists(record.output_artifact)
+        assert not record.workspace.exists()
     finally:
         replacement.shutdown()
 

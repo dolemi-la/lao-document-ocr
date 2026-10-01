@@ -191,15 +191,16 @@ GET    /v1/jobs/{job_id}/download
 
 See [docs/async-jobs.md](docs/async-jobs.md).
 
-Expired cleanup can optionally survive API restarts through a namespace-bound
-SQLite journal on persistent local storage. This does not restore public jobs
-or cover crashes before expiry. See [durable expired cleanup](docs/durable-expired-cleanup.md)
-for the opt-in setting and Compose overlay; default behavior is unchanged.
+Private cleanup ownership can optionally survive API restarts through a
+namespace-bound SQLite journal on persistent local storage. See
+[durable cleanup](docs/durable-expired-cleanup.md) for the opt-in setting and
+Compose overlay; default behavior is unchanged and public jobs are not restored.
 
-Managed API results can also retain private cleanup ownership from before storage
-publication through retention when durable cleanup is enabled. See
-[publication ownership](docs/result-publication-ownership.md) for lost-reply
-recovery, the custom-runner helper, and remaining upload/workspace gaps.
+[Workspace ownership](docs/workspace-ownership.md) starts before directory
+allocation and covers interrupted uploads and pre-publication work. The same
+row continues through [result publication](docs/result-publication-ownership.md)
+and retention. Framework spool files, storage temporary/multipart remnants,
+and late provider writes still require separate reconciliation.
 
 ### Convert
 
