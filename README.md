@@ -204,6 +204,11 @@ lets key-based cleanup remove new interrupted copies without touching active wri
 Legacy random temporary files, framework spool files, S3 multipart remnants,
 and late provider writes still require separate reconciliation.
 
+A bounded [read-only filesystem inventory](docs/filesystem-remnant-inventory.md)
+can report legacy/staging filename-pattern candidates without opening document
+contents or changing files. It requires an explicit root, hides paths by default,
+and reports partial scans; no candidate is automatically authorized for deletion.
+
 ### Convert
 
 ```http

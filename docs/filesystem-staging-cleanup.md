@@ -148,3 +148,11 @@ web tests, and the production web build passed. All 13 protected-input hashes
 matched the starting manifest, including Phetsarath, recognizer weights, capture
 assets, and frozen evaluation inputs. These are lifecycle checks, not a
 container-startup, live-provider, or OCR-quality result.
+
+## Read-only inventory follow-up
+
+[Filesystem remnant inventory](filesystem-remnant-inventory.md) provides bounded
+metadata observations for an explicit root, including legacy naming candidates.
+It does not change this exact-key cleanup protocol, acquire writer locks, adopt
+unknown files, or decide which files are safe to delete. Scans are non-atomic;
+limits and incomplete observations are reported separately from detail sampling.

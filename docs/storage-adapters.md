@@ -43,6 +43,11 @@ key-derived temporary files and final results share writer/cleanup locks. It
 does not scan old random files or prune shared directory scaffolding. Stable
 lock files remain in place, bounded to 64 slots.
 
+The standalone [remnant inventory](filesystem-remnant-inventory.md) inspects
+metadata under an explicitly selected root without constructing this adapter,
+changing permissions, reading document bytes, or acquiring writer locks. Its
+filename-pattern candidates are not a deletion plan or proof of abandonment.
+
 ## S3-compatible backend
 
 Install the optional dependency:
