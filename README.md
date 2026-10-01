@@ -199,7 +199,9 @@ Compose overlay; default behavior is unchanged and public jobs are not restored.
 [Workspace ownership](docs/workspace-ownership.md) starts before directory
 allocation and covers interrupted uploads and pre-publication work. The same
 row continues through [result publication](docs/result-publication-ownership.md)
-and retention. Framework spool files, storage temporary/multipart remnants,
+and retention. [Recoverable filesystem staging](docs/filesystem-staging-cleanup.md)
+lets key-based cleanup remove new interrupted copies without touching active writes.
+Legacy random temporary files, framework spool files, S3 multipart remnants,
 and late provider writes still require separate reconciliation.
 
 ### Convert

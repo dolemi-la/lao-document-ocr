@@ -36,7 +36,12 @@ Filesystem storage:
 - uses private directory/file permissions
 - writes through a temporary file + atomic rename
 - streams downloads in chunks
-- removes now-empty artifact directories after deletion
+- removes now-empty artifact directories after deletion in default mode
+
+Durable filesystem storage uses [recoverable staging](filesystem-staging-cleanup.md):
+key-derived temporary files and final results share writer/cleanup locks. It
+does not scan old random files or prune shared directory scaffolding. Stable
+lock files remain in place, bounded to 64 slots.
 
 ## S3-compatible backend
 
@@ -188,7 +193,7 @@ is committed before storage is invoked, covering lost replies for that declared
 key. [Workspace ownership](workspace-ownership.md) begins before allocation and
 continues through publication and expiry. A custom runner's returned key is
 recorded at terminal handoff, but direct custom writes that lose their reply,
-temporary/multipart remnants, and provider writes completing after recovery
+legacy temporary/multipart remnants, and provider writes completing after recovery
 deletion still need independent reconciliation and retention controls.
 Local OCR workspaces are still retained until normal expiry, not erased as soon
 as cancellation is requested.

@@ -2,6 +2,11 @@
 
 Starting checkout: `d30d70e25e99cde3b12ba2e427700850bd0b358c`.
 
+The [filesystem staging follow-up](filesystem-staging-cleanup.md) covers new
+key-derived temporary copies with active-write protection. Remaining temporary
+file gaps below refer to legacy random files and other storage protocols; no
+unknown files are scanned or adopted.
+
 ## Scope and boundary
 
 `JOB_CLEANUP_DURABLE=true` adds a private SQLite journal for cleanup ownership.

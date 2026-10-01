@@ -2,6 +2,11 @@
 
 Starting checkout: `88194a64484730ff442fb221a2acf29b4ec3670c`.
 
+The [filesystem staging follow-up](filesystem-staging-cleanup.md) covers new
+key-derived temporary copies with active-write protection. Remaining temporary
+file gaps below refer to legacy random files and other storage protocols; no
+unknown files are scanned or adopted.
+
 ## Scope
 
 With `JOB_CLEANUP_DURABLE=true`, the manager commits cleanup ownership before

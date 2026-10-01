@@ -253,7 +253,9 @@ async def observe_request(request: Request, call_next):
 
 def _build_result_storage():
     if RESULT_STORAGE_BACKEND == "filesystem":
-        return FilesystemArtifactStorage(RESULT_STORAGE_ROOT)
+        return FilesystemArtifactStorage(
+            RESULT_STORAGE_ROOT, recoverable_writes=JOB_CLEANUP_DURABLE,
+        )
     if RESULT_STORAGE_BACKEND == "s3":
         if not RESULT_STORAGE_S3_BUCKET:
             raise RuntimeError(

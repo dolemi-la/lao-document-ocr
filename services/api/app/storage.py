@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from services.api.app.filesystem_writes import (
+    STAGING_DIRECTORY,
+    FilesystemWriteError,
+    RecoverableFilesystemWrites,
+)
+
 
 @dataclass(frozen=True)
 class StoredArtifact:
@@ -52,18 +58,36 @@ def _safe_relative_key(key: str) -> Path:
 
 
 class FilesystemArtifactStorage:
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, recoverable_writes: bool = False) -> None:
+        if type(recoverable_writes) is not bool:
+            raise ValueError("recoverable_writes must be a boolean")
+        if recoverable_writes and Path(root).is_symlink():
+            raise FilesystemWriteError(
+                "Recoverable filesystem storage requires a non-symlink root."
+            )
         self.root = Path(root).resolve()
+        self.recoverable_writes = recoverable_writes
+        self._recoverable = RecoverableFilesystemWrites(self.root) if recoverable_writes else None
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.root.chmod(0o700)
 
     def _path(self, key: str) -> Path:
         relative = _safe_relative_key(key)
+        if not relative.parts or relative.parts[0] == STAGING_DIRECTORY:
+            raise ValueError("storage key uses a reserved internal namespace")
+        if self._recoverable is not None:
+            current = self.root
+            for part in relative.parts:
+                current = current / part
+                if current.is_symlink():
+                    raise FilesystemWriteError("Unsafe filesystem result link; operation refused.")
         destination = (self.root / relative).resolve()
         try:
-            destination.relative_to(self.root)
+            resolved = destination.relative_to(self.root)
         except ValueError as exc:
             raise ValueError("storage key escapes storage root") from exc
+        if not resolved.parts or resolved.parts[0] == STAGING_DIRECTORY:
+            raise ValueError("storage key uses a reserved internal namespace")
         return destination
 
     def put_file(
@@ -79,6 +103,12 @@ class FilesystemArtifactStorage:
             raise FileNotFoundError(f"artifact source not found: {source_path}")
 
         destination = self._path(key)
+        if self._recoverable is not None:
+            size = self._recoverable.put(source_path, destination)
+            return StoredArtifact(
+                key=key, filename=Path(filename).name or "artifact.bin",
+                media_type=media_type, size_bytes=size,
+            )
         destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         destination.parent.chmod(0o700)
         temporary = destination.with_name(
@@ -116,6 +146,9 @@ class FilesystemArtifactStorage:
 
     def delete(self, artifact: StoredArtifact) -> None:
         path = self._path(artifact.key)
+        if self._recoverable is not None:
+            self._recoverable.delete(path)
+            return
         path.unlink(missing_ok=True)
 
         parent = path.parent

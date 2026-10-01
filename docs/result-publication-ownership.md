@@ -2,6 +2,11 @@
 
 Starting checkout: `c6049c726341e460246059f3b999759cf17b9ec0`.
 
+The [filesystem staging follow-up](filesystem-staging-cleanup.md) covers new
+key-derived temporary copies with active-write protection. Remaining temporary
+file gaps below refer to legacy random files and other storage protocols; no
+unknown files are scanned or adopted.
+
 ## Scope
 
 With `JOB_CLEANUP_DURABLE=true`, the API now commits private cleanup ownership
