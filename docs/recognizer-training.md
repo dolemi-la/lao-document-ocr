@@ -395,3 +395,14 @@ The [completed matched-data resolution study](recognizer-resolution-study.md)
 records both the longer-line improvement and short-line regression. Its h64
 export is a private experimental candidate with 64 × 1,024 preprocessing; no
 production or general-purpose default is changed.
+
+## Short-line replay follow-up
+
+The [short-replay matched-budget study](recognizer-short-replay-study.md) tests
+additional repetitions without generating new images or changing vocabulary.
+Both arms use 64 by 1,024 inputs and the existing strict initialization/resume
+interfaces. The saved development-only decision retains
+`training/runs/short-replay-f83479b/control/final/recognizer.pt2`; its resumable
+state is the same run's `control/model/training-state.pt`. The replay alternative
+and all parents remain available. Challenge tradeoffs and the small short-dev
+guard are documented; no production model or default was changed.

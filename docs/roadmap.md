@@ -195,6 +195,15 @@ but short-challenge CER regressed from 3.99% to 4.35%, and exact short lines fel
 from 257 to 235. This is a documented tradeoff, not a universal upgrade. Both
 new exports and the parent remain private; real optical release gates stay open.
 
+A fixed-budget [short-line replay study](recognizer-short-replay-study.md) compared
+ordinary h64 continuation with oversampling existing short training images,
+using 1,260 updates and 7,560 presentations per arm. The development-only rule
+selected control (4.04% overall dev CER); replay lost one exact short dev line.
+Selected-control short-challenge CER improved from 4.35% to 3.62% and longer-line
+CER from 5.50% to 5.26%, but exact longer lines fell from 19 to 18. Replay had
+more exact challenge lines but was not retroactively selected. Both candidates
+remain private synthetic experiments, not a release or optical-validation result.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction
