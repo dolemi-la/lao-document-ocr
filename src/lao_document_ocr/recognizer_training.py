@@ -535,7 +535,9 @@ def evaluate(model, loader, vocabulary: CharacterVocabulary, device) -> dict[str
     }
 
 
-def _initialize_model_weights(model, source, *, model_config, model_version, vocabulary) -> dict:
+def _initialize_model_weights(
+    model, source, *, model_config, model_version, vocabulary, allow_resize: bool = False,
+) -> dict:
     """Load a selected inference checkpoint, never its optimizer/history or latest state."""
     torch, _, _, _ = _require_torch()
     path = Path(source)
@@ -554,7 +556,21 @@ def _initialize_model_weights(model, source, *, model_config, model_version, voc
     config = _normalized_resume_model_config(
         checkpoint.get("model_config"), model_version=model_version,
     )
-    if config != model_config.to_dict():
+    target_config = model_config.to_dict()
+    geometry_fields = {"image_height", "max_width"}
+    if type(allow_resize) is not bool:
+        raise ValueError("Initialization resize option must be a boolean")
+    if allow_resize:
+        for geometry in (config, target_config):
+            for field, minimum in (("image_height", 16), ("max_width", 32)):
+                value = geometry.get(field)
+                if type(value) is not int or value < minimum:
+                    raise ValueError("Initialization input geometry is invalid")
+        source_layers = {k: v for k, v in config.items() if k not in geometry_fields}
+        target_layers = {k: v for k, v in target_config.items() if k not in geometry_fields}
+        if source_layers != target_layers:
+            raise ValueError("Initialization model configuration mismatch")
+    elif config != target_config:
         raise ValueError("Initialization model configuration mismatch")
     if (checkpoint.get("vocabulary_checksum") != vocabulary.checksum()
             or checkpoint.get("vocabulary") != vocabulary.to_dict()):
@@ -575,6 +591,10 @@ def _initialize_model_weights(model, source, *, model_config, model_version, voc
         "source_best_epoch": checkpoint.get("best_epoch"),
         "optimizer_restored": False, "history_restored": False,
         "rng_restored": False, "vocabulary_verified": True,
+        "resize_authorized": allow_resize,
+        "input_geometry_changed": any(config[k] != target_config[k] for k in geometry_fields),
+        "source_input_geometry": {k: config[k] for k in sorted(geometry_fields)},
+        "target_input_geometry": {k: target_config[k] for k in sorted(geometry_fields)},
     }
 
 
@@ -585,8 +605,13 @@ def train_recognizer(
     training_config: TrainingConfig | None = None,
     resume_from: str | Path | None = None,
     initialize_from: str | Path | None = None,
+    initialize_resize: bool = False,
     recompute_resume_metrics: bool = False,
 ) -> dict:
+    if type(initialize_resize) is not bool:
+        raise ValueError("initialize_resize must be a boolean")
+    if initialize_resize and initialize_from is None:
+        raise ValueError("--initialize-resize requires --initialize-from")
     if initialize_from is not None and resume_from is not None:
         raise ValueError("--initialize-from and --resume-from are mutually exclusive")
     if initialize_from is not None and Path(output_dir).exists():
@@ -596,6 +621,11 @@ def train_recognizer(
     if recompute_resume_metrics and resume_from is None:
         raise ValueError("--recompute-resume-metrics requires --resume-from")
     training_config = training_config or TrainingConfig()
+    if initialize_resize:
+        for field, minimum in (("image_height", 16), ("max_width", 32)):
+            value = getattr(training_config, field)
+            if type(value) is not int or value < minimum:
+                raise ValueError("Initialization input geometry is invalid")
     torch, nn, DataLoader, _ = _require_torch()
 
     from lao_document_ocr.recognizer_model import LaoCrnnRecognizer, RecognizerConfig
@@ -678,7 +708,7 @@ def train_recognizer(
     if initialize_from is not None:
         initialization_metadata = _initialize_model_weights(
             model, initialize_from, model_config=model_config,
-            model_version=model_version, vocabulary=vocabulary,
+            model_version=model_version, vocabulary=vocabulary, allow_resize=initialize_resize,
         )
 
     if resume_from is not None:

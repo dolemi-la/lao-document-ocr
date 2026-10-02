@@ -380,3 +380,18 @@ state at `training/runs/phone-diversity-cd729ab/phone/model/training-state.pt`.
 Selection was frozen before challenge evaluation. This candidate improved longer
 synthetic lines, while the control retained slightly better short-line overall
 scores. Both models are private experiments, not production releases.
+
+## Explicit input-resolution initialization
+
+A new experiment can use `--initialize-from` with `--initialize-resize` to change
+only input height and padded width while preserving compatible CRNN layer
+shapes and the exact vocabulary. The switch is opt-in and cannot relax strict
+resume. Optimizer/history remain fresh; source/target geometry and the parent
+checkpoint hash are recorded. See [resolution initialization](recognizer-initialization-resize.md)
+for validation, usage and why identical weights need not make identical
+predictions at a different input size. Production defaults remain unchanged.
+
+The [completed matched-data resolution study](recognizer-resolution-study.md)
+records both the longer-line improvement and short-line regression. Its h64
+export is a private experimental candidate with 64 × 1,024 preprocessing; no
+production or general-purpose default is changed.

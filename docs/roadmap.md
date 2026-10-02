@@ -187,6 +187,14 @@ short/long challenge CER was 3.99%/6.51%, versus 3.98%/7.13% for the control.
 Only one of 48 longer phone-style lines was exact. These remain single-seed,
 previously inspected synthetic regression results, not real optical validation.
 
+A fixed-data [input-resolution comparison](recognizer-resolution-study.md) completed
+three epochs / 945 updates per arm at 48 × 768 versus 64 × 1,024. The h64 final
+model was selected using development CER (4.70% versus 4.85% for its parent),
+before challenge evaluation. Long-challenge CER improved from 6.51% to 5.50%,
+but short-challenge CER regressed from 3.99% to 4.35%, and exact short lines fell
+from 257 to 235. This is a documented tradeoff, not a universal upgrade. Both
+new exports and the parent remain private; real optical release gates stay open.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction

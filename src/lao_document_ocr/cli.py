@@ -1053,6 +1053,10 @@ def _parser() -> argparse.ArgumentParser:
         help="Selected weights for a NEW fine-tuning experiment; reset optimizer/history.",
     )
     train.add_argument(
+        "--initialize-resize", action="store_true",
+        help="Allow only input height/width changes with --initialize-from; never relax resume.",
+    )
+    train.add_argument(
         "--recompute-resume-metrics", action="store_true",
         help=(
             "Explicitly migrate valid-timestep-v1 training states by recomputing "
@@ -2288,6 +2292,7 @@ def _train_recognizer(args: argparse.Namespace) -> int:
         training_config=config,
         resume_from=args.resume_from,
         initialize_from=args.initialize_from,
+        initialize_resize=args.initialize_resize,
         recompute_resume_metrics=args.recompute_resume_metrics,
     )
     print(f"Checkpoint: {result['checkpoint']}")
