@@ -357,3 +357,14 @@ and never overwrites existing reports. It is an explicit command, not an
 automatic training guard or proof of document independence. See
 [recognizer-fresh-evaluation.md](recognizer-fresh-evaluation.md) for its contract
 and the frozen-candidate 160-text / 480-image experiment.
+
+## Longer-line development continuation
+
+The completed [eight-epoch longer-line experiment](recognizer-long-line-finetuning.md)
+uses the existing `--initialize-from` path with a new dataset and optimizer,
+followed by exact per-epoch resume. It preserves the prior coverage experiment,
+its development split, and both excluded challenges. The fixed-final export is
+`training/runs/long-line-finetune-d303493/final/recognizer.pt2`; the resumable state
+is in the same run's `model/training-state.pt`. These are private local artifacts,
+not redistributed or promoted production weights. Longer phone-style whole-line
+recognition remains a documented weakness despite improved aggregate CER.

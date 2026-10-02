@@ -171,6 +171,14 @@ Exact challenge lines increased from 123 to 188. Epoch 9 was best on development
 (9.05%) but was not substituted into the final challenge result. Real optical
 validation and production promotion remain incomplete.
 
+A separately planned [longer-line fine-tuning run](recognizer-long-line-finetuning.md)
+completed eight epochs / 2,016 updates on 2,016 training images, preserving the
+156-image development set. Matched dev CER fell from 9.60% to 5.59%, and the
+unchanged short challenge from 6.30% to 4.26% (248/480 exact lines). A new
+144-image longer-line challenge improved from 14.67% to 7.48%, but only 18/144
+lines were exact and none of its 48 phone-style lines was exact. These remain
+private synthetic results; the optical benchmark and release criterion stay open.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction
