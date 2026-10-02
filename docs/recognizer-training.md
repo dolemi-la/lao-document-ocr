@@ -368,3 +368,15 @@ its development split, and both excluded challenges. The fixed-final export is
 is in the same run's `model/training-state.pt`. These are private local artifacts,
 not redistributed or promoted production weights. Longer phone-style whole-line
 recognition remains a documented weakness despite improved aggregate CER.
+
+## Equal-update phone-style comparison
+
+The completed [phone-diversity study](recognizer-phone-diversity-study.md)
+compares fresh phone-style renderings against extra repetitions using the same
+parent weights, vocabulary, development images and 1,260 completed updates per
+arm. The development-selected final candidate is
+`training/runs/phone-diversity-cd729ab/phone/final/recognizer.pt2`, with resumable
+state at `training/runs/phone-diversity-cd729ab/phone/model/training-state.pt`.
+Selection was frozen before challenge evaluation. This candidate improved longer
+synthetic lines, while the control retained slightly better short-line overall
+scores. Both models are private experiments, not production releases.

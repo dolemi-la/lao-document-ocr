@@ -179,6 +179,14 @@ unchanged short challenge from 6.30% to 4.26% (248/480 exact lines). A new
 lines were exact and none of its 48 phone-style lines was exact. These remain
 private synthetic results; the optical benchmark and release criterion stay open.
 
+A fixed [phone-diversity comparison](recognizer-phone-diversity-study.md) then
+completed 1,260 updates each for a 2,016-image repetition control and a 2,520-image
+phone-variant arm, both retaining 864 text groups. Final development CER was
+5.36% versus 4.85%; the phone arm was selected before challenge scoring. Its
+short/long challenge CER was 3.99%/6.51%, versus 3.98%/7.13% for the control.
+Only one of 48 longer phone-style lines was exact. These remain single-seed,
+previously inspected synthetic regression results, not real optical validation.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction
