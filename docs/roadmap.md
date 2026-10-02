@@ -204,6 +204,16 @@ CER from 5.50% to 5.26%, but exact longer lines fell from 19 to 18. Replay had
 more exact challenge lines but was not retroactively selected. Both candidates
 remain private synthetic experiments, not a release or optical-validation result.
 
+A fixed-budget [text-coverage study](recognizer-text-coverage-study.md) compared
+420 new training text groups (1,260 images) against further repetitions, with
+1,260 updates and 7,560 presentations per arm. The expanded final model passed
+the short-dev guard and was selected before challenge evaluation: 3.62% dev
+CER versus the control's 3.81%. Short-challenge CER improved from the parent's
+3.62% to 3.37% (273/480 exact), and long-challenge CER from 5.26% to 4.53%
+(27/144 exact). Long phone-style exact lines were only 5/48; the control had
+slightly better CER on that subset. Both exports remain private development
+artifacts, and the real optical release criterion is still unmet.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction

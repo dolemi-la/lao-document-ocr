@@ -406,3 +406,15 @@ interfaces. The saved development-only decision retains
 state is the same run's `control/model/training-state.pt`. The replay alternative
 and all parents remain available. Challenge tradeoffs and the small short-dev
 guard are documented; no production model or default was changed.
+
+## New text coverage follow-up
+
+The [matched-budget text-coverage study](recognizer-text-coverage-study.md) added
+420 unused training text groups in three Phetsarath synthetic profiles, rather
+than repeating old short images. Both arms completed 1,260 updates with the
+existing development set and excluded challenges unchanged. The development-only
+choice retains `training/runs/text-coverage-ed769db/expanded/final/recognizer.pt2`;
+its resumable state is in `expanded/model/training-state.pt` under the same run.
+Use its accompanying metadata and 64 by 1,024 preprocessing. All parents and the
+control are preserved. These private synthetic results do not change production
+OCR or satisfy the real optical release gate.
