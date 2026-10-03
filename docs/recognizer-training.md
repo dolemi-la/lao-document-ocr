@@ -418,3 +418,14 @@ its resumable state is in `expanded/model/training-state.pt` under the same run.
 Use its accompanying metadata and 64 by 1,024 preprocessing. All parents and the
 control are preserved. These private synthetic results do not change production
 OCR or satisfy the real optical release gate.
+
+## Fixed-data coverage-budget continuation
+
+The [fixed-data budget continuation](recognizer-coverage-budget-continuation.md)
+restores the selected coverage model's exact epoch-2 state into a separate
+experiment and completes the frozen epoch-6 endpoint. No new images, text,
+preprocessing, optimizer configuration or vocabulary are introduced. The saved
+development-only decision is `parent`; the carry-forward export is
+`training/runs/text-coverage-ed769db/expanded/final/recognizer.pt2`.
+It requires its own metadata and 64 by 1,024 geometry. The new resumable state is `training/runs/coverage-budget-d40e29f/model/training-state.pt`.
+All parent checkpoints remain preserved; real optical release gates remain open.

@@ -214,6 +214,17 @@ CER versus the control's 3.81%. Short-challenge CER improved from the parent's
 slightly better CER on that subset. Both exports remain private development
 artifacts, and the real optical release criterion is still unmet.
 
+A [fixed-data coverage-budget continuation](recognizer-coverage-budget-continuation.md)
+then restored the expanded model's exact epoch-2 state and completed epoch 6,
+adding 2,520 updates on unchanged 3,780-image training data. Matched dev CER
+changed from 3.62% to 3.30%, short-challenge CER from 3.37% to 3.02%, and
+long-challenge CER from 4.53% to 4.09%. Exact short challenge lines rose from
+273/480 to 286/480, and exact long challenge lines from 27/144 to 29/144.
+However, exact short development lines fell from 15/30 to 13/30, so the
+pre-recorded safeguard retains the parent. This is additional-compute synthetic
+regression evidence, not an equal-compute comparison, optical validation or
+production promotion.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction
