@@ -1,112 +1,180 @@
-# Learning-rate comparison: paused at a low-disk safety boundary
+# Matched learning-rate comparison after the coverage-budget safeguard failure
 
-## Current status
+## Question, parent selection, and recorded decision
 
-This experiment is **paused, not complete**. The retained model is still
-`training/runs/text-coverage-ed769db/expanded/final/recognizer.pt2`.
-No new candidate was selected, neither challenge was scored, and no production
-setting was changed. The previous [coverage-budget continuation](recognizer-coverage-budget-continuation.md)
-remains a separate completed experiment with its own rejected final endpoint.
+The [previous coverage-budget continuation](recognizer-coverage-budget-continuation.md)
+improved aggregate scores but lost two exact short development lines. Its saved
+decision retained the original epoch-2 text-coverage model. This study starts
+from that retained model, not the rejected epoch-6 weights.
 
-The starting revision is `7263730ef6e85917cfe0c87d744ff616825f0860`.
-The new plan was frozen before training at SHA-256
-`7e0812160ce26fa70a3512b9c2b57d935eb592cdaa34e08fecb5c320074ed1f6`.
+It asks whether smaller optimizer steps can improve overall development error
+without losing short-development whole-line correctness. The source revision is
+`7263730ef6e85917cfe0c87d744ff616825f0860`. Before optimizer work, the plan fixed two
+new two-epoch experiments with the same starting weights, dataset, seed,
+model geometry, batch size, stopping point, and decision rule. The learning
+rate is the only configured difference between the two arms.
 
-## Frozen experiment
-
-Both arms initialize from the retained text-coverage epoch-2 native weights,
-not the unselected coverage-budget epoch-6 state. They start fresh AdamW state
-with the same seed 2026100302. Each is planned for two epochs, 1,260 optimizer
-updates and 7,560 sample presentations. Only learning rate differs:
-standard uses 0.00005; gentle uses 0.00002.
-
-The 3,780 training images, 1,284 training text groups, 156 ordered development
-images, 93-class vocabulary, Phetsarath font, and 64 by 1,024 input geometry
-remain unchanged. Batch size is 6 and device is Apple MPS. No new images or
-text were generated. The existing 480-image short and 144-image long challenges
-remain excluded from training and from selection.
-
-The existing decision rule is unchanged: a final endpoint must improve overall
-development character edits without more short-development edits or fewer
-short-development exact lines than the retained parent. Lowest eligible overall
-dev edits wins; ties prefer parent, then standard, then gentle. Selection must
-be saved before any challenge scoring. The planned two-epoch endpoints must not
-be replaced with the interim results below.
-
-## Completed work and interruption
-
-| Arm | Learning rate | Completed epochs | Durable optimizer updates | Interim dev CER |
+| Arm | AdamW learning rate | Epochs | Optimizer updates | Sample presentations |
 | --- | ---: | ---: | ---: | ---: |
-| Standard | 0.00005 | 1 of 2 | 630 | 3.5701% |
-| Gentle | 0.00002 | 1 of 2 | 630 | 3.6066% |
+| Standard | 0.00005 | 2 | 1,260 | 7,560 |
+| Gentle | 0.00002 | 2 | 1,260 | 7,560 |
 
-For context, the retained parent has 3.6248% overall development CER. These
-interim numbers do not establish whole-line quality, final eligibility, or a
-winning learning rate.
+Both initialize through the existing weights-only path with fresh AdamW state
+and seed 2026100302. This is not exact continuation of the previous optimizer.
+The second epoch of each arm uses strict resume of its own state, preserving
+optimizer, shuffle generator, RNG, dataset identity, padding strategy, and device.
+Batch size is 6; execution uses Apple MPS and two Torch CPU threads.
 
-During standard epoch 2, observed free disk space fell to approximately
-**2.2 GiB**, below the recorded **4 GiB** safety floor. The training process was
-terminated with SIGTERM. Its supervisor recorded return code -15. The on-disk
-training state still hashes exactly to the completed standard epoch-1 state.
-No epoch-2 report exists. The number of discarded in-memory updates is unknown
-and is not included in the completed budget.
+## Unchanged data and preprocessing
 
-The gentle epoch-2 stage was never started. Both completed first-epoch states
-remain intact. At the closing input audit, free space had recovered to
-5.90 GiB, but training was not restarted: a transient
-recovery does not establish enough sustained headroom. No unrelated files,
-models, datasets, fonts, or caches were deleted to make room. The cause of the
-disk-space fluctuation has not been established.
+Both arms use the same 3,780 training images and 1,284 normalized training text
+groups. The ordered 156-image development set and the 480-image short and
+144-image long challenges are unchanged. No text or image was generated, moved
+between splits, or relabeled. Phetsarath OT Regular and the existing 93-class
+vocabulary including blank remain unchanged.
 
-## Exact resume handoff
+Inputs remain 64 pixels high with 1,024-pixel fixed padding. The model is the
+existing bidirectional CRNN v2, using normalized valid-timestep greedy decoding.
+No architecture, beam search, language model, calibration, or runtime source changed.
+All 3,936 combined train/development images passed CTC capacity checks. The two
+existing width-capped images were retained rather than filtered after seeing scores.
 
-The remaining order is **standard epoch 2, then gentle epoch 2**. Obtain sustained
-storage headroom before restarting; 4 GiB is the stop floor, not a comfortable
-starting target. Do not weaken the floor or silently change batch size, device,
-learning rate, data, or the fixed budget to continue this experiment.
+Exact normalized training/development labels and image bytes remain separated.
+Both challenge audits check labels and image hashes against training/development
+and the other challenge. These checks do not establish source/document independence,
+absence of semantic near-duplicates, or real optical performance.
 
-From the repository root, after resolving storage pressure:
+## Development-only selection
 
-```bash
-.venv/bin/python -B benchmarks/private/model-learning-rate-7263730/supervise.py \
-  start standard-002-retry1 train --arm standard --epoch 2
+A new final endpoint must reduce overall-development edits without increasing
+short-development edits or losing short-development exact lines relative to
+parent. Lowest eligible overall-development edits wins, with ties retaining
+parent, then standard, then gentle. The rule is unchanged from the earlier
+safeguard; it was not adjusted after observing these results.
+
+| Endpoint | Overall dev edits | Short dev edits | Short dev exact lines | Eligible |
+| --- | ---: | ---: | ---: | --- |
+| parent | 199/5490 | 23/507 | 15/30 | true |
+| standard | 183/5490 | 22/507 | 13/30 | false |
+| gentle | 190/5490 | 23/507 | 13/30 | false |
+
+The saved carry-forward decision is **parent**. It was recorded before
+any new challenge evaluation, then hash-bound into each evaluation report.
+Both new endpoints reduce overall development character edits, but each loses
+two exact short-development lines (15/30 to 13/30), so neither qualifies.
+The short safeguard is based on only 30 previously inspected images representing
+18 labels. This limits its evidential strength; passing it is not release validation.
+
+## Matched fixed-final results
+
+Only fixed final epoch-2 weights are compared, never an intermediate best checkpoint.
+The same evaluator reproduces the parent counts exactly. Standalone development
+counts agree with the training-loop results. Lower CER is better.
+
+| Evaluation set | Images | Parent CER | Standard CER | Gentle CER |
+| --- | ---: | ---: | ---: | ---: |
+| Unchanged development | 156 | 3.6248% | 3.3333% | 3.4608% |
+| Frozen short challenge | 480 | 3.3691% | 3.1306% | 3.2101% |
+| Frozen long challenge | 144 | 4.5289% | 4.0662% | 4.2732% |
+
+| Evaluation set | Parent exact lines | Standard exact lines | Gentle exact lines |
+| --- | ---: | ---: | ---: |
+| Unchanged development | 57/156 | 61/156 | 57/156 |
+| Frozen short challenge | 273/480 | 292/480 | 281/480 |
+| Frozen long challenge | 27/144 | 32/144 | 29/144 |
+
+| Synthetic subset | Parent CER | Standard CER | Gentle CER |
+| --- | ---: | ---: | ---: |
+| Unchanged development: clean-scan | 2.8490% | 2.6781% | 3.0199% |
+| Unchanged development: noisy-scan | 2.8490% | 2.7350% | 2.7350% |
+| Unchanged development: phone-photo | 4.8433% | 4.3875% | 4.3875% |
+| Frozen short challenge: clean-scan | 3.1306% | 2.9517% | 3.0411% |
+| Frozen short challenge: noisy-scan | 3.2499% | 2.9517% | 2.9517% |
+| Frozen short challenge: phone-photo | 3.7269% | 3.4884% | 3.6374% |
+| Frozen long challenge: clean-scan | 2.5201% | 2.5566% | 2.6297% |
+| Frozen long challenge: noisy-scan | 3.2505% | 2.9218% | 2.8853% |
+| Frozen long challenge: phone-photo | 7.8159% | 6.7202% | 7.3046% |
+
+Profile regressions relative to parent (CER increase or fewer exact lines):
+
+- standard, frozen long challenge / clean-scan: CER 2.5201% → 2.5566%; exact lines 13 → 15.
+- gentle, unchanged development / clean-scan: CER 2.8490% → 3.0199%; exact lines 19 → 18.
+- gentle, frozen short challenge / phone-photo: CER 3.7269% → 3.6374%; exact lines 86 → 85.
+- gentle, frozen long challenge / clean-scan: CER 2.5201% → 2.6297%; exact lines 13 → 13.
+
+Long phone-style exact lines are parent: 5/48; standard: 6/48; gentle: 5/48.
+All results, including subset regressions, are retained. A lower character
+error rate is not equivalent to better whole-line correctness. The private
+summaries also report whitespace-token WER; this is not a complete linguistic
+word-segmentation assessment for Lao.
+
+## Stage history and verification
+
+| Arm | Epoch | Optimizer updates | Development CER |
+| --- | ---: | ---: | ---: |
+| standard | 1 | 630 | 3.5701% |
+| gentle | 1 | 630 | 3.6066% |
+| standard | 2 | 1260 | 3.3333% |
+| gentle | 2 | 1260 | 3.4608% |
+
+The original standard epoch-2 attempt was stopped with SIGTERM when free disk
+space fell to approximately 2.2 GiB, below the frozen 4 GiB stop floor. Its
+original return-code -15 receipt and `paused.summary.json` remain unchanged.
+Discarded in-memory updates are unknown and excluded from the completed budget.
+After storage recovered, `standard-002-retry1` resumed the verified own-arm
+epoch-1 state. Both epoch-2 runs were observed with two-second disk checks.
+
+All four stages now have successful process receipts (including that retry)
+and observed changes to model
+weights. Independent review checks actual AdamW step counters and learning rates,
+fresh parent initialization, strict own-arm resume chains, unchanged histories,
+and identical final shuffle-generator states between arms. The final native
+checkpoints match the latest fixed-epoch weights, not merely the best dev weights.
+
+The audit verified 259 protected-file hashes and
+4,560 distinct image hashes. Each export passed 24
+native/export and CPU/MPS prediction checks with zero mismatches. This is sampled
+export/device parity, not a guarantee for every input or hardware backend.
+
+## Local artifacts and boundaries
+
+The carry-forward export is:
+
+```text
+training/runs/text-coverage-ed769db/expanded/final/recognizer.pt2
 ```
 
-A supervisor exit code of 75 means the action is still running, not successful.
-Observe that same name with `wait standard-002-retry1`; do not advance until it
-has a successful process receipt and the matching epoch-2 summary. Keep the
-original `standard-002.result.json` SIGTERM receipt rather than overwriting it.
-Then run the planned `gentle-002` stage. Both stages resume their own completed
-epoch-1 states; do not start from the rejected earlier experiment.
+Both new final exports remain under
+`training/runs/learning-rate-7263730/<arm>/final/recognizer.pt2` with metadata.
+Exact-resume states are at `<arm>/model/training-state.pt`. They require their
+own export metadata and 64 by 1,024 input geometry. Parent and rejected-epoch-6
+artifacts remain intact.
 
-Once both final stages have passed, the frozen experiment runner's `select`,
-`evaluate` for parent/standard/gentle, and `complete` actions still remain.
-The independent gate helper `verify.py` must account for the preserved original
-failure and the successful standard-epoch-2 retry receipt; its original receipt
-name must not be turned into a fake success. Record the resource interruption
-in the eventual final report. `paused.summary.json` is historical evidence,
-not a completion report to overwrite.
+| Arm | Final export SHA-256 |
+| --- | --- |
+| standard | `d33963a01c5fec7e95e1e18965c9f279539eb45d2735d787cb2c1ca277dda580` |
+| gentle | `73412f5a6cd740632b35de370e1573db0180f295851deaf872c46264aeae0ded` |
 
-All private run files are under `training/runs/learning-rate-7263730/`.
-Resume states are `standard/model/training-state.pt` and
-`gentle/model/training-state.pt`. Logs and review helpers are under
-`benchmarks/private/model-learning-rate-7263730/`.
+Frozen plan SHA-256: `7e0812160ce26fa70a3512b9c2b57d935eb592cdaa34e08fecb5c320074ed1f6`.
+Plans, hashes, private runners, stage histories, selection and evaluations remain
+under the Git-ignored run directory. Independent review and execution/gate logs
+are under `benchmarks/private/model-learning-rate-7263730/`. No font, source text,
+images, private predictions, or model weights are redistributed by this commit.
 
-## Verification completed so far
+## Software gates and interpretation
 
-The closing audit verified **259 protected-file hashes**,
-**4,560 distinct image hashes**, and exact matches between both durable
-states and their successful first-epoch receipts. The input holdout audits and
-CTC preflight passed. All 3,936 train/development images fit CTC capacity; the
-two previously width-capped inputs were retained.
+The full local Python suite passed 1,782 tests with two optional S3 SDK cases
+skipped and six dependency deprecation warnings. The focused training/resume/
+holdout suite also passed all 90 tests. Web lint, all 145 web tests,
+production web build, Python lint, and local documentation-link checks passed.
+No production code, deployment setting, default OCR model, or dependency changed.
 
-The full Python suite passed 1,782 tests with two optional S3 SDK tests skipped
-and six dependency deprecation warnings. Python lint, web lint, all 145 web
-tests, and the production web build passed. Those are software gates, not proof
-that an unfinished training experiment has improved OCR accuracy.
+This is one paired seed on a shared synthetic source corpus, not a replicated
+causal result. Both optimizers are reset, so these results are not directly
+interchangeable with the prior exact-resume budget continuation. Equal update
+counts do not guarantee equal wall time. Repeatedly inspected development and
+challenge sets are regression evidence, not fresh confirmatory tests.
 
-No final export or new challenge result exists for this study. The final-result
-writer was prepared but not run. The source corpus and synthetic profiles retain
-the prior private-development restrictions; no source text, font, image,
-prediction, or model weight is redistributed. Real scan/photo validation and the
-fixed-set Tesseract comparison remain open.
+Rights-reviewed real scan/photo transcriptions and a fixed-set Tesseract
+comparison remain required for a release decision. No production promotion
+is claimed. All planned training and evaluation steps are complete.

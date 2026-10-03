@@ -430,13 +430,12 @@ development-only decision is `parent`; the carry-forward export is
 It requires its own metadata and 64 by 1,024 geometry. The new resumable state is `training/runs/coverage-budget-d40e29f/model/training-state.pt`.
 All parent checkpoints remain preserved; real optical release gates remain open.
 
-## Paused learning-rate comparison
+## Matched learning-rate comparison
 
-The [learning-rate progress handoff](recognizer-learning-rate-progress.md)
-records two completed first epochs and a low-disk interruption of standard
-epoch 2. Neither final endpoint is complete; no challenge was scored and no new
-candidate was selected. The two remaining stages, original SIGTERM receipt,
-intact checkpoint hashes, and exact resume procedure are recorded there.
-The retained export is still
-`training/runs/text-coverage-ed769db/expanded/final/recognizer.pt2`.
-Resolve storage pressure before restarting; do not weaken the frozen experiment.
+The [two-rate comparison](recognizer-learning-rate-progress.md) starts both arms
+from the retained text-coverage epoch-2 weights with fresh AdamW state. The
+learning rates are 0.00005 and 0.00002; each completes two epochs and 1,260
+updates on unchanged data. Selection retains `parent` before challenge scoring.
+The carry-forward export is `training/runs/text-coverage-ed769db/expanded/final/recognizer.pt2`.
+Use its own metadata and 64 by 1,024 preprocessing. Both new candidates and
+all prior artifacts remain private; no production configuration was changed.
