@@ -225,6 +225,14 @@ pre-recorded safeguard retains the parent. This is additional-compute synthetic
 regression evidence, not an equal-compute comparison, optical validation or
 production promotion.
 
+A [two-rate comparison](recognizer-learning-rate-progress.md) is paused after
+both first epochs completed (630 updates each). Standard epoch 2 was stopped
+when free storage fell to approximately 2.2 GiB, below its 4 GiB floor; its
+completed epoch-1 state remains intact. Gentle epoch 2 has not started. No new
+selection, challenge result, or completion is claimed, and the previously
+retained text-coverage export remains selected. Resolve storage headroom before
+resuming the two fixed final stages.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction
