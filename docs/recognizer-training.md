@@ -131,6 +131,18 @@ The completed [Phetsarath coverage fine-tuning experiment](recognizer-coverage-f
 uses this mode and reports its fixed final endpoint separately from the
 checkpoint selected on development data.
 
+### Freeze BatchNorm running statistics for a new experiment
+
+`--freeze-batch-norm` keeps BatchNorm layers in evaluation mode during training,
+using their stored running statistics. Affine weights and biases remain trainable,
+and the rest of the model, including dropout, stays in training mode. With
+`--initialize-from`, these statistics come from the selected parent checkpoint.
+The option defaults to off and is serialized as `freeze_batch_norm` in training
+configuration. Older checkpoints without the field retain the default behavior.
+Exact resume must use the same policy; changing it requires a new initialized
+experiment. Freezing also changes training-time normalization and is not an
+inference-only buffer replacement.
+
 ### Watch predictions, not only training loss
 
 Each new epoch records no-text `dev_prediction_diagnostics`: empty decoded
@@ -439,3 +451,13 @@ updates on unchanged data. Selection retains `parent` before challenge scoring.
 The carry-forward export is `training/runs/text-coverage-ed769db/expanded/final/recognizer.pt2`.
 Use its own metadata and 64 by 1,024 preprocessing. Both new candidates and
 all prior artifacts remain private; no production configuration was changed.
+
+## Replicated BatchNorm policy comparison
+
+The [three-seed paired study](recognizer-batch-norm-study.md) compares ordinary
+BatchNorm updates with frozen parent running statistics at learning rate 0.00002.
+All six runs complete two epochs and 1,260 updates. Control passes the per-run
+short-line guard in 0/3 seeds; frozen statistics passes in 1/3 and fails its
+primary seed. The predeclared replication rule therefore retains the original
+text-coverage parent. The two primary exports and all six resume states remain
+private; no service default or production model changed.

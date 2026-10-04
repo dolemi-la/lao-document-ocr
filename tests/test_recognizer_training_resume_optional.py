@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 
 import pytest
 from PIL import Image, ImageDraw
@@ -14,6 +15,7 @@ from lao_document_ocr.recognizer_training import (  # noqa: E402
     TRAINING_PADDING_STRATEGY,
     TrainingConfig,
     _greedy_decode,
+    _set_training_mode,
     train_recognizer,
 )
 from lao_document_ocr.training_manifest import TrainingSample  # noqa: E402
@@ -57,12 +59,14 @@ class _TinyRecognizer(torch.nn.Module):
     def __init__(self, num_classes: int, config: _TinyRecognizerConfig) -> None:
         super().__init__()
         self.config = config
+        self.batch_norm = torch.nn.BatchNorm2d(1)
         self.dropout = torch.nn.Dropout(p=0.2)
         self.projection = torch.nn.Linear(1, num_classes)
         with torch.no_grad():
             self.projection.bias[0] = config.blank_logit_bias
 
     def forward(self, images):
+        images = self.batch_norm(images)
         sequence = images.mean(dim=2)[:, :, :: self.width_downsample_factor]
         sequence = sequence.permute(2, 0, 1)
         sequence = self.dropout(sequence)
@@ -122,23 +126,24 @@ def _config(*, epochs: int) -> TrainingConfig:
     )
 
 
-def test_resumed_training_matches_uninterrupted_training(tmp_path) -> None:
+@pytest.mark.parametrize("freeze", [False, True])
+def test_resumed_training_matches_uninterrupted_training(tmp_path, freeze) -> None:
     samples = _samples(tmp_path)
 
     full = train_recognizer(
         samples,
         tmp_path / "full",
-        training_config=_config(epochs=2),
+        training_config=replace(_config(epochs=2), freeze_batch_norm=freeze),
     )
     partial = train_recognizer(
         samples,
         tmp_path / "partial",
-        training_config=_config(epochs=1),
+        training_config=replace(_config(epochs=1), freeze_batch_norm=freeze),
     )
     resumed = train_recognizer(
         samples,
         tmp_path / "resumed",
-        training_config=_config(epochs=2),
+        training_config=replace(_config(epochs=2), freeze_batch_norm=freeze),
         resume_from=partial["training_state"],
     )
 
@@ -464,7 +469,8 @@ def test_metric_migration_rescores_both_retained_states_and_preserves_history(
     state["history"][0]["dev_cer"] = 0.001
     original_history = [dict(row) for row in state["history"]]
     for value in state["best_state_dict"].values():
-        value.add_(0.1)
+        if value.is_floating_point():
+            value.add_(0.1)
     path = tmp_path / "retained-metric.pt"
     torch.save(state, path)
     before = path.read_bytes()
@@ -648,3 +654,39 @@ def test_legacy_weights_only_ties_use_first_retained_epoch(tmp_path):
     )
     metadata = json.loads(resumed["metadata"].read_text())
     assert metadata["resume"]["completed_epoch"] == 1
+
+
+@pytest.mark.parametrize("freeze", [False, True])
+def test_batch_norm_policy_preserves_affine_gradients_and_dropout(freeze):
+    model = _TinyRecognizer(3, _TinyRecognizerConfig())
+    before = {key: value.clone() for key, value in model.batch_norm.state_dict().items()}
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    for _ in range(2):
+        model.eval()
+        _set_training_mode(model, training=True, freeze_batch_norm=freeze)
+        assert model.training and model.dropout.training
+        assert model.batch_norm.training is not freeze
+        optimizer.zero_grad()
+        model(torch.randn(4, 1, 16, 48))[..., 1].sum().backward()
+        assert model.batch_norm.weight.grad.abs().sum() > 0
+        assert model.batch_norm.bias.grad.abs().sum() > 0
+        optimizer.step()
+    for key in ("running_mean", "running_var", "num_batches_tracked"):
+        assert torch.equal(before[key], model.batch_norm.state_dict()[key]) is freeze
+    assert not torch.equal(before["weight"], model.batch_norm.weight)
+    assert not torch.equal(before["bias"], model.batch_norm.bias)
+
+
+def test_legacy_batch_norm_policy_and_resume_mismatch(tmp_path):
+    samples = _samples(tmp_path)
+    partial = train_recognizer(samples, tmp_path / "partial", training_config=_config(epochs=1))
+    state = torch.load(partial["training_state"], weights_only=False)
+    assert state["training_config"].pop("freeze_batch_norm") is False
+    legacy = tmp_path / "legacy.pt"
+    torch.save(state, legacy)
+    train_recognizer(samples, tmp_path / "compatible", training_config=_config(epochs=2),
+                     resume_from=legacy)
+    with pytest.raises(ValueError, match="configuration mismatch: freeze_batch_norm"):
+        train_recognizer(samples, tmp_path / "mismatch",
+                         training_config=replace(_config(epochs=2), freeze_batch_norm=True),
+                         resume_from=legacy)

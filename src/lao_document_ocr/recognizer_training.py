@@ -289,6 +289,7 @@ class TrainingConfig:
     num_workers: int = 0
     device: str = "auto"
     bidirectional: bool = True
+    freeze_batch_norm: bool = False
 
     def __post_init__(self) -> None:
         if self.epochs < 1:
@@ -321,6 +322,16 @@ def _require_torch():
             "Install with: pip install -e '.[train]'"
         ) from exc
     return torch, nn, DataLoader, Dataset
+
+
+def _set_training_mode(model, *, training: bool, freeze_batch_norm: bool) -> None:
+    """Freeze running statistics without freezing affine parameters or dropout."""
+    _, nn, _, _ = _require_torch()
+    model.train(training)
+    if training and freeze_batch_norm:
+        for module in model.modules():
+            if isinstance(module, nn.modules.batchnorm._BatchNorm):
+                module.eval()
 
 
 def prepare_line_pil_image(
@@ -809,11 +820,13 @@ def train_recognizer(
             "image_height",
             "max_width",
             "num_workers",
+            "freeze_batch_norm",
         )
         mismatched = [
             field
             for field in compatibility_fields
-            if previous_config.get(field) != training_config.to_dict().get(field)
+            if previous_config.get(field, False if field == "freeze_batch_norm" else None)
+            != training_config.to_dict().get(field)
         ]
         if mismatched:
             raise ValueError(
@@ -947,7 +960,10 @@ def train_recognizer(
                 baseline_dev_cer_recomputed = best_cer
             finally:
                 model.load_state_dict(latest_weights)
-                model.train(saved_mode)
+                _set_training_mode(
+                    model, training=saved_mode,
+                    freeze_batch_norm=training_config.freeze_batch_norm,
+                )
                 generator.set_state(saved_generator)
                 _restore_rng_state(torch, device, saved_rng)
             metric_migrations.append({
@@ -993,7 +1009,9 @@ def train_recognizer(
 
     output.mkdir(parents=True, exist_ok=True)
     for epoch in range(start_epoch, training_config.epochs + 1):
-        model.train()
+        _set_training_mode(
+            model, training=True, freeze_batch_norm=training_config.freeze_batch_norm,
+        )
         total_loss = 0.0
         batches = 0
 

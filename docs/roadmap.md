@@ -233,6 +233,14 @@ The unchanged short-dev safeguard selects `parent` before challenge scoring.
 Both new models and all regressions are recorded; this is single-seed synthetic
 evidence, not real optical validation or production promotion.
 
+A [replicated BatchNorm policy study](recognizer-batch-norm-study.md) completed
+six fixed two-epoch runs across three paired seeds. Frozen running statistics
+passes the short-development guard in only one seed and fails the predeclared
+primary seed; control passes in none. The saved replication rule retains the
+text-coverage parent. This does not support BatchNorm freezing as a consistent
+short-line remedy on the existing synthetic corpus. All challenge results and
+adverse profiles are recorded; real scan/photo validation remains outstanding.
+
 Exit condition: our recognizer beats the published Tesseract baseline on the fixed test set.
 
 ## Phase 3 — layout/table reconstruction

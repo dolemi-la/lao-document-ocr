@@ -1037,6 +1037,10 @@ def _parser() -> argparse.ArgumentParser:
     train.add_argument("--epochs", type=int, default=5)
     train.add_argument("--batch-size", type=int, default=16)
     train.add_argument("--learning-rate", type=float, default=1e-3)
+    train.add_argument(
+        "--freeze-batch-norm", action="store_true",
+        help="Keep BatchNorm running statistics fixed; affine parameters remain trainable.",
+    )
     train.add_argument("--dev-ratio", type=float, default=0.1)
     train.add_argument("--seed", type=int, default=20260921)
     train.add_argument("--image-height", type=int, default=48)
@@ -2285,6 +2289,7 @@ def _train_recognizer(args: argparse.Namespace) -> int:
         num_workers=args.num_workers,
         device=args.device,
         bidirectional=not args.unidirectional,
+        freeze_batch_norm=args.freeze_batch_norm,
     )
     result = train_recognizer(
         samples,
